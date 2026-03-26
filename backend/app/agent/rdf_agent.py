@@ -14,18 +14,28 @@ from app.db.graphdb_client import (
     run_sparql_select as _db_sparql_select,
     run_sparql_construct as _db_sparql_construct,
 )
+from app.db.themes import get_active_theme
 
-SYSTEM_PROMPT = """You are the RDF/SPARQL Agent of the Pangia GeoIA platform.
+_BASE_SYSTEM_PROMPT = """You are the RDF/SPARQL Agent of the Pangia GeoIA platform.
 Your job is to answer questions by querying a GraphDB RDF triplestore that stores
 geospatial ontologies and linked data using SPARQL.
 
-Guidelines:
+## Ontology schema
+
+{schema}
+
+## Guidelines
 - Use `run_sparql_select` for SELECT queries returning tabular data.
 - Use `run_sparql_construct` for CONSTRUCT queries returning RDF triples.
 - Write valid SPARQL 1.1 queries; use PREFIX declarations as needed.
 - Always summarise the results in plain language.
 - If no relevant data exists, say so clearly.
 """
+
+
+def _build_system_prompt() -> str:
+    schema = get_active_theme().rdf_schema_prompt.strip()
+    return _BASE_SYSTEM_PROMPT.format(schema=schema or "(no schema defined for this theme)")
 
 _MAX_ITERATIONS = 5
 
@@ -73,7 +83,7 @@ async def run(state: AgentState) -> dict:
         "",
     )
 
-    messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=user_query)]
+    messages = [SystemMessage(content=_build_system_prompt()), HumanMessage(content=user_query)]
 
     for _ in range(_MAX_ITERATIONS):
         response: AIMessage = await llm.ainvoke(messages)

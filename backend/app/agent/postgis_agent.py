@@ -11,19 +11,29 @@ from langchain_openai import ChatOpenAI
 from app.agent.state import AgentState
 from app.config import get_settings
 from app.db.postgis_client import run_spatial_query
+from app.db.themes import get_active_theme
 
-SYSTEM_PROMPT = """You are the PostGIS Spatial SQL Agent of the Pangia GeoIA platform.
+_BASE_SYSTEM_PROMPT = """You are the PostGIS Spatial SQL Agent of the Pangia GeoIA platform.
 Your job is to answer geographic and spatial questions by querying a PostGIS-enabled
 PostgreSQL database using spatial SQL functions (ST_Contains, ST_Distance,
 ST_Intersects, ST_Within, ST_Area, etc.).
 
-Guidelines:
+## Database schema
+
+{schema}
+
+## Guidelines
 - Write standard PostGIS SQL; always use parameterised queries where possible.
 - Only issue SELECT queries; mutations (INSERT/UPDATE/DELETE) are blocked.
 - Explain the spatial reasoning behind your query.
 - Format numeric results with appropriate units (metres, km², etc.).
 - If the query returns no rows, say so clearly.
 """
+
+
+def _build_system_prompt() -> str:
+    schema = get_active_theme().postgis_schema_prompt.strip()
+    return _BASE_SYSTEM_PROMPT.format(schema=schema or "(no schema defined for this theme)")
 
 _MAX_ITERATIONS = 5
 
@@ -61,7 +71,7 @@ async def run(state: AgentState) -> dict:
         "",
     )
 
-    messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=user_query)]
+    messages = [SystemMessage(content=_build_system_prompt()), HumanMessage(content=user_query)]
 
     for _ in range(_MAX_ITERATIONS):
         response: AIMessage = await llm.ainvoke(messages)

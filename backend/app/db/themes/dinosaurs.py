@@ -25,6 +25,43 @@ Relationship types:
 - (Dinosaur)-[:COEXISTS_WITH {period}]->(Dinosaur)
 """,
 
+    postgis_schema_prompt="""\
+Tables:
+- fossil_sites(id, name, country, era, location_modern GEOMETRY(POINT,4326),
+               location_pangaea GEOMETRY(POINT,4326), dinosaurs_found TEXT[],
+               period_start INTEGER, period_end INTEGER)
+- paleo_continents(id, name, period, geometry GEOMETRY(POLYGON,4326),
+                   parent_continent VARCHAR)
+
+Use PostGIS functions such as ST_Distance, ST_Contains, ST_Within, ST_Intersects,
+ST_DWithin, ST_AsText, ST_X/ST_Y to answer spatial questions.
+Distances are in metres (use /1000 to convert to km).
+""",
+
+    rdf_schema_prompt="""\
+Prefix: PREFIX : <http://pangia.io/ontology#>
+
+Classes:
+- :Dinosaur        — rdfs:label (string)
+- :FossilSite      — rdfs:label (string)
+- :PaleoContinent  — rdfs:label (string)
+
+Object properties:
+- :foundAtSite     (:Dinosaur → :FossilSite)
+- :locatedIn       (:Dinosaur → :PaleoContinent)
+- :subContinentOf  (:PaleoContinent → :PaleoContinent)
+
+Data properties (all on :Dinosaur unless noted):
+- :period (xsd:string), :diet (xsd:string),
+  :lengthM (xsd:decimal), :weightKg (xsd:decimal),
+  :eraStart (xsd:integer), :eraEnd (xsd:integer)
+- :country (xsd:string) — on :FossilSite
+- :modernLat, :modernLon, :pangaeaLat, :pangaeaLon (xsd:decimal) — on :FossilSite
+
+Named graph: <http://pangia.io/graphs/dinosaurs>
+Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
+""",
+
     # ── Neo4j – Cypher statements ────────────────────────────────────────────
     neo4j_statements=[
         # Dinosaur nodes

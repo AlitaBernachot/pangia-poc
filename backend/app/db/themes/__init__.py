@@ -37,6 +37,8 @@ class SeedTheme:
     graphdb_named_graph: str = ""
     graphdb_turtle: str = ""
     neo4j_schema_prompt: str = ""
+    postgis_schema_prompt: str = ""
+    rdf_schema_prompt: str = ""
 
 
 import importlib
