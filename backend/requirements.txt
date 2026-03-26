@@ -8,7 +8,7 @@ httpx>=0.26.0
 
 # LangChain / LangGraph
 langchain>=0.2.0
-langgraph>=0.1.0
+langgraph>=0.2.0
 langchain-openai>=0.1.0
 langchain-community>=0.2.0
 langchain-core>=0.2.0
@@ -16,10 +16,10 @@ langchain-core>=0.2.0
 # Neo4j (Knowledge Graph agent)
 neo4j>=5.17.0
 
-# ChromaDB (Vector agent)
+# ChromaDB (Vector agent) – requires gcc / build-essential at image build time
 chromadb>=0.5.0
 
-# PostGIS (Spatial SQL agent)
+# PostGIS (Spatial SQL agent) – requires libpq-dev at image build time
 asyncpg>=0.29.0
 
 # Redis (sessions)

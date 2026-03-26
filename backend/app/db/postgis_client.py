@@ -3,20 +3,34 @@ PostGIS (PostgreSQL) async client.
 
 Uses asyncpg with a connection pool.  All queries are executed inside
 read-only transactions to prevent any mutations.
+
+`asyncpg` is imported lazily (inside each function) so the rest of the
+application starts up even when the package is not yet installed.
 """
 import json
 from decimal import Decimal
 
-import asyncpg
-
 from app.config import get_settings
 
-_pool: asyncpg.Pool | None = None
+_pool = None
 
 
-async def get_pool() -> asyncpg.Pool:
+def _asyncpg():
+    """Lazy import of the asyncpg package."""
+    try:
+        import asyncpg  # noqa: PLC0415
+        return asyncpg
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "The 'asyncpg' package is required for the PostGIS agent. "
+            "Add it to requirements.txt and rebuild the Docker image."
+        ) from exc
+
+
+async def get_pool():
     global _pool
     if _pool is None:
+        asyncpg = _asyncpg()
         settings = get_settings()
         _pool = await asyncpg.create_pool(
             dsn=settings.postgis_dsn,
