@@ -12,6 +12,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 | **Vector Search** | ChromaDB (embeddings) |
 | **Spatial SQL** | PostgreSQL + PostGIS |
 | **Sessions** | Redis |
+| **Observability** | Arize Phoenix (traces, spans, LLM call inspection) |
 | **Infrastructure** | Docker Compose |
 
 ---
@@ -88,6 +89,30 @@ docker compose up --build
 | GraphDB Workbench | http://localhost:7200 | RDF triplestore |
 | ChromaDB | http://localhost:8001 | Vector store |
 | PostGIS | localhost:5432 | Spatial database |
+| Phoenix UI | http://localhost:6006 | Agent observability (traces & spans) |
+
+---
+
+## Observability (Arize Phoenix)
+
+All LangChain/LangGraph spans — router decisions, sub-agent calls, LLM round-trips, and tool invocations — are captured automatically via [OpenInference](https://github.com/Arize-ai/openinference) auto-instrumentation and sent to the bundled [Arize Phoenix](https://github.com/Arize-ai/phoenix) collector.
+
+Open **http://localhost:6006** after `docker compose up` to explore:
+
+- **Traces** – end-to-end request traces from user query to streamed answer
+- **Spans** – individual steps: routing decision, each sub-agent ReAct loop, LLM calls, tool starts/ends
+- **LLM call inspector** – prompt tokens, completion tokens, latency, model name
+
+Phoenix is registered during FastAPI's lifespan startup (`backend/app/main.py`) so it never blocks the application from starting if the collector is temporarily unavailable.
+
+### Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `PHOENIX_COLLECTOR_ENDPOINT` | `http://phoenix:6006/v1/traces` | OTLP HTTP endpoint (set automatically in Docker) |
+| `PHOENIX_PROJECT_NAME` | `pangia-geoia` | Project name shown in the Phoenix UI |
+
+Override `PHOENIX_PROJECT_NAME` in `.env` to organise traces across multiple environments.
 
 ---
 
