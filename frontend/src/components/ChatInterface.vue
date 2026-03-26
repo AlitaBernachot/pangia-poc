@@ -6,7 +6,7 @@
       <div v-if="messages.length === 0" class="empty-state">
         <span class="empty-icon">🌍</span>
         <p class="empty-title">Ask me anything about geography</p>
-        <p class="empty-sub">I can query the knowledge graph, answer spatial questions, and more.</p>
+        <p class="empty-sub">I orchestrate Neo4j · RDF/SPARQL · Vector Search · PostGIS to answer your questions.</p>
         <div class="suggestions">
           <button
             v-for="s in suggestions"
@@ -31,24 +31,62 @@
           </div>
 
           <div class="bubble-wrap">
-            <!-- Tool activity badges -->
-            <div v-if="msg.toolActivity && msg.toolActivity.length" class="tool-activity">
+            <!-- Routing banner: which agents were selected -->
+            <div v-if="msg.routingAgents && msg.routingAgents.length" class="routing-banner">
+              <span class="routing-label">Routing to:</span>
               <span
-                v-for="(t, i) in msg.toolActivity"
-                :key="i"
-                class="tool-badge"
-                :class="t.status"
-              >
-                <span class="tool-icon">🔍</span>
-                {{ t.tool }}
-                <span class="tool-status-dot" />
-              </span>
+                v-for="a in msg.routingAgents"
+                :key="a"
+                class="agent-pill"
+                :class="a.toLowerCase().replace(/[^a-z]/g, '-')"
+              >{{ a }}</span>
             </div>
 
+            <!-- Sub-agent activity (thinking panels) -->
+            <div
+              v-if="msg.agentActivity && msg.agentActivity.length"
+              class="agent-panels"
+            >
+              <details
+                v-for="activity in msg.agentActivity"
+                :key="activity.agent"
+                class="agent-panel"
+                :class="{ active: activity.streaming }"
+              >
+                <summary class="agent-panel-header">
+                  <span class="agent-panel-icon">{{ agentIcon(activity.agent) }}</span>
+                  <span class="agent-panel-name">{{ activity.agent }}</span>
+                  <span class="agent-panel-status" :class="activity.streaming ? 'running' : 'done'">
+                    {{ activity.streaming ? 'thinking…' : 'done' }}
+                  </span>
+                </summary>
+                <div class="agent-panel-body">
+                  <!-- Tool calls within this agent -->
+                  <div v-if="activity.tools.length" class="tool-activity">
+                    <span
+                      v-for="(t, i) in activity.tools"
+                      :key="i"
+                      class="tool-badge"
+                      :class="t.status"
+                    >
+                      <span class="tool-icon">🔍</span>
+                      {{ t.tool }}
+                      <span class="tool-status-dot" />
+                    </span>
+                  </div>
+                  <!-- Intermediate reasoning text -->
+                  <div v-if="activity.content" class="agent-reasoning">
+                    <span v-html="renderContent(activity.content)" />
+                    <span v-if="activity.streaming" class="cursor" />
+                  </div>
+                </div>
+              </details>
+            </div>
+
+            <!-- Final answer bubble -->
             <div class="bubble" :class="{ streaming: msg.streaming }">
-              <!-- Streaming cursor while receiving -->
               <span v-html="renderContent(msg.content)" />
-              <span v-if="msg.streaming" class="cursor" />
+              <span v-if="msg.streaming && !msg.content" class="cursor" />
             </div>
           </div>
         </div>
@@ -104,33 +142,53 @@ import { ref, nextTick } from 'vue'
 
 /* ─── Types ──────────────────────────────────────────────────────────────────── */
 interface ToolActivity { tool: string; status: 'running' | 'done' }
+interface AgentActivity {
+  agent: string
+  content: string
+  streaming: boolean
+  tools: ToolActivity[]
+}
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   streaming?: boolean
-  toolActivity?: ToolActivity[]
+  /** Names of sub-agents selected by the router */
+  routingAgents?: string[]
+  /** Per-agent intermediate activity panels */
+  agentActivity?: AgentActivity[]
 }
 
 /* ─── State ──────────────────────────────────────────────────────────────────── */
-const messages   = ref<Message[]>([])
-const draft      = ref('')
-const sessionId  = ref<string | null>(null)
-const isStreaming = ref(false)
-const isThinking  = ref(false)
-const messagesRef = ref<HTMLElement | null>(null)
-const inputRef    = ref<HTMLTextAreaElement | null>(null)
+const messages    = ref<Message[]>([])
+const draft       = ref('')
+const sessionId   = ref<string | null>(null)
+const isStreaming  = ref(false)
+const isThinking   = ref(false)
+const messagesRef  = ref<HTMLElement | null>(null)
+const inputRef     = ref<HTMLTextAreaElement | null>(null)
 
 const suggestions = [
   'What are the largest countries by area?',
-  'Tell me about river systems in South America.',
-  'Which cities are near the equator?',
-  'Explain tectonic plate boundaries.',
+  'Find cities within 100 km of a major river using spatial data.',
+  'Show semantic relationships between mountain ranges.',
+  'Query RDF data about European capitals.',
 ]
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────────── */
 let _idCounter = 0
 const uid = () => `msg-${++_idCounter}`
+
+const AGENT_ICONS: Record<string, string> = {
+  'Neo4j': '🔷',
+  'RDF/SPARQL': '🔗',
+  'Vector': '🧲',
+  'PostGIS': '🗺️',
+  'Synthesiser': '✨',
+}
+function agentIcon(agent: string): string {
+  return AGENT_ICONS[agent] ?? '🤖'
+}
 
 function scrollToBottom() {
   nextTick(() => {
@@ -172,16 +230,21 @@ async function sendMessage() {
   draft.value = ''
   autoResize()
 
-  // Push user bubble
   messages.value.push({ id: uid(), role: 'user', content: text })
   scrollToBottom()
 
   isThinking.value = true
   isStreaming.value = true
 
-  // Reserve AI bubble (filled while streaming)
   const aiId = uid()
-  const aiMsg: Message = { id: aiId, role: 'assistant', content: '', streaming: true, toolActivity: [] }
+  const aiMsg: Message = {
+    id: aiId,
+    role: 'assistant',
+    content: '',
+    streaming: true,
+    routingAgents: [],
+    agentActivity: [],
+  }
 
   try {
     const response = await fetch('/api/chat', {
@@ -213,37 +276,79 @@ async function sendMessage() {
         const payload = line.slice(6).trim()
         if (!payload) continue
 
-        let event: Record<string, string>
+        let event: Record<string, string | string[]>
         try { event = JSON.parse(payload) } catch { continue }
 
         switch (event.type) {
           case 'session':
-            sessionId.value = event.session_id
+            sessionId.value = event.session_id as string
             break
 
+          // ── Routing decision ──────────────────────────────────
+          case 'routing': {
+            const agents = event.agents as string[]
+            aiMsg.routingAgents = agents
+            // Pre-create activity panels for each agent
+            aiMsg.agentActivity = agents.map(a => ({
+              agent: a,
+              content: '',
+              streaming: true,
+              tools: [],
+            }))
+            scrollToBottom()
+            break
+          }
+
+          // ── Final synthesis tokens ────────────────────────────
           case 'token':
-            aiMsg.content += event.content
+            // Mark all sub-agent panels as done once synthesis starts
+            aiMsg.agentActivity?.forEach(a => { a.streaming = false })
+            aiMsg.content += event.content as string
             scrollToBottom()
             break
 
-          case 'tool_start':
-            aiMsg.toolActivity?.push({ tool: event.tool, status: 'running' })
+          // ── Sub-agent intermediate tokens ─────────────────────
+          case 'agent_token': {
+            const agentLabel = event.agent as string
+            let panel = aiMsg.agentActivity?.find(a => a.agent === agentLabel)
+            if (!panel) {
+              panel = { agent: agentLabel, content: '', streaming: true, tools: [] }
+              aiMsg.agentActivity?.push(panel)
+            }
+            panel.content += event.content as string
+            scrollToBottom()
             break
+          }
+
+          // ── Tool lifecycle ────────────────────────────────────
+          case 'tool_start': {
+            const agentLabel = event.agent as string
+            const panel = aiMsg.agentActivity?.find(a => a.agent === agentLabel)
+            if (panel) {
+              panel.tools.push({ tool: event.tool as string, status: 'running' })
+            }
+            break
+          }
 
           case 'tool_end': {
-            const t = aiMsg.toolActivity?.find(
-              a => a.tool === event.tool && a.status === 'running'
-            )
-            if (t) t.status = 'done'
+            const agentLabel = event.agent as string
+            const panel = aiMsg.agentActivity?.find(a => a.agent === agentLabel)
+            if (panel) {
+              const t = panel.tools.find(
+                tt => tt.tool === event.tool && tt.status === 'running'
+              )
+              if (t) t.status = 'done'
+            }
             break
           }
 
           case 'error':
-            aiMsg.content += `\n\n⚠️ ${event.content}`
+            aiMsg.content += `\n\n⚠️ ${event.content as string}`
             break
 
           case 'done':
             aiMsg.streaming = false
+            aiMsg.agentActivity?.forEach(a => { a.streaming = false })
             break
         }
       }
@@ -298,7 +403,7 @@ async function sendMessage() {
 }
 .empty-icon { font-size: 3rem; }
 .empty-title { font-size: 1.25rem; font-weight: 600; color: var(--color-text); }
-.empty-sub   { color: var(--color-text-muted); font-size: 0.9rem; max-width: 340px; }
+.empty-sub   { color: var(--color-text-muted); font-size: 0.9rem; max-width: 380px; }
 
 .suggestions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 0.75rem; }
 .suggestion-chip {
@@ -335,10 +440,75 @@ async function sendMessage() {
   margin-top: 2px;
 }
 
-.bubble-wrap { display: flex; flex-direction: column; gap: 0.35rem; max-width: min(68%, 700px); }
+.bubble-wrap { display: flex; flex-direction: column; gap: 0.4rem; max-width: min(72%, 760px); }
+
+/* ─── Routing banner ───────────────────────────────────────────────────────── */
+.routing-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.routing-label { font-weight: 500; color: var(--color-text-muted); }
+.agent-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  border: 1px solid;
+}
+.agent-pill.neo4j      { color: #4ade80; border-color: #4ade80; background: rgba(74,222,128,0.08); }
+.agent-pill.rdf-sparql { color: #f59e0b; border-color: #f59e0b; background: rgba(245,158,11,0.08); }
+.agent-pill.vector     { color: #a78bfa; border-color: #a78bfa; background: rgba(167,139,250,0.08); }
+.agent-pill.postgis    { color: #38bdf8; border-color: #38bdf8; background: rgba(56,189,248,0.08); }
+
+/* ─── Sub-agent activity panels ────────────────────────────────────────────── */
+.agent-panels { display: flex; flex-direction: column; gap: 0.3rem; }
+
+.agent-panel {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.agent-panel.active { border-color: var(--color-primary); }
+.agent-panel summary { list-style: none; }
+.agent-panel summary::-webkit-details-marker { display: none; }
+
+.agent-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+  user-select: none;
+}
+.agent-panel-header:hover { background: rgba(255,255,255,0.04); }
+.agent-panel-icon  { font-size: 0.9rem; }
+.agent-panel-name  { flex: 1; font-weight: 500; color: var(--color-text); }
+.agent-panel-status {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid;
+}
+.agent-panel-status.running { color: var(--color-accent); border-color: var(--color-accent); animation: pulse 1.4s ease-in-out infinite; }
+.agent-panel-status.done    { color: #4ade80; border-color: #4ade80; }
+@keyframes pulse { 50% { opacity: 0.5; } }
+
+.agent-panel-body {
+  padding: 0.5rem 0.75rem 0.6rem;
+  border-top: 1px solid var(--color-border);
+}
 
 /* ─── Tool activity ────────────────────────────────────────────────────────── */
-.tool-activity { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.tool-activity { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.4rem; }
 .tool-badge {
   display: inline-flex;
   align-items: center;
@@ -353,10 +523,15 @@ async function sendMessage() {
 .tool-badge.running { border-color: var(--color-accent); color: var(--color-accent); }
 .tool-badge.done    { border-color: #22c55e; color: #22c55e; }
 .tool-icon { font-size: 0.8rem; }
-.tool-status-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: currentColor;
+.tool-status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+/* ─── Agent reasoning text ─────────────────────────────────────────────────── */
+.agent-reasoning {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* ─── Bubble ───────────────────────────────────────────────────────────────── */
@@ -377,8 +552,6 @@ async function sendMessage() {
   border-bottom-right-radius: 4px;
 }
 .message-row.assistant .bubble { border-bottom-left-radius: 4px; }
-
-/* Streaming glow */
 .bubble.streaming { border-color: var(--color-primary); }
 
 /* Cursor blink */
@@ -486,3 +659,4 @@ async function sendMessage() {
 .msg-enter-active { transition: all 0.25s ease; }
 .msg-enter-from { opacity: 0; transform: translateY(10px); }
 </style>
+

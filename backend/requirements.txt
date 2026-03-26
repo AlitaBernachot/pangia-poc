@@ -13,8 +13,14 @@ langchain-openai>=0.1.0
 langchain-community>=0.2.0
 langchain-core>=0.2.0
 
-# Neo4j
+# Neo4j (Knowledge Graph agent)
 neo4j>=5.17.0
+
+# ChromaDB (Vector agent)
+chromadb>=0.5.0
+
+# PostGIS (Spatial SQL agent)
+asyncpg>=0.29.0
 
 # Redis (sessions)
 redis[hiredis]>=5.0.1

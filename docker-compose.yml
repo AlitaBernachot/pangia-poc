@@ -10,7 +10,7 @@ services:
       - backend
     restart: unless-stopped
 
-  # ── Backend (FastAPI + LangGraph) ─────────────────────────────────────────
+  # ── Backend (FastAPI + LangGraph multi-agent) ──────────────────────────────
   backend:
     build:
       context: ./backend
@@ -20,9 +20,19 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      # Neo4j
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD:-pangia-password}
+      # GraphDB
+      - GRAPHDB_URL=http://graphdb:7200
+      - GRAPHDB_REPOSITORY=${GRAPHDB_REPOSITORY:-pangia}
+      # ChromaDB
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      # PostGIS
+      - POSTGIS_DSN=postgresql://${POSTGIS_USER:-pangia}:${POSTGIS_PASSWORD:-pangia-password}@postgis:5432/${POSTGIS_DB:-pangia}
+      # Redis
       - REDIS_URL=redis://redis:6379
       - CORS_ORIGINS=["http://localhost:3000","http://frontend"]
     depends_on:
@@ -30,9 +40,15 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      graphdb:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+      postgis:
+        condition: service_healthy
     restart: unless-stopped
 
-  # ── Neo4j (Knowledge Graph) ────────────────────────────────────────────────
+  # ── Neo4j (Knowledge Graph agent) ─────────────────────────────────────────
   neo4j:
     image: neo4j:5.18
     ports:
@@ -40,7 +56,6 @@ services:
       - "7687:7687"  # Bolt
     environment:
       - NEO4J_AUTH=${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-pangia-password}
-      # Enable full-text search plugin used by the agent tools
       - NEO4J_PLUGINS=["apoc"]
       - NEO4J_dbms_security_procedures_unrestricted=apoc.*
     volumes:
@@ -50,6 +65,57 @@ services:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
       interval: 15s
       timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+  # ── GraphDB (RDF / SPARQL agent) ───────────────────────────────────────────
+  graphdb:
+    image: ontotext/graphdb:10.7.0
+    ports:
+      - "7200:7200"  # HTTP API + workbench UI
+    environment:
+      - GDB_HEAP_SIZE=1g
+    volumes:
+      - graphdb_data:/opt/graphdb/home
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:7200/rest/repositories || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
+  # ── ChromaDB (Vector / embedding agent) ───────────────────────────────────
+  chromadb:
+    image: chromadb/chroma:0.5.20
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/v1/heartbeat || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── PostGIS (Spatial SQL agent) ────────────────────────────────────────────
+  postgis:
+    image: postgis/postgis:16-3.4-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGIS_USER:-pangia}
+      - POSTGRES_PASSWORD=${POSTGIS_PASSWORD:-pangia-password}
+      - POSTGRES_DB=${POSTGIS_DB:-pangia}
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGIS_USER:-pangia} -d ${POSTGIS_DB:-pangia}"]
+      interval: 10s
+      timeout: 5s
       retries: 10
     restart: unless-stopped
 
@@ -71,4 +137,7 @@ services:
 volumes:
   neo4j_data:
   neo4j_logs:
+  graphdb_data:
+  chroma_data:
+  postgis_data:
   redis_data:

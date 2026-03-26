@@ -7,11 +7,21 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
 from pydantic import BaseModel
 
-from app.agent.graph import agent_graph
+from app.agent.master import agent_graph
 from app.agent.state import AgentState
 from app.db.redis_client import load_session, save_session
 
 router = APIRouter(prefix="/api", tags=["chat"])
+
+# Labels shown in the UI for each sub-agent
+_AGENT_LABELS: dict[str, str] = {
+    "neo4j_agent": "Neo4j",
+    "rdf_agent": "RDF/SPARQL",
+    "vector_agent": "Vector",
+    "postgis_agent": "PostGIS",
+    "merge": "Synthesiser",
+    "router": "Router",
+}
 
 
 class ChatRequest(BaseModel):
@@ -33,6 +43,10 @@ def _sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
 
 
+def _node_from_event(event: dict) -> str:
+    return event.get("metadata", {}).get("langgraph_node", "")
+
+
 # ─── SSE streaming endpoint ───────────────────────────────────────────────────
 
 @router.post("/chat")
@@ -49,16 +63,16 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         if cls:
             history.append(cls(content=m["content"]))
 
-    # Append the new user message
     history.append(HumanMessage(content=body.message))
 
     initial_state: AgentState = {
         "messages": history,
         "session_id": session_id,
+        "agents_to_call": [],
+        "sub_results": {},
     }
 
     async def event_stream() -> AsyncGenerator[str, None]:
-        # First event: emit session_id so the client can persist it
         yield _sse({"type": "session", "session_id": session_id})
 
         full_ai_content = ""
@@ -69,32 +83,53 @@ async def chat(body: ChatRequest) -> StreamingResponse:
                 initial_state, version="v2"
             ):
                 kind = event.get("event", "")
+                node = _node_from_event(event)
 
-                # Stream individual LLM tokens
-                if kind == "on_chat_model_stream":
+                # ── Routing decision ──────────────────────────────────────
+                # router_node guarantees at least one agent, but guard anyway.
+                if kind == "on_chain_end" and node == "router":
+                    output = event.get("data", {}).get("output", {})
+                    agents = output.get("agents_to_call", [])
+                    if agents:
+                        yield _sse({"type": "routing", "agents": agents})
+
+                # ── Token streaming ───────────────────────────────────────
+                elif kind == "on_chat_model_stream":
                     chunk: AIMessageChunk = event["data"]["chunk"]
                     token = chunk.content
-                    if token:
+                    if not token:
+                        continue
+                    if node == "merge":
+                        # Final synthesis tokens → primary stream
                         full_ai_content += token
                         yield _sse({"type": "token", "content": token})
+                    else:
+                        # Sub-agent intermediate reasoning
+                        label = _AGENT_LABELS.get(node, node)
+                        yield _sse(
+                            {"type": "agent_token", "agent": label, "content": token}
+                        )
 
-                # Tool start notification
+                # ── Tool lifecycle ────────────────────────────────────────
                 elif kind == "on_tool_start":
+                    label = _AGENT_LABELS.get(node, node)
                     yield _sse(
                         {
                             "type": "tool_start",
+                            "agent": label,
                             "tool": event.get("name", ""),
-                            "input": event["data"].get("input", ""),
+                            "input": str(event["data"].get("input", "")),
                         }
                     )
 
-                # Tool end notification
                 elif kind == "on_tool_end":
+                    label = _AGENT_LABELS.get(node, node)
                     yield _sse(
                         {
                             "type": "tool_end",
+                            "agent": label,
                             "tool": event.get("name", ""),
-                            "output": str(event["data"].get("output", "")),
+                            "output": str(event["data"].get("output", ""))[:300],
                         }
                     )
 
