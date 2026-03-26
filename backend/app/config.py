@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # Built-in themes: dinosaurs
     seed_theme: str = "dinosaurs"
 
+    # Arize Phoenix (agent observability)
+    phoenix_collector_endpoint: str = "http://localhost:6006/v1/traces"
+    phoenix_project_name: str = "pangia-geoia"
+
 
 @lru_cache
 def get_settings() -> Settings:
