@@ -138,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, reactive } from 'vue'
 
 /* ─── Types ──────────────────────────────────────────────────────────────────── */
 interface ToolActivity { tool: string; status: 'running' | 'done' }
@@ -237,14 +237,14 @@ async function sendMessage() {
   isStreaming.value = true
 
   const aiId = uid()
-  const aiMsg: Message = {
+  const aiMsg = reactive<Message>({
     id: aiId,
     role: 'assistant',
     content: '',
     streaming: true,
     routingAgents: [],
     agentActivity: [],
-  }
+  })
 
   try {
     const response = await fetch('/api/chat', {
