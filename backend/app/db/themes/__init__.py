@@ -36,3 +36,29 @@ class SeedTheme:
     postgis_statements: list[str] = field(default_factory=list)
     graphdb_named_graph: str = ""
     graphdb_turtle: str = ""
+    neo4j_schema_prompt: str = ""
+
+
+import importlib
+
+
+def get_active_theme() -> "SeedTheme":
+    """Load and return the SeedTheme for the currently configured SEED_THEME."""
+    from app.config import get_settings  # local import to avoid circular dep
+
+    settings = get_settings()
+    module_path = f"app.db.themes.{settings.seed_theme}"
+    try:
+        module = importlib.import_module(module_path)
+    except ModuleNotFoundError as exc:
+        raise ValueError(
+            f"Unknown seed theme '{settings.seed_theme}'. "
+            f"Create app/db/themes/{settings.seed_theme}.py to add it."
+        ) from exc
+    theme = getattr(module, "theme", None)
+    if not isinstance(theme, SeedTheme):
+        raise ValueError(
+            f"Module '{module_path}' must expose a 'theme' attribute "
+            f"of type SeedTheme."
+        )
+    return theme

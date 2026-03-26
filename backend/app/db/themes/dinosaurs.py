@@ -10,6 +10,21 @@ from app.db.themes import SeedTheme
 theme = SeedTheme(
     name="dinosaurs",
 
+    neo4j_schema_prompt="""\
+Node labels:
+- Dinosaur   — properties: name, period, diet, length_m, weight_kg, era_start, era_end
+- Site        — properties: name, country, lat, lon
+- Continent   — properties: name, period_start, period_end
+
+Relationship types:
+- (Dinosaur)-[:FOSSIL_DISCOVERED_IN]->(Site)
+- (Dinosaur)-[:LOCATED_IN {period}]->(Continent)
+- (Dinosaur)-[:MIGRATED_FROM {period}]->(Continent)
+- (Dinosaur)-[:MIGRATED_TO {period}]->(Continent)
+- (Dinosaur)-[:PREYS_ON]->(Dinosaur)
+- (Dinosaur)-[:COEXISTS_WITH {period}]->(Dinosaur)
+""",
+
     # ── Neo4j – Cypher statements ────────────────────────────────────────────
     neo4j_statements=[
         # Dinosaur nodes
