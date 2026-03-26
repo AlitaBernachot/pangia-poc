@@ -4,11 +4,14 @@ GraphDB (Ontotext) SPARQL client.
 Uses httpx for async HTTP requests to the SPARQL endpoint.
 """
 import json
+import logging
 from urllib.parse import quote
 
 import httpx
 
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 def _sparql_url() -> str:
@@ -82,6 +85,24 @@ async def ensure_repository() -> None:
             content=ttl_config.encode(),
             headers={"Content-Type": "text/turtle"},
         )
+        if response.is_success:
+            return
+
+        # GraphDB may return 500 (or other non-2xx codes) when the repository
+        # already exists or when the server is still warming up.  Re-check
+        # whether the repository is accessible before treating this as an
+        # error so that startup race-conditions are handled gracefully.
+        verify = await client.get(f"{base}/rest/repositories/{repo}")
+        if verify.status_code == 200:
+            logger.warning(
+                "GraphDB returned HTTP %s when creating repository '%s', "
+                "but the repository is now accessible -- continuing.",
+                response.status_code,
+                repo,
+            )
+            return
+
+        # Repository is still not accessible; surface the original error.
         response.raise_for_status()
 
 
