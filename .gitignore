@@ -1,0 +1,21 @@
+# Environment
+.env
+
+# Frontend build artifacts & dependencies
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Backend virtual envs & caches
+backend/.venv/
+backend/__pycache__/
+backend/app/**/__pycache__/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.mypy_cache/
+.ruff_cache/
+
+# OS
+.DS_Store
+Thumbs.db
