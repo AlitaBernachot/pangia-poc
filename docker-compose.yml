@@ -37,6 +37,8 @@ services:
       # Seeding – enabled by default so dev/demo stacks get sample data;
       # set SEED_DB=false in your .env (or override at runtime) for production.
       - SEED_DB=${SEED_DB:-true}
+      # Seed theme – selects which dataset to load.  Built-in: dinosaurs
+      - SEED_THEME=${SEED_THEME:-dinosaurs}
       - CORS_ORIGINS=["http://localhost:3000","http://frontend"]
     depends_on:
       neo4j:

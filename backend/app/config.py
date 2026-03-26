@@ -37,6 +37,9 @@ class Settings(BaseSettings):
 
     # Seeding (dev / demo mode only – set to false in production)
     seed_db: bool = False
+    # Theme to seed.  Must match a module name under app/db/themes/.
+    # Built-in themes: dinosaurs
+    seed_theme: str = "dinosaurs"
 
 
 @lru_cache
