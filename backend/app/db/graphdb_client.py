@@ -4,6 +4,7 @@ GraphDB (Ontotext) SPARQL client.
 Uses httpx for async HTTP requests to the SPARQL endpoint.
 """
 import json
+from urllib.parse import quote
 
 import httpx
 
@@ -45,6 +46,66 @@ async def run_sparql_select(sparql: str) -> str:
         for row in bindings
     ]
     return json.dumps(rows, indent=2, ensure_ascii=False)
+
+
+async def ensure_repository() -> None:
+    """Create the GraphDB repository if it does not already exist."""
+    settings = get_settings()
+    base = settings.graphdb_url.rstrip("/")
+    repo = settings.graphdb_repository
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        r = await client.get(f"{base}/rest/repositories/{repo}")
+        if r.status_code == 200:
+            return  # Repository already exists
+
+        # Repository not found – create it with a minimal Turtle config.
+        ttl_config = (
+            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+            "@prefix rep: <http://www.openrdf.org/config/repository#> .\n"
+            "@prefix sr: <http://www.openrdf.org/config/repository/sail#> .\n"
+            "@prefix sail: <http://www.openrdf.org/config/sail#> .\n"
+            "@prefix graphdb: <http://www.ontotext.com/config/graphdb#> .\n\n"
+            "[] a rep:Repository ;\n"
+            f'   rep:repositoryID "{repo}" ;\n'
+            '   rdfs:label "Pangia GeoIA" ;\n'
+            "   rep:repositoryImpl [\n"
+            '       rep:repositoryType "graphdb:FreeSailRepository" ;\n'
+            "       sr:sailImpl [\n"
+            '           sail:sailType "graphdb:FreeSail" ;\n'
+            '           graphdb:ruleset "rdfsplus-optimized"\n'
+            "       ]\n"
+            "   ] .\n"
+        )
+        response = await client.post(
+            f"{base}/rest/repositories",
+            content=ttl_config.encode(),
+            headers={"Content-Type": "text/turtle"},
+        )
+        response.raise_for_status()
+
+
+async def load_turtle_into_graph(turtle_content: str, named_graph: str) -> None:
+    """Replace a named graph with the provided Turtle RDF content.
+
+    Uses a PUT request to the GraphDB statements endpoint, which atomically
+    replaces all existing triples in the named graph (idempotent).
+    """
+    settings = get_settings()
+    base = settings.graphdb_url.rstrip("/")
+    repo = settings.graphdb_repository
+
+    # GraphDB expects the context URI wrapped in angle brackets, URL-encoded.
+    encoded_ctx = quote(f"<{named_graph}>", safe="")
+    url = f"{base}/repositories/{repo}/statements?context={encoded_ctx}"
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.put(
+            url,
+            content=turtle_content.encode("utf-8"),
+            headers={"Content-Type": "text/turtle"},
+        )
+        response.raise_for_status()
 
 
 async def run_sparql_construct(sparql: str) -> str:
