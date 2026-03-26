@@ -87,11 +87,16 @@ async def chat(body: ChatRequest) -> StreamingResponse:
 
                 # ── Routing decision ──────────────────────────────────────
                 # router_node guarantees at least one agent, but guard anyway.
+                # astream_events(version="v2") also fires on_chain_end for
+                # inner chains (e.g. the structured-output LLM chain inside
+                # router_node). In that case output is a RoutingDecision
+                # Pydantic model, not a dict – skip those events.
                 if kind == "on_chain_end" and node == "router":
                     output = event.get("data", {}).get("output", {})
-                    agents = output.get("agents_to_call", [])
-                    if agents:
-                        yield _sse({"type": "routing", "agents": agents})
+                    if isinstance(output, dict):
+                        agents = output.get("agents_to_call", [])
+                        if agents:
+                            yield _sse({"type": "routing", "agents": agents})
 
                 # ── Token streaming ───────────────────────────────────────
                 elif kind == "on_chat_model_stream":
