@@ -66,7 +66,7 @@ services:
       postgis:
         condition: service_healthy
       phoenix:
-        condition: service_healthy
+        condition: service_started
     restart: unless-stopped
 
   # ── Neo4j (Knowledge Graph agent) ─────────────────────────────────────────
@@ -152,7 +152,7 @@ services:
     volumes:
       - phoenix_data:/phoenix
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:6006/healthz || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:6006/health || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 10

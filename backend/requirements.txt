@@ -27,4 +27,4 @@ redis[hiredis]>=5.0.1
 
 # Arize Phoenix (agent observability)
 arize-phoenix-otel>=0.8.0
-openinference-instrumentation-langchain>=0.3.0
+openinference-instrumentation-langchain>=0.1.0
