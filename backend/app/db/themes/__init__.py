@@ -39,6 +39,8 @@ class SeedTheme:
     neo4j_schema_prompt: str = ""
     postgis_schema_prompt: str = ""
     rdf_schema_prompt: str = ""
+    chroma_documents: list[dict] = field(default_factory=list)
+    """List of {"text": str, "metadata": dict} dicts to embed in ChromaDB."""
 
 
 import importlib

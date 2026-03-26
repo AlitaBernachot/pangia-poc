@@ -406,7 +406,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
 
 # ── Ontology declaration ────────────────────────────────────────────────────
 <http://pangia.io/ontology> a owl:Ontology ;
-    rdfs:label "Pangia Paléogéographie Ontologie"@fr .
+    rdfs:label "PangIA Paléogéographie Ontologie"@fr .
 
 # ── Classes ─────────────────────────────────────────────────────────────────
 :Dinosaur a owl:Class ;
@@ -605,4 +605,94 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
     :eraEnd         "0"^^xsd:integer ;
     :subContinentOf :Laurasia .
 """,
+
+    # ── ChromaDB – documents à vectoriser ────────────────────────────────────
+    chroma_documents=[
+        {
+            "text": (
+                "Le Velociraptor est un dinosaure carnivore du Crétacé supérieur "
+                "(-75 à -71 Ma), mesurant environ 2 mètres pour 15 kg. "
+                "Il vivait en Asie centrale. Des fossiles ont été découverts sur le "
+                "site de Djadokhta, en Mongolie. Il coexistait avec le Tyrannosaurus "
+                "rex et chassait notamment l'Archaeopteryx."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Velociraptor", "period": "Crétacé supérieur"},
+        },
+        {
+            "text": (
+                "Le Tyrannosaurus rex est un dinosaure carnivore du Crétacé supérieur "
+                "(-68 à -66 Ma), mesurant 12,3 mètres pour 8 000 kg. "
+                "Il vivait en Amérique du Nord. Ses fossiles sont notamment connus du "
+                "site de Hell Creek, aux États-Unis. Il coexistait avec le Velociraptor."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Tyrannosaurus rex", "period": "Crétacé supérieur"},
+        },
+        {
+            "text": (
+                "Le Brachiosaurus est un dinosaure herbivore du Jurassique supérieur "
+                "(-154 à -150 Ma), mesurant 22 mètres pour 56 000 kg. "
+                "Il vivait sur le continent de Gondwana. Ses fossiles ont été découverts "
+                "à Tendaguru, en Tanzanie. Il coexistait avec le Diplodocus."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Brachiosaurus", "period": "Jurassique supérieur"},
+        },
+        {
+            "text": (
+                "L'Archaeopteryx est un dinosaure carnivore du Jurassique supérieur "
+                "(-150 à -148 Ma), mesurant 50 cm pour 1 kg. "
+                "Considéré comme un ancêtre des oiseaux modernes, il vivait en Europe. "
+                "Ses fossiles proviennent du site de Solnhofen, en Allemagne."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Archaeopteryx", "period": "Jurassique supérieur"},
+        },
+        {
+            "text": (
+                "Le Diplodocus est un dinosaure herbivore du Jurassique supérieur "
+                "(-154 à -152 Ma), mesurant 27 mètres pour 15 000 kg. "
+                "Il vivait en Amérique du Nord. Ses fossiles proviennent de la "
+                "Morrison Formation, aux États-Unis. Il coexistait avec le Brachiosaurus."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Diplodocus", "period": "Jurassique supérieur"},
+        },
+        {
+            "text": (
+                "Le site de Hell Creek (États-Unis) est un gisement fossilifère du "
+                "Crétacé supérieur (-68 à -66 Ma) situé à 46.9°N, -101.5°E. "
+                "On y a découvert des fossiles de Tyrannosaurus rex, Triceratops et Ankylosaurus."
+            ),
+            "metadata": {"type": "site", "name": "Hell Creek", "country": "USA"},
+        },
+        {
+            "text": (
+                "Le site de Djadokhta (Mongolie) est un gisement fossilifère du "
+                "Crétacé supérieur (-75 à -71 Ma) situé à 43.5°N, 104.5°E. "
+                "On y a découvert des fossiles de Velociraptor, Protoceratops et Oviraptor."
+            ),
+            "metadata": {"type": "site", "name": "Djadokhta", "country": "Mongolie"},
+        },
+        {
+            "text": (
+                "Le site de Tendaguru (Tanzanie) est un gisement fossilifère du "
+                "Jurassique supérieur (-154 à -150 Ma) situé à -9.5°N, 35.3°E. "
+                "On y a découvert des fossiles de Brachiosaurus, Giraffatitan et Kentrosaurus."
+            ),
+            "metadata": {"type": "site", "name": "Tendaguru", "country": "Tanzanie"},
+        },
+        {
+            "text": (
+                "Le site de Solnhofen (Allemagne) est un gisement fossilifère du "
+                "Jurassique supérieur (-150 à -148 Ma) situé à 48.9°N, 11.0°E. "
+                "On y a découvert des fossiles d'Archaeopteryx, Compsognathus et Pterodactylus."
+            ),
+            "metadata": {"type": "site", "name": "Solnhofen", "country": "Allemagne"},
+        },
+        {
+            "text": (
+                "La Pangée était le supercontinent qui existait pendant le Trias "
+                "(-335 à -175 Ma). Elle s'est fragmentée en Laurasia (nord) et Gondwana (sud) "
+                "au Jurassique. Tous les dinosaures connus vivaient sur ses fragments."
+            ),
+            "metadata": {"type": "continent", "name": "Pangée", "period": "Trias"},
+        },
+    ],
 )

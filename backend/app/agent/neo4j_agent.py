@@ -16,7 +16,7 @@ from app.config import get_settings
 from app.db.neo4j_client import run_query, run_readonly_query
 from app.db.themes import get_active_theme
 
-_BASE_SYSTEM_PROMPT = """You are the Neo4j Knowledge Graph Agent of the Pangia GeoIA platform.
+_BASE_SYSTEM_PROMPT = """You are the Neo4j Knowledge Graph Agent of the PangIA GeoIA platform.
 Your job is to answer questions by querying a Neo4j graph database that stores
 geographic entities, relationships, and facts using Cypher.
 

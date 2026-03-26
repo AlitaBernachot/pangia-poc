@@ -14,6 +14,7 @@ import importlib
 import logging
 
 from app.config import get_settings
+from app.db.chroma_client import add_documents
 from app.db.graphdb_client import ensure_repository, load_turtle_into_graph
 from app.db.neo4j_client import run_query
 from app.db.postgis_client import run_write_query
@@ -81,6 +82,17 @@ async def _seed_graphdb(theme: SeedTheme) -> None:
     logger.info("GraphDB seeded (%s).", theme.name)
 
 
+async def _seed_chroma(theme: SeedTheme) -> None:
+    if not theme.chroma_documents:
+        logger.debug("Theme '%s' has no ChromaDB documents – skipping.", theme.name)
+        return
+    logger.info("Seeding ChromaDB (%s) …", theme.name)
+    texts = [doc["text"] for doc in theme.chroma_documents]
+    metadatas = [doc.get("metadata", {}) for doc in theme.chroma_documents]
+    await add_documents(texts, metadatas)
+    logger.info("ChromaDB seeded (%s, %d documents).", theme.name, len(texts))
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -99,5 +111,6 @@ async def seed_all() -> None:
     await _seed_neo4j(theme)
     await _seed_postgis(theme)
     await _seed_graphdb(theme)
+    await _seed_chroma(theme)
 
     logger.info("All datastores seeded successfully (theme: '%s').", theme_name)

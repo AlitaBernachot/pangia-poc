@@ -16,7 +16,7 @@ from app.db.graphdb_client import (
 )
 from app.db.themes import get_active_theme
 
-_BASE_SYSTEM_PROMPT = """You are the RDF/SPARQL Agent of the Pangia GeoIA platform.
+_BASE_SYSTEM_PROMPT = """You are the RDF/SPARQL Agent of the PangIA GeoIA platform.
 Your job is to answer questions by querying a GraphDB RDF triplestore that stores
 geospatial ontologies and linked data using SPARQL.
 

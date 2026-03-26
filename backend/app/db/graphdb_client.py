@@ -87,7 +87,7 @@ async def ensure_repository() -> None:
         "@prefix graphdb: <http://www.ontotext.com/config/graphdb#> .\n\n"
         "[] a rep:Repository ;\n"
         f'   rep:repositoryID "{repo}" ;\n'
-        '   rdfs:label "Pangia GeoIA" ;\n'
+        '   rdfs:label "PangIA GeoIA" ;\n'
         "   rep:repositoryImpl [\n"
         '       rep:repositoryType "graphdb:SailRepository" ;\n'
         "       sr:sailImpl [\n"

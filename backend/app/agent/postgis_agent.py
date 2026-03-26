@@ -13,7 +13,7 @@ from app.config import get_settings
 from app.db.postgis_client import run_spatial_query
 from app.db.themes import get_active_theme
 
-_BASE_SYSTEM_PROMPT = """You are the PostGIS Spatial SQL Agent of the Pangia GeoIA platform.
+_BASE_SYSTEM_PROMPT = """You are the PostGIS Spatial SQL Agent of the PangIA GeoIA platform.
 Your job is to answer geographic and spatial questions by querying a PostGIS-enabled
 PostgreSQL database using spatial SQL functions (ST_Contains, ST_Distance,
 ST_Intersects, ST_Within, ST_Area, etc.).

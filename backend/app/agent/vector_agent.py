@@ -12,7 +12,7 @@ from app.agent.state import AgentState
 from app.config import get_settings
 from app.db.chroma_client import similarity_search, add_documents
 
-SYSTEM_PROMPT = """You are the Vector Search Agent of the Pangia GeoIA platform.
+SYSTEM_PROMPT = """You are the Vector Search Agent of the PangIA GeoIA platform.
 Your job is to answer questions using semantic similarity search over a ChromaDB
 vector store that contains embedded geographic documents, descriptions, and facts.
 

@@ -1,4 +1,4 @@
-# Pangia – GeoIA Agent 🌍
+# PangIA – GeoIA Agent 🌍
 
 A minimal AI agent chat application with a **multi-agent architecture**:
 
