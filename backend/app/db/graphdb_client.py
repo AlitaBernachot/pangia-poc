@@ -3,6 +3,7 @@ GraphDB (Ontotext) SPARQL client.
 
 Uses httpx for async HTTP requests to the SPARQL endpoint.
 """
+import asyncio
 import json
 import logging
 from urllib.parse import quote
@@ -12,6 +13,12 @@ import httpx
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+# Maximum number of attempts when creating the GraphDB repository.
+# Covers transient 500 errors that GraphDB emits while its internal state
+# is still warming up even after the health-check passes.
+_REPO_CREATE_MAX_ATTEMPTS = 5
+_REPO_CREATE_RETRY_DELAY_S = 3
 
 
 def _sparql_url() -> str:
@@ -52,58 +59,115 @@ async def run_sparql_select(sparql: str) -> str:
 
 
 async def ensure_repository() -> None:
-    """Create the GraphDB repository if it does not already exist."""
+    """Create the GraphDB repository if it does not already exist.
+
+    Retries up to ``_REPO_CREATE_MAX_ATTEMPTS`` times with a fixed delay
+    between attempts to tolerate the transient HTTP 500 errors that GraphDB
+    emits while its internal state finishes initialising even after its
+    health-check endpoint reports ``200 OK``.
+
+    Raises
+    ------
+    httpx.HTTPStatusError
+        When all retry attempts are exhausted and GraphDB keeps returning a
+        non-2xx response for the repository-creation request.
+    RuntimeError
+        When all retry attempts are exhausted but no HTTP response was
+        received at all (e.g. connection refused on every attempt).
+    """
     settings = get_settings()
     base = settings.graphdb_url.rstrip("/")
     repo = settings.graphdb_repository
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        r = await client.get(f"{base}/rest/repositories/{repo}")
-        if r.status_code == 200:
-            return  # Repository already exists
+    ttl_config = (
+        "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+        "@prefix rep: <http://www.openrdf.org/config/repository#> .\n"
+        "@prefix sr: <http://www.openrdf.org/config/repository/sail#> .\n"
+        "@prefix sail: <http://www.openrdf.org/config/sail#> .\n"
+        "@prefix graphdb: <http://www.ontotext.com/config/graphdb#> .\n\n"
+        "[] a rep:Repository ;\n"
+        f'   rep:repositoryID "{repo}" ;\n'
+        '   rdfs:label "Pangia GeoIA" ;\n'
+        "   rep:repositoryImpl [\n"
+        '       rep:repositoryType "graphdb:FreeSailRepository" ;\n'
+        "       sr:sailImpl [\n"
+        '           sail:sailType "graphdb:FreeSail" ;\n'
+        '           graphdb:ruleset "rdfsplus-optimized"\n'
+        "       ]\n"
+        "   ] .\n"
+    )
 
-        # Repository not found – create it with a minimal Turtle config.
-        ttl_config = (
-            "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
-            "@prefix rep: <http://www.openrdf.org/config/repository#> .\n"
-            "@prefix sr: <http://www.openrdf.org/config/repository/sail#> .\n"
-            "@prefix sail: <http://www.openrdf.org/config/sail#> .\n"
-            "@prefix graphdb: <http://www.ontotext.com/config/graphdb#> .\n\n"
-            "[] a rep:Repository ;\n"
-            f'   rep:repositoryID "{repo}" ;\n'
-            '   rdfs:label "Pangia GeoIA" ;\n'
-            "   rep:repositoryImpl [\n"
-            '       rep:repositoryType "graphdb:FreeSailRepository" ;\n'
-            "       sr:sailImpl [\n"
-            '           sail:sailType "graphdb:FreeSail" ;\n'
-            '           graphdb:ruleset "rdfsplus-optimized"\n'
-            "       ]\n"
-            "   ] .\n"
-        )
-        response = await client.post(
-            f"{base}/rest/repositories",
-            content=ttl_config.encode(),
-            headers={"Content-Type": "text/turtle"},
-        )
-        if response.is_success:
-            return
+    last_response: httpx.Response | None = None
 
-        # GraphDB may return 500 (or other non-2xx codes) when the repository
-        # already exists or when the server is still warming up.  Re-check
-        # whether the repository is accessible before treating this as an
-        # error so that startup race-conditions are handled gracefully.
-        verify = await client.get(f"{base}/rest/repositories/{repo}")
-        if verify.status_code == 200:
-            logger.warning(
-                "GraphDB returned HTTP %s when creating repository '%s', "
-                "but the repository is now accessible -- continuing.",
-                response.status_code,
-                repo,
+    for attempt in range(1, _REPO_CREATE_MAX_ATTEMPTS + 1):
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # ── 1. Check whether the repository already exists ──────────────
+            r = await client.get(f"{base}/rest/repositories/{repo}")
+            if r.status_code == 200:
+                return  # Repository already exists
+
+            # ── 2. Try to create it ─────────────────────────────────────────
+            response = await client.post(
+                f"{base}/rest/repositories",
+                content=ttl_config.encode(),
+                headers={"Content-Type": "text/turtle"},
             )
-            return
 
-        # Repository is still not accessible; surface the original error.
-        response.raise_for_status()
+            if response.is_success:
+                logger.info(
+                    "GraphDB repository '%s' created successfully (attempt %d/%d).",
+                    repo,
+                    attempt,
+                    _REPO_CREATE_MAX_ATTEMPTS,
+                )
+                return
+
+            # ── 3. Re-verify: GraphDB sometimes returns 500 even when the
+            #       repository was actually created (race in its own code).
+            verify = await client.get(f"{base}/rest/repositories/{repo}")
+            if verify.status_code == 200:
+                logger.warning(
+                    "GraphDB returned HTTP %s when creating repository '%s' "
+                    "(attempt %d/%d), but the repository is now accessible -- "
+                    "continuing.",
+                    response.status_code,
+                    repo,
+                    attempt,
+                    _REPO_CREATE_MAX_ATTEMPTS,
+                )
+                return
+
+            last_response = response
+
+        # ── 4. Not yet ready; back off and retry ────────────────────────────
+        if attempt < _REPO_CREATE_MAX_ATTEMPTS:
+            logger.warning(
+                "GraphDB repository creation failed "
+                "(attempt %d/%d, HTTP %s) -- retrying in %ds ...\n"
+                "Response body: %s",
+                attempt,
+                _REPO_CREATE_MAX_ATTEMPTS,
+                last_response.status_code if last_response else "N/A",
+                _REPO_CREATE_RETRY_DELAY_S,
+                last_response.text if last_response else "",
+            )
+            await asyncio.sleep(_REPO_CREATE_RETRY_DELAY_S)
+
+    # ── All attempts exhausted ───────────────────────────────────────────────
+    logger.error(
+        "GraphDB repository '%s' could not be created after %d attempts.\n"
+        "Final response (HTTP %s): %s",
+        repo,
+        _REPO_CREATE_MAX_ATTEMPTS,
+        last_response.status_code if last_response else "N/A",
+        last_response.text if last_response else "N/A",
+    )
+    if last_response is not None:
+        last_response.raise_for_status()
+    raise RuntimeError(
+        f"GraphDB repository '{repo}' could not be created after "
+        f"{_REPO_CREATE_MAX_ATTEMPTS} attempts."
+    )
 
 
 async def load_turtle_into_graph(turtle_content: str, named_graph: str) -> None:
@@ -111,6 +175,20 @@ async def load_turtle_into_graph(turtle_content: str, named_graph: str) -> None:
 
     Uses a PUT request to the GraphDB statements endpoint, which atomically
     replaces all existing triples in the named graph (idempotent).
+
+    Parameters
+    ----------
+    turtle_content:
+        Valid Turtle-formatted RDF data to load into the graph.
+    named_graph:
+        The named-graph URI (e.g. ``"http://example.org/my-graph"``).
+        The URI is automatically wrapped in angle brackets and URL-encoded
+        before being sent to GraphDB.
+
+    Raises
+    ------
+    httpx.HTTPStatusError
+        When GraphDB returns a non-2xx response.
     """
     settings = get_settings()
     base = settings.graphdb_url.rstrip("/")

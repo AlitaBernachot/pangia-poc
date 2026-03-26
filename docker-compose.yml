@@ -87,6 +87,7 @@ services:
       interval: 20s
       timeout: 10s
       retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   # ── ChromaDB (Vector / embedding agent) ───────────────────────────────────
