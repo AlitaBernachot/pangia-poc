@@ -17,7 +17,7 @@ langchain-core>=0.2.0
 neo4j>=5.17.0
 
 # ChromaDB (Vector agent) – requires gcc / build-essential at image build time
-chromadb>=0.5.0
+chromadb==0.5.20
 
 # PostGIS (Spatial SQL agent) – requires libpq-dev at image build time
 asyncpg>=0.29.0

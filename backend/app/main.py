@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -9,11 +10,21 @@ from app.db.chroma_client import close_client as close_chroma
 from app.db.neo4j_client import close_driver
 from app.db.postgis_client import close_pool
 from app.db.redis_client import close_redis
+from app.db.seed import seed_all
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # startup
+    settings = get_settings()
+    if settings.seed_db:
+        logger.info("SEED_DB=true – running database seeds …")
+        try:
+            await seed_all()
+        except Exception:
+            logger.exception("Database seeding failed – continuing startup anyway.")
     yield
     # shutdown – close all data-store connections
     await close_driver()

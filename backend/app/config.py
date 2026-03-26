@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # Application
-    app_title: str = "Pangia GeoIA Agent"
+    app_title: str = "PangIA GeoIA Agent"
     app_version: str = "0.1.0"
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     # Redis (sessions)
     redis_url: str = "redis://localhost:6379"
     session_ttl_seconds: int = 3600  # 1 hour
+
+    # Seeding (dev / demo mode only – set to false in production)
+    seed_db: bool = False
+    # Theme to seed.  Must match a module name under app/db/themes/.
+    # Built-in themes: dinosaurs
+    seed_theme: str = "dinosaurs"
 
 
 @lru_cache

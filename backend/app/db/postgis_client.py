@@ -59,6 +59,13 @@ def _serialize(value):
     return str(value)
 
 
+async def run_write_query(sql: str, params: list | None = None) -> None:
+    """Execute a write SQL statement (DDL or DML) outside a read-only transaction."""
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute(sql, *(params or []))
+
+
 async def run_spatial_query(sql: str, params: list | None = None) -> str:
     """Execute a read-only spatial SQL query and return JSON results.
 

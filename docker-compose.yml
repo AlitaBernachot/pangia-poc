@@ -1,11 +1,17 @@
 services:
-  # ── Frontend (Vue 3 + nginx) ───────────────────────────────────────────────
+  # ── Frontend (Vue 3 + Vite dev server) ──────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: builder      # stop at the node stage, skip nginx
     ports:
-      - "3000:80"
+      - "3000:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - /app/node_modules  # preserve container node_modules
+    command: npm run dev -- --host
     depends_on:
       - backend
     restart: unless-stopped
@@ -30,11 +36,21 @@ services:
       # ChromaDB
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
+      - CHROMA_CLIENT_AUTH_PROVIDER=
+      - ANONYMIZED_TELEMETRY=False
       # PostGIS
       - POSTGIS_DSN=postgresql://${POSTGIS_USER:-pangia}:${POSTGIS_PASSWORD:-pangia-password}@postgis:5432/${POSTGIS_DB:-pangia}
       # Redis
       - REDIS_URL=redis://redis:6379
+      # Seeding – enabled by default so dev/demo stacks get sample data;
+      # set SEED_DB=false in your .env (or override at runtime) for production.
+      - SEED_DB=${SEED_DB:-true}
+      # Seed theme – selects which dataset to load.  Built-in: dinosaurs
+      - SEED_THEME=${SEED_THEME:-dinosaurs}
       - CORS_ORIGINS=["http://localhost:3000","http://frontend"]
+    volumes:
+      - ./backend/app:/app/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       neo4j:
         condition: service_healthy
@@ -82,6 +98,7 @@ services:
       interval: 20s
       timeout: 10s
       retries: 10
+      start_period: 30s
     restart: unless-stopped
 
   # ── ChromaDB (Vector / embedding agent) ───────────────────────────────────

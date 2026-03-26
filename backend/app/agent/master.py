@@ -1,5 +1,5 @@
 """
-Master orchestrator agent (Pangia GeoIA).
+Master orchestrator agent (PangIA GeoIA).
 
 Topology
 --------
@@ -40,7 +40,7 @@ from app.config import get_settings
 
 # ─── Prompts ──────────────────────────────────────────────────────────────────
 
-ROUTER_SYSTEM = """You are the master orchestrator of the Pangia GeoIA platform.
+ROUTER_SYSTEM = """You are the master orchestrator of the PangIA GeoIA platform.
 Your role is to analyse a user's geographic question and decide which specialised
 sub-agents should be invoked to answer it.
 
@@ -63,7 +63,7 @@ Rules:
   - Always include at least one agent.
 """
 
-MERGE_SYSTEM = """You are the synthesis module of the Pangia GeoIA platform.
+MERGE_SYSTEM = """You are the synthesis module of the PangIA GeoIA platform.
 You will receive the original user question and the individual answers from one or
 more specialised sub-agents (Neo4j, RDF/SPARQL, Vector, PostGIS).
 

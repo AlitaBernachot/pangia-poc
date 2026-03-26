@@ -3,7 +3,7 @@
     <header class="app-header">
       <div class="logo">
         <span class="logo-icon">🌍</span>
-        <span class="logo-text">Pangia <em>GeoIA Agent</em></span>
+        <span class="logo-text">PangIA <em>GeoIA Agent</em></span>
       </div>
     </header>
     <main class="app-main">
