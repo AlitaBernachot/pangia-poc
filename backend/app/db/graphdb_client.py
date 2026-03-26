@@ -89,9 +89,9 @@ async def ensure_repository() -> None:
         f'   rep:repositoryID "{repo}" ;\n'
         '   rdfs:label "Pangia GeoIA" ;\n'
         "   rep:repositoryImpl [\n"
-        '       rep:repositoryType "graphdb:FreeSailRepository" ;\n'
+        '       rep:repositoryType "graphdb:SailRepository" ;\n'
         "       sr:sailImpl [\n"
-        '           sail:sailType "graphdb:FreeSail" ;\n'
+        '           sail:sailType "graphdb:Sail" ;\n'
         '           graphdb:ruleset "rdfsplus-optimized"\n'
         "       ]\n"
         "   ] .\n"
@@ -109,8 +109,7 @@ async def ensure_repository() -> None:
             # ── 2. Try to create it ─────────────────────────────────────────
             response = await client.post(
                 f"{base}/rest/repositories",
-                content=ttl_config.encode(),
-                headers={"Content-Type": "text/turtle"},
+                files={"config": ("config.ttl", ttl_config.encode(), "text/turtle")},
             )
 
             if response.is_success:
