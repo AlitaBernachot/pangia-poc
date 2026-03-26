@@ -35,6 +35,9 @@ services:
       # Redis
       - REDIS_URL=redis://redis:6379
       - CORS_ORIGINS=["http://localhost:3000","http://frontend"]
+      # Arize Phoenix (observability)
+      - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
+      - PHOENIX_PROJECT_NAME=${PHOENIX_PROJECT_NAME:-pangia-geoia}
     depends_on:
       neo4j:
         condition: service_healthy
@@ -45,6 +48,8 @@ services:
       chromadb:
         condition: service_healthy
       postgis:
+        condition: service_healthy
+      phoenix:
         condition: service_healthy
     restart: unless-stopped
 
@@ -119,6 +124,23 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # ── Arize Phoenix (Agent observability) ───────────────────────────────────
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports:
+      - "6006:6006"  # Phoenix UI
+      - "4317:4317"  # OTLP gRPC endpoint
+    environment:
+      - PHOENIX_WORKING_DIR=/phoenix
+    volumes:
+      - phoenix_data:/phoenix
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6006/healthz || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+
   # ── Redis (Sessions) ───────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
@@ -141,3 +163,4 @@ volumes:
   chroma_data:
   postgis_data:
   redis_data:
+  phoenix_data:
