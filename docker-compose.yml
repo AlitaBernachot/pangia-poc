@@ -34,6 +34,9 @@ services:
       - POSTGIS_DSN=postgresql://${POSTGIS_USER:-pangia}:${POSTGIS_PASSWORD:-pangia-password}@postgis:5432/${POSTGIS_DB:-pangia}
       # Redis
       - REDIS_URL=redis://redis:6379
+      # Seeding – enabled by default so dev/demo stacks get sample data;
+      # set SEED_DB=false in your .env (or override at runtime) for production.
+      - SEED_DB=${SEED_DB:-true}
       - CORS_ORIGINS=["http://localhost:3000","http://frontend"]
     depends_on:
       neo4j:

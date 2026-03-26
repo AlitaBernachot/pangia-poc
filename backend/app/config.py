@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
     session_ttl_seconds: int = 3600  # 1 hour
 
+    # Seeding (dev / demo mode only – set to false in production)
+    seed_db: bool = False
+
 
 @lru_cache
 def get_settings() -> Settings:
