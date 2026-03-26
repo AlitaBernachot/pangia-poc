@@ -1,3 +1,5 @@
+![PangIA Banner](docs/banner.png)
+
 # PangIA – GeoIA Agent 🌍
 
 A minimal AI agent chat application with a **multi-agent architecture**:
