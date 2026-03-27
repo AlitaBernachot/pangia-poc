@@ -76,6 +76,7 @@ node then synthesises all results into a final streamed answer.
 | `RDF_AGENT_ENABLED` | `true` | RDF/Linked Data agent (SPARQL / GraphDB) |
 | `VECTOR_AGENT_ENABLED` | `true` | Semantic search agent (ChromaDB) |
 | `POSTGIS_AGENT_ENABLED` | `true` | Spatial SQL agent (PostGIS) |
+| `MAP_AGENT_ENABLED` | `true` | Geographic visualisation agent (GeoJSON / Leaflet map) |
 
 Set any flag to `false` in `.env` to exclude that agent from all routing decisions.
 The orchestrator always keeps at least one agent active as a fallback (defaults to `neo4j`).
@@ -262,7 +263,21 @@ SEED_THEME=my_theme docker compose up --build
    | `vector_guidelines` | Theme-specific hints for the Vector agent |
    | `suggestions` | Example prompts shown in the chat UI |
 
-3. Set `SEED_THEME=<my_theme>` and start the stack.
+3. **Review the router's agent descriptions and routing rules** in
+   `backend/app/agent/master.py`:
+   - `_AGENT_DESCRIPTIONS` — the short capability blurb shown to the router LLM
+     for each agent.  If your theme stores data in a way that differs from the
+     generic description (e.g. PostGIS holds domain-specific tables with
+     coordinates), refine the description so the router knows to select that agent.
+   - `_EXTRA_ROUTING_RULES` — explicit rules that override or supplement the
+     router's judgment for common question patterns in your domain (e.g. "questions
+     about X location → include both neo4j and postgis").  Add domain-specific
+     rules here rather than embedding them in the agent descriptions.
+
+   Keep both sections as generic as possible; add only rules that are genuinely
+   necessary for correct routing in your theme.
+
+4. Set `SEED_THEME=<my_theme>` and start the stack.
 
 ---
 

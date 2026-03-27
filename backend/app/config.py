@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     rdf_agent_enabled: bool = True
     vector_agent_enabled: bool = True
     postgis_agent_enabled: bool = True
+    map_agent_enabled: bool = True
 
     # Arize Phoenix (agent observability)
     phoenix_collector_endpoint: str = "http://localhost:6006/v1/traces"

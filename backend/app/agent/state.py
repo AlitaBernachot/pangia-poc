@@ -1,5 +1,5 @@
 import operator
-from typing import Annotated, Sequence, TypedDict
+from typing import Annotated, Any, Sequence, TypedDict
 
 from langchain_core.messages import BaseMessage
 
@@ -23,6 +23,9 @@ class AgentState(TypedDict):
     # Set by the router node: which sub-agents should be invoked
     agents_to_call: list[str]
 
-    # Keyed by agent name ("neo4j" | "rdf" | "vector" | "postgis").
+    # Keyed by agent name ("neo4j" | "rdf" | "vector" | "postgis" | "map").
     # Results from parallel sub-agent branches are merged via _merge_dicts.
     sub_results: Annotated[dict[str, str], _merge_dicts]
+
+    # GeoJSON FeatureCollection produced by the map agent (None if not invoked).
+    geojson: dict[str, Any] | None
