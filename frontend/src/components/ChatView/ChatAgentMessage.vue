@@ -87,7 +87,7 @@ import { reactive, watch } from 'vue'
 import Avatar from 'primevue/avatar'
 import Fieldset from 'primevue/fieldset'
 import { type Message, AGENT_COLORS, agentIcon, renderContent } from '@/types'
-import MapViewer from './MapViewer.vue'
+import MapViewer from '../MapViewer.vue'
 
 const props = defineProps<{ msg: Message }>()
 
