@@ -72,8 +72,8 @@ async def extract_geojson_from_text(text: str) -> str:
         r"(?:lat(?:itude)?)\s*[=:]\s*(-?\d+\.?\d*)[,\s]+(?:lon(?:gitude)?)\s*[=:]\s*(-?\d+\.?\d*)",
         # (48.8566, 2.3522)
         r"\(\s*(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)\s*\)",
-        # standalone 48.8566, 2.3522
-        r"(-?\d{1,3}\.\d{4,})\s*,\s*(-?\d{1,3}\.\d{4,})",
+        # standalone 48.8566, 2.3522  (requires at least 1 decimal digit)
+        r"(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)",
     ]
     # Hemisphere pattern: 48.8566°N 2.3522°E (no negative sign with hemisphere indicator)
     hemisphere_pattern = re.compile(
@@ -283,7 +283,7 @@ _TOOL_MAP = {t.name: t for t in MAP_TOOLS}
 # ─── Node function ────────────────────────────────────────────────────────────
 
 _COORD_HINT_RE = re.compile(
-    r"lat(?:itude)?|lon(?:gitude)?|°[NS]|°[EW]|\b\d{1,3}\.\d{2,}\b",
+    r"lat(?:itude)?|lon(?:gitude)?|°[NS]|°[EW]|\b\d{1,3}\.\d+\b",
     re.IGNORECASE,
 )
 
