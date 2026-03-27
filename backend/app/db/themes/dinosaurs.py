@@ -1140,6 +1140,44 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
     :subContinentOf :Laurasia .
 """,
 
+    # ── Agent guidelines (theme-specific) ────────────────────────────────────
+    neo4j_guidelines="""\
+- For questions about fossil sites ("which sites contain fossils of X", "where \
+were X fossils found"), predator/prey relationships ("what does X prey on", \
+"what hunts X"), or species coexistence ("which species coexist with X"), \
+always use `run_cypher_query` with a direct MATCH pattern.
+- Entity names in the graph use no diacritics (e.g. 'Velociraptor', not \
+'Vélociraptor', 'Tyrannosaurus rex' not 'T-rex'). Strip accents when writing \
+Cypher string literals.
+""",
+
+    postgis_guidelines="""\
+- The `fossil_sites.dinosaurs_found` column is a TEXT[] array; use \
+`'Species name' = ANY(dinosaurs_found)` to filter by species name.
+- Coordinates are stored in WGS-84 (EPSG:4326). Cast to `::geography` for \
+metre-accurate ST_Distance / ST_DWithin results.
+- `location_modern` holds the current GPS position; `location_pangaea` holds \
+the reconstructed Pangaea-era position.
+""",
+
+    rdf_guidelines="""\
+- Use PREFIX : <http://pangia.io/ontology#> in every query.
+- Always scope patterns inside GRAPH <http://pangia.io/graphs/dinosaurs> { ... }.
+- Key object properties: :preysOn, :coexistsWith, :foundAtSite, :locatedIn, \
+:subContinentOf.
+- Key data properties on :Dinosaur: :lengthM (decimal, metres), :weightKg \
+(decimal), :diet (string), :period (string), :eraStart/:eraEnd (integer, Ma).
+""",
+
+    vector_guidelines="""\
+- Documents cover: dinosaur species descriptions, fossil site descriptions, \
+paleo-continent overviews, and food-chain summaries.
+- Available metadata filters: `type` (dinosaur | site | continent | food_chain), \
+`name`, `period`, `country`, `region`.
+- Prefer semantic search for general questions; use metadata filters when the \
+user specifies a particular type, time period, or geographic area.
+""",
+
     # ── Suggestions UI ────────────────────────────────────────────────────────
     suggestions=[
         "Quels dinosaures vivaient en Asie ?",

@@ -25,22 +25,24 @@ geographic entities, relationships, and facts using Cypher.
 {schema}
 
 ## Guidelines
-- For structured questions about relationships (e.g. "which sites contain fossils
-  of X", "what does X prey on", "which species coexist with X"), use
-  `run_cypher_query` directly with a precise MATCH query — do NOT rely on the
-  full-text index for these.
+- For structured questions about specific entities and their relationships, use
+  `run_cypher_query` directly with a precise MATCH query.
 - Use `search_knowledge_graph` only for broad exploratory searches where you do
   not know the exact entity name.
-- Entity names in the graph use no diacritics for species (e.g. 'Velociraptor',
-  not 'Vélociraptor'). Strip accents from names when writing Cypher literals.
 - Always explain what you found and cite the relevant nodes/relationships.
 - If the graph contains no relevant data, say so clearly.
-"""
+{extra_guidelines}"""
 
 
 def _build_system_prompt() -> str:
-    schema = get_active_theme().neo4j_schema_prompt.strip()
-    return _BASE_SYSTEM_PROMPT.format(schema=schema or "(no schema defined for this theme)")
+    theme = get_active_theme()
+    schema = theme.neo4j_schema_prompt.strip()
+    guidelines = theme.neo4j_guidelines.strip()
+    extra = f"\n## Theme-specific guidelines\n{guidelines}" if guidelines else ""
+    return _BASE_SYSTEM_PROMPT.format(
+        schema=schema or "(no schema defined for this theme)",
+        extra_guidelines=extra,
+    )
 
 _MAX_ITERATIONS = 5
 
