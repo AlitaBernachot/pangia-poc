@@ -1,10 +1,10 @@
 {
   "servers": {
-    "shadcnVue": {
+    "primevue": {
       "command": "npx",
       "args": [
-        "shadcn-vue@latest",
-        "mcp"
+        "-y",
+        "@primevue/mcp"
       ]
     }
   }
