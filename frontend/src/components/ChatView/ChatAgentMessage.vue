@@ -69,6 +69,9 @@
       <!-- Map viewer (shown when GeoJSON is available) -->
       <MapViewer v-if="msg.geojson" :geojson="msg.geojson" />
 
+      <!-- DataViz viewer (shown when chart/KPI/table data is available) -->
+      <DataVizViewer v-if="msg.dataviz" :dataviz="msg.dataviz" />
+
       <!-- Final answer -->
       <div
         v-if="msg.content || msg.streaming"
@@ -88,6 +91,7 @@ import Avatar from 'primevue/avatar'
 import Fieldset from 'primevue/fieldset'
 import { type Message, AGENT_COLORS, agentIcon, renderContent } from '@/types'
 import MapViewer from '../MapViewer.vue'
+import DataVizViewer from '../DataVizViewer.vue'
 
 const props = defineProps<{ msg: Message }>()
 

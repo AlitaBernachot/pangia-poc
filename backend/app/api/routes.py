@@ -22,6 +22,7 @@ _AGENT_LABELS: dict[str, str] = {
     "postgis_agent": "PostGIS",
     "map_agent": "Map",
     "data_gouv_agent": "Data.gouv.fr",
+    "dataviz_agent": "DataViz",
     "merge": "Synthesiser",
     "router": "Router",
 }
@@ -34,6 +35,7 @@ _AGENT_UI_LABELS: dict[str, str] = {
     "postgis": "PostGIS",
     "map": "Map",
     "data_gouv": "Data.gouv.fr",
+    "dataviz": "DataViz",
 }
 
 
@@ -96,6 +98,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         "agents_to_call": [],
         "sub_results": {},
         "geojson": None,
+        "dataviz": None,
     }
 
     async def event_stream() -> AsyncGenerator[str, None]:
@@ -131,6 +134,14 @@ async def chat(body: ChatRequest) -> StreamingResponse:
                         geojson = output.get("geojson")
                         if geojson and isinstance(geojson, dict):
                             yield _sse({"type": "geojson", "data": geojson})
+
+                # ── DataViz agent output ───────────────────────────────────
+                elif kind == "on_chain_end" and node == "dataviz_agent":
+                    output = event.get("data", {}).get("output", {})
+                    if isinstance(output, dict):
+                        dataviz = output.get("dataviz")
+                        if dataviz and isinstance(dataviz, dict):
+                            yield _sse({"type": "dataviz", "data": dataviz})
 
                 # ── Token streaming ───────────────────────────────────────
                 elif kind == "on_chat_model_stream":

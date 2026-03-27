@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     postgis_agent_enabled: bool = True
     map_agent_enabled: bool = True
     data_gouv_agent_enabled: bool = True
+    dataviz_agent_enabled: bool = True
 
     # Per-agent model configuration
     # For each agent set <AGENT>_MODEL_PROVIDER and <AGENT>_MODEL_NAME to
@@ -72,6 +73,8 @@ class Settings(BaseSettings):
     map_agent_model_name: str = ""
     data_gouv_agent_model_provider: str = ""
     data_gouv_agent_model_name: str = ""
+    dataviz_agent_model_provider: str = ""
+    dataviz_agent_model_name: str = ""
     merge_model_provider: str = ""
     merge_model_name: str = ""
 

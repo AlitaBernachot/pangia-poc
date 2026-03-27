@@ -50,6 +50,11 @@ User query  +  selected_agents? (optional)
 │                                       └───────┬──────────┘       │
 │                                               │                  │
 │                                       ┌───────▼──────────┐       │
+│                                       │  dataviz_agent   │       │
+│                                       │ (charts/KPI/tbl) │       │
+│                                       └───────┬──────────┘       │
+│                                               │                  │
+│                                       ┌───────▼──────────┐       │
 │                                       │   merge node     │       │
 │                                       │  (synthesise)    │       │
 │                                       └───────┬──────────┘       │
@@ -83,6 +88,7 @@ node then synthesises all results into a final streamed answer.
 | `VECTOR_AGENT_ENABLED` | `true` | Semantic search agent (ChromaDB) |
 | `POSTGIS_AGENT_ENABLED` | `true` | Spatial SQL agent (PostGIS) |
 | `MAP_AGENT_ENABLED` | `true` | Geographic visualisation agent (GeoJSON / Leaflet map) |
+| `DATAVIZ_AGENT_ENABLED` | `true` | Data visualisation agent (charts, KPIs, tables) |
 
 Set any flag to `false` in `.env` to exclude that agent from all routing decisions.
 The orchestrator always keeps at least one agent active as a fallback (defaults to `neo4j`).
@@ -96,7 +102,7 @@ Every agent (including the router and the merge node) can use a **different LLM 
 | `<AGENT>_MODEL_PROVIDER` | `openai`, `anthropic`, `ollama` | Provider for this agent. Leave empty to use the global provider. |
 | `<AGENT>_MODEL_NAME` | `gpt-4o`, `claude-3-5-sonnet-latest`, `llama3` | Model name for this agent. Leave empty to fall back to `OPENAI_MODEL`. |
 
-Available `<AGENT>` prefixes: `ROUTER`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_AGENT`, `POSTGIS_AGENT`, `MAP_AGENT`, `DATA_GOUV_AGENT`, `MERGE`.
+Available `<AGENT>` prefixes: `ROUTER`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_AGENT`, `POSTGIS_AGENT`, `MAP_AGENT`, `DATA_GOUV_AGENT`, `DATAVIZ_AGENT`, `MERGE`.
 
 Example `.env` — use a powerful model for the router and merge, a cheaper one for sub-agents:
 
@@ -128,12 +134,43 @@ Leave both variables empty (the default) to use the global `OPENAI_MODEL` for ev
 | `token` | Final synthesis token (streamed to user) |
 | `tool_start` | A sub-agent started a tool call |
 | `tool_end` | A sub-agent tool call completed |
+| `geojson` | GeoJSON FeatureCollection from the Map agent (rendered as interactive Leaflet map) |
+| `dataviz` | Visualisation payload from the DataViz agent (charts, KPI cards, tables) |
 | `error` | An error occurred |
 | `done` | Stream complete |
 
+### Data Visualisation Agent
+
+The **DataViz Agent** (`dataviz_agent`) runs **sequentially after the Map agent**, reading the accumulated
+`sub_results` from all parallel sub-agents to detect and format numerical / statistical data.
+
+**Responsibilities:**
+- Detect visualisable data (counts, averages, distributions, time-series, proportions)
+- Choose the most appropriate visualisation type
+- Produce chart structures compatible with **D3.js**
+- Compute **KPI cards** (value, unit, variation, trend, threshold)
+- Generate **formatted tables** (column headers + row data)
+
+**Output types:**
+
+| Type | Description | Frontend component |
+|---|---|---|
+| `charts` | Bar, line, pie, scatter, or histogram chart data | `ChartViewer.vue` (D3.js) |
+| `kpis` | Key performance indicator cards with trend indicators | `KpiCards.vue` |
+| `tables` | Tabular data with column headers and rows | `TableViewer.vue` (PrimeVue DataTable) |
+
+When the DataViz agent produces visualisations, they are rendered in the chat interface
+automatically:
+- 📊 **Charts** are rendered using D3.js for bar, line, pie, scatter, and histogram types.
+- 🔢 **KPI cards** display key metrics with trend direction (↑ up / ↓ down / → stable).
+- 📋 **Tables** use PrimeVue DataTable for scrollable, formatted tabular display.
+
+The DataViz agent can be **disabled without affecting any other agent** by setting
+`DATAVIZ_AGENT_ENABLED=false` in your `.env` file.
+
 ---
 
-## Quick Start
+
 
 ### 1. Configure environment
 
