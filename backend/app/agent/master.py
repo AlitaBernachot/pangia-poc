@@ -54,7 +54,10 @@ AGENT_LABELS = {
 _AGENT_DESCRIPTIONS = {
     "neo4j": (
         "  • neo4j   – Knowledge Graph (Cypher queries against Neo4j).\n"
-        "               Best for: entity relationships, graph traversals, structured facts."
+        "               Best for: entity relationships, graph traversals, structured facts,\n"
+        "               fossil site discovery (\"which sites yielded fossils of X\",\n"
+        "               \"where were X fossils found\"), predator/prey chains, co-existence\n"
+        "               between species, species locations, migrations."
     ),
     "rdf": (
         "  • rdf     – RDF/SPARQL (SPARQL queries against GraphDB).\n"
@@ -62,7 +65,8 @@ _AGENT_DESCRIPTIONS = {
     ),
     "vector": (
         "  • vector  – Semantic search (embedding similarity via ChromaDB).\n"
-        "               Best for: free-text similarity, document retrieval, concept proximity."
+        "               Best for: free-text similarity, document retrieval, concept proximity,\n"
+        "               general descriptive questions (\"tell me about X\")."
     ),
     "postgis": (
         "  • postgis – Spatial SQL (PostGIS queries against PostgreSQL).\n"
@@ -70,6 +74,11 @@ _AGENT_DESCRIPTIONS = {
         "               area calculations, coordinate transformations."
     ),
 }
+
+_EXTRA_ROUTING_RULES = (
+    "  - Questions about which sites found/yielded/contain fossils of a species → neo4j.\n"
+    "  - Questions about species relationships (predator, prey, coexists) → neo4j."
+)
 
 # LangGraph node name → run function for each sub-agent
 _AGENT_NODES: dict[str, tuple[str, Any]] = {
@@ -88,6 +97,8 @@ Your job:
 2. Remove redundancy; reconcile any contradictions by noting them clearly.
 3. Cite the source agent(s) when referencing specific facts.
 4. Use plain, accessible language appropriate for a geographic information system.
+5. Whenever a geographic location, site, or place is mentioned, **always include
+   its coordinates (latitude, longitude)** if they were provided by any sub-agent.
 """
 
 
@@ -126,6 +137,7 @@ def _build_router_system(available_agents: list[str]) -> str:
         "Rules:\n"
         "  - Select the minimum set of agents needed to answer the question well.\n"
         "  - Only select from the available agents listed above.\n"
+        f"{_EXTRA_ROUTING_RULES}\n"
         "  - A question about semantic similarity alone needs only \"vector\".\n"
         "  - A question about spatial distance needs only \"postgis\".\n"
         "  - A complex question might legitimately need several agents.\n"

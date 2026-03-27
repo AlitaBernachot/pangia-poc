@@ -28,12 +28,18 @@ ST_Intersects, ST_Within, ST_Area, etc.).
 - Explain the spatial reasoning behind your query.
 - Format numeric results with appropriate units (metres, km², etc.).
 - If the query returns no rows, say so clearly.
-"""
+{extra_guidelines}"""
 
 
 def _build_system_prompt() -> str:
-    schema = get_active_theme().postgis_schema_prompt.strip()
-    return _BASE_SYSTEM_PROMPT.format(schema=schema or "(no schema defined for this theme)")
+    theme = get_active_theme()
+    schema = theme.postgis_schema_prompt.strip()
+    guidelines = theme.postgis_guidelines.strip()
+    extra = f"\n## Theme-specific guidelines\n{guidelines}" if guidelines else ""
+    return _BASE_SYSTEM_PROMPT.format(
+        schema=schema or "(no schema defined for this theme)",
+        extra_guidelines=extra,
+    )
 
 _MAX_ITERATIONS = 5
 

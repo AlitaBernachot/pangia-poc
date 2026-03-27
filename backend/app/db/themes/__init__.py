@@ -41,6 +41,16 @@ class SeedTheme:
     rdf_schema_prompt: str = ""
     chroma_documents: list[dict] = field(default_factory=list)
     """List of {"text": str, "metadata": dict} dicts to embed in ChromaDB."""
+    suggestions: list[str] = field(default_factory=list)
+    """Example queries shown as quick-start suggestions in the chat UI."""
+    neo4j_guidelines: str = ""
+    """Theme-specific guidelines injected into the Neo4j agent system prompt."""
+    postgis_guidelines: str = ""
+    """Theme-specific guidelines injected into the PostGIS agent system prompt."""
+    rdf_guidelines: str = ""
+    """Theme-specific guidelines injected into the RDF/SPARQL agent system prompt."""
+    vector_guidelines: str = ""
+    """Theme-specific guidelines injected into the Vector agent system prompt."""
 
 
 import importlib

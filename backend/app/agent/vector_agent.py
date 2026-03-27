@@ -11,17 +11,24 @@ from langchain_openai import ChatOpenAI
 from app.agent.state import AgentState
 from app.config import get_settings
 from app.db.chroma_client import similarity_search, add_documents
+from app.db.themes import get_active_theme
 
-SYSTEM_PROMPT = """You are the Vector Search Agent of the PangIA GeoIA platform.
+_BASE_SYSTEM_PROMPT = """You are the Vector Search Agent of the PangIA GeoIA platform.
 Your job is to answer questions using semantic similarity search over a ChromaDB
 vector store that contains embedded geographic documents, descriptions, and facts.
 
-Guidelines:
+## Guidelines
 - Use `vector_similarity_search` to find semantically similar content to a query.
 - Use `vector_add_documents` only when explicitly asked to store new information.
 - Summarise the most relevant results and explain why they match the query.
 - If no relevant results are found, say so clearly.
-"""
+{extra_guidelines}"""
+
+
+def _build_system_prompt() -> str:
+    guidelines = get_active_theme().vector_guidelines.strip()
+    extra = f"\n## Theme-specific guidelines\n{guidelines}" if guidelines else ""
+    return _BASE_SYSTEM_PROMPT.format(extra_guidelines=extra)
 
 _MAX_ITERATIONS = 5
 
@@ -68,7 +75,7 @@ async def run(state: AgentState) -> dict:
         "",
     )
 
-    messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=user_query)]
+    messages = [SystemMessage(content=_build_system_prompt()), HumanMessage(content=user_query)]
 
     for _ in range(_MAX_ITERATIONS):
         response: AIMessage = await llm.ainvoke(messages)

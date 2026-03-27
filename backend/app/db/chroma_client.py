@@ -8,7 +8,13 @@ Chroma server (configured via CHROMA_HOST / CHROMA_PORT).
 application starts up even when the package is not yet installed.
 """
 import json
+import os
 from typing import Optional
+
+# Disable chromadb telemetry before any chromadb import to avoid the
+# "capture() takes 1 positional argument but 3 were given" bug in 0.5.x.
+os.environ.setdefault("ANONYMIZED_TELEMETRY", "False")
+os.environ.setdefault("CHROMA_TELEMETRY", "False")
 
 from app.config import get_settings
 

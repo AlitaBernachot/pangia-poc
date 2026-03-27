@@ -30,12 +30,18 @@ geospatial ontologies and linked data using SPARQL.
 - Write valid SPARQL 1.1 queries; use PREFIX declarations as needed.
 - Always summarise the results in plain language.
 - If no relevant data exists, say so clearly.
-"""
+{extra_guidelines}"""
 
 
 def _build_system_prompt() -> str:
-    schema = get_active_theme().rdf_schema_prompt.strip()
-    return _BASE_SYSTEM_PROMPT.format(schema=schema or "(no schema defined for this theme)")
+    theme = get_active_theme()
+    schema = theme.rdf_schema_prompt.strip()
+    guidelines = theme.rdf_guidelines.strip()
+    extra = f"\n## Theme-specific guidelines\n{guidelines}" if guidelines else ""
+    return _BASE_SYSTEM_PROMPT.format(
+        schema=schema or "(no schema defined for this theme)",
+        extra_guidelines=extra,
+    )
 
 _MAX_ITERATIONS = 5
 
