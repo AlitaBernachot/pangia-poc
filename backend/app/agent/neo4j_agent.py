@@ -29,6 +29,9 @@ geographic entities, relationships, and facts using Cypher.
   `run_cypher_query` directly with a precise MATCH query.
 - Use `search_knowledge_graph` only for broad exploratory searches where you do
   not know the exact entity name.
+- When returning sites or geographic entities, **always include all available
+  coordinates** (lat, lon, or equivalent properties) in the query results and
+  in your answer.
 - Always explain what you found and cite the relevant nodes/relationships.
 - If the graph contains no relevant data, say so clearly.
 {extra_guidelines}"""

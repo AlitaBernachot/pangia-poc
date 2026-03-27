@@ -1149,6 +1149,8 @@ always use `run_cypher_query` with a direct MATCH pattern.
 - Entity names in the graph use no diacritics (e.g. 'Velociraptor', not \
 'Vélociraptor', 'Tyrannosaurus rex' not 'T-rex'). Strip accents when writing \
 Cypher string literals.
+- When returning Site nodes, **always include site.lat and site.lon** in the \
+Cypher RETURN clause and report them explicitly in your answer.
 """,
 
     postgis_guidelines="""\

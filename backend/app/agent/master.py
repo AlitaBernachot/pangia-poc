@@ -78,6 +78,8 @@ Your job:
 2. Remove redundancy; reconcile any contradictions by noting them clearly.
 3. Cite the source agent(s) when referencing specific facts.
 4. Use plain, accessible language appropriate for a geographic information system.
+5. Whenever a geographic location, site, or place is mentioned, **always include
+   its coordinates (latitude, longitude)** if they were provided by any sub-agent.
 """
 
 AGENT_LABELS = {
