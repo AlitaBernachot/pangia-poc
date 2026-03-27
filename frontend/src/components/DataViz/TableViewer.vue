@@ -1,7 +1,17 @@
 <template>
   <div class="table-wrapper rounded-xl border border-white/10 bg-white/3 overflow-hidden">
-    <div v-if="table.title" class="px-3 py-2 border-b border-white/8 text-sm font-semibold text-white/80">
-      {{ table.title }}
+    <div class="flex items-center px-3 py-2 border-b border-white/8">
+      <span v-if="table.title" class="text-sm font-semibold text-white/80">{{ table.title }}</span>
+      <Button
+        class="ml-auto"
+        size="small"
+        severity="secondary"
+        text
+        icon="pi pi-download"
+        label="CSV"
+        title="Download CSV"
+        @click="downloadCsv"
+      />
     </div>
     <DataTable
       :value="rows"
@@ -30,6 +40,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import Button from 'primevue/button'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import type { DataVizTable } from '@/types'
@@ -45,4 +56,22 @@ const rows = computed(() =>
     return obj
   })
 )
+
+function downloadCsv() {
+  const escape = (v: string | number) => {
+    const s = String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g, '""')}"`
+      : s
+  }
+  const header = props.table.columns.map(escape).join(',')
+  const body = props.table.rows.map(row => row.map(escape).join(',')).join('\n')
+  const blob = new Blob([`${header}\n${body}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${props.table.title ?? 'table'}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 </script>
