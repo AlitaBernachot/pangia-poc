@@ -31,3 +31,6 @@ langchain-mcp-adapters>=0.2.2
 # Arize Phoenix (agent observability)
 arize-phoenix-otel>=0.8.0
 openinference-instrumentation-langchain>=0.1.0
+
+# Corpus ingestion tool (tools/ingest_corpus.py)
+pdfplumber>=0.11.0
