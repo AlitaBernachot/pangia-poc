@@ -29,3 +29,7 @@ class AgentState(TypedDict):
 
     # GeoJSON FeatureCollection produced by the map agent (None if not invoked).
     geojson: dict[str, Any] | None
+
+    # Structured visualisation data produced by the dataviz agent (None if not invoked).
+    # Contains charts, KPI cards, and/or tables ready for the frontend to render.
+    dataviz: dict[str, Any] | None

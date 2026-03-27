@@ -24,7 +24,7 @@ import { ref, reactive, nextTick, onMounted } from 'vue'
 import ChatHeader from './ChatView/ChatHeader.vue'
 import ChatMessages from './ChatView/ChatMessages.vue'
 import ChatPrompt from './ChatView/ChatPrompt.vue'
-import { type Message, type AgentInfo } from '@/types'
+import { type Message, type AgentInfo, type DataVizPayload } from '@/types'
 
 const suggestions    = ref<string[]>([])
 const messages    = ref<Message[]>([])
@@ -153,6 +153,10 @@ async function send(text: string) {
             break
           case 'geojson':
             aiMsg.geojson = ev.data as unknown as Record<string, unknown>
+            chatMessagesRef.value?.scrollToBottom()
+            break
+          case 'dataviz':
+            aiMsg.dataviz = ev.data as unknown as DataVizPayload
             chatMessagesRef.value?.scrollToBottom()
             break
           case 'done':
