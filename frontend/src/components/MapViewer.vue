@@ -3,7 +3,17 @@
     <div class="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
       <span class="text-sm">🗺️</span>
       <span class="text-xs font-medium text-white/70">Interactive Map</span>
-      <span class="ml-auto text-xs text-white/30">{{ featureCount }} feature{{ featureCount !== 1 ? 's' : '' }}</span>
+      <span class="text-xs text-white/30">{{ featureCount }} feature{{ featureCount !== 1 ? 's' : '' }}</span>
+      <Button
+        class="ml-auto"
+        size="small"
+        severity="secondary"
+        text
+        icon="pi pi-download"
+        label="GeoJSON"
+        title="Download GeoJSON"
+        @click="downloadGeoJson"
+      />
     </div>
     <div ref="mapRef" class="map-container" />
   </div>
@@ -11,6 +21,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
+import Button from 'primevue/button'
 import * as L from 'leaflet'
 
 const props = defineProps<{
@@ -136,6 +147,16 @@ watch(
   },
   { deep: true },
 )
+
+function downloadGeoJson() {
+  const blob = new Blob([JSON.stringify(props.geojson, null, 2)], { type: 'application/geo+json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'map.geojson'
+  a.click()
+  URL.revokeObjectURL(url)
+}
 </script>
 
 <style>
