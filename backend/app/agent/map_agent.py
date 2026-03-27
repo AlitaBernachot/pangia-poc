@@ -28,22 +28,27 @@ from app.config import get_settings
 # ─── System prompt ────────────────────────────────────────────────────────────
 
 _SYSTEM_PROMPT = """You are the Map Agent of the PangIA GeoIA platform.
-Your role is to extract geographic entities from the user's question and build a
-structured GeoJSON FeatureCollection that can be displayed on an interactive map.
+Your role is to extract geographic entities from the provided context (results from
+other agents and the original user question) and build a structured GeoJSON
+FeatureCollection that can be displayed on an interactive map.
 
 ## Workflow
-1. Read the user question carefully and identify all geographic locations, sites,
-   coordinates, or place names mentioned.
-2. For each location:
+1. Read the **[AGENT RESULTS]** section carefully: it contains the output of other
+   specialised sub-agents (e.g. Neo4j, PostGIS) enriched with coordinates, site
+   names, and country information.
+2. For each location found in the context:
    - If exact coordinates (lat/lon) are present in the text, use
-     `extract_geojson_from_text`.
+     `extract_geojson_from_text` passing the relevant excerpt.
    - If only a name or address is given, use `geocode_address` to obtain
      coordinates.
-3. Collect all resulting Feature objects and assemble them into a single
+3. Use the site name and country from the context to set a meaningful `name`
+   property on each feature.
+4. Collect all resulting Feature objects and assemble them into a single
    FeatureCollection using `create_geojson`.
-4. Enrich every feature with a descriptive popup using `add_popup_content`.
-5. Compute the map viewport with `calculate_bounds`.
-6. **Your final message must be a single valid JSON object** with exactly these
+5. Enrich every feature with a descriptive popup using `add_popup_content`
+   (include the site name, country, and any other relevant facts from the context).
+6. Compute the map viewport with `calculate_bounds`.
+7. **Your final message must be a single valid JSON object** with exactly these
    two keys:
    {{"geojson": <FeatureCollection or null>, "summary": "<one-line description>"}}
 
@@ -277,9 +282,39 @@ _TOOL_MAP = {t.name: t for t in MAP_TOOLS}
 
 # ─── Node function ────────────────────────────────────────────────────────────
 
+_COORD_HINT_RE = re.compile(
+    r"lat(?:itude)?|lon(?:gitude)?|°[NS]|°[EW]|\b\d{1,3}\.\d{2,}\b",
+    re.IGNORECASE,
+)
+
+
 async def run(state: AgentState) -> dict:
-    """LangGraph node: run the Map Agent ReAct loop."""
+    """LangGraph node: run the Map Agent after parallel sub-agents complete.
+
+    Reads sub_results produced by other agents (e.g. Neo4j) and extracts
+    geographic coordinates to build a GeoJSON FeatureCollection.  Skips the
+    LLM entirely when no coordinate-like content is detected.
+    """
     settings = get_settings()
+
+    sub_results: dict[str, str] = state.get("sub_results", {})
+    user_query = next(
+        (m.content for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
+        "",
+    )
+
+    # Build enriched context from all sub-agent results
+    sub_text = "\n\n".join(
+        f"[{agent.upper()} RESULTS]:\n{result}"
+        for agent, result in sub_results.items()
+        if result and result.strip()
+    )
+
+    # Quick heuristic: skip entirely if there is no geographic signal
+    combined_check = f"{sub_text} {user_query}"
+    if not _COORD_HINT_RE.search(combined_check):
+        return {"sub_results": {"map": ""}, "geojson": None}
+
     llm = ChatOpenAI(
         model=settings.openai_model,
         temperature=settings.openai_temperature,
@@ -287,12 +322,14 @@ async def run(state: AgentState) -> dict:
         streaming=True,
     ).bind_tools(MAP_TOOLS)
 
-    user_query = next(
-        (m.content for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
-        "",
+    # Primary LLM input: enriched context from other agents + original question
+    map_input = (
+        f"{sub_text}\n\nOriginal user question: {user_query}"
+        if sub_text
+        else user_query
     )
 
-    messages = [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=user_query)]
+    messages = [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=map_input)]
 
     for _ in range(_MAX_ITERATIONS):
         response: AIMessage = await llm.ainvoke(messages)
