@@ -5,7 +5,7 @@
       ref="chatMessagesRef"
       :messages="messages"
       :is-thinking="isThinking"
-      :suggestions="SUGGESTIONS"
+      :suggestions="suggestions"
       @suggest="handleSuggest"
     />
     <ChatPrompt
@@ -17,19 +17,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, nextTick } from 'vue'
+import { ref, reactive, nextTick, onMounted } from 'vue'
 import ChatHeader from './ChatView/ChatHeader.vue'
 import ChatMessages from './ChatView/ChatMessages.vue'
 import ChatPrompt from './ChatView/ChatPrompt.vue'
 import { type Message } from '@/types'
 
-const SUGGESTIONS = [
-  'Quels dinosaures vivaient en Asie centrale ?',
-  'Quels sites ont livré des fossiles de Vélociraptor ?',
-  'Compare la taille du T-rex et du Vélociraptor.',
-  'Montre les relations entre les espèces du Crétacé.',
-]
-
+const suggestions    = ref<string[]>([])
 const messages    = ref<Message[]>([])
 const sessionId   = ref<string | null>(null)
 const isStreaming  = ref(false)
@@ -40,6 +34,16 @@ const chatPromptRef   = ref<InstanceType<typeof ChatPrompt>   | null>(null)
 
 let _id = 0
 const uid = () => `m${++_id}`
+
+onMounted(async () => {
+  try {
+    const res = await fetch('/api/suggestions')
+    if (res.ok) {
+      const data = await res.json()
+      suggestions.value = data.suggestions ?? []
+    }
+  } catch { /* silently ignore */ }
+})
 
 function handleSuggest(text: string) {
   chatPromptRef.value?.submitText(text)

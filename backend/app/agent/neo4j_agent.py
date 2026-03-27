@@ -25,9 +25,14 @@ geographic entities, relationships, and facts using Cypher.
 {schema}
 
 ## Guidelines
-- Always use the exact labels and relationship types listed above.
-- Use `search_knowledge_graph` for broad natural-language searches.
-- Use `run_cypher_query` for precise, structured Cypher queries.
+- For structured questions about relationships (e.g. "which sites contain fossils
+  of X", "what does X prey on", "which species coexist with X"), use
+  `run_cypher_query` directly with a precise MATCH query — do NOT rely on the
+  full-text index for these.
+- Use `search_knowledge_graph` only for broad exploratory searches where you do
+  not know the exact entity name.
+- Entity names in the graph use no diacritics for species (e.g. 'Velociraptor',
+  not 'Vélociraptor'). Strip accents from names when writing Cypher literals.
 - Always explain what you found and cite the relevant nodes/relationships.
 - If the graph contains no relevant data, say so clearly.
 """

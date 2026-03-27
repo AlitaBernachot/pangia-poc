@@ -50,6 +50,8 @@ Object properties:
 - :foundAtSite     (:Dinosaur → :FossilSite)
 - :locatedIn       (:Dinosaur → :PaleoContinent)
 - :subContinentOf  (:PaleoContinent → :PaleoContinent)
+- :preysOn         (:Dinosaur → :Dinosaur)
+- :coexistsWith    (:Dinosaur → :Dinosaur)
 
 Data properties (all on :Dinosaur unless noted):
 - :period (xsd:string), :diet (xsd:string),
@@ -240,6 +242,314 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
               (site:Site {name: 'Solnhofen'})
         MERGE (dino)-[:FOSSIL_DISCOVERED_IN]->(site)
         """,
+
+        # ── Additional dinosaur nodes ─────────────────────────────────────
+        """
+        MERGE (n:Dinosaur {name: 'Allosaurus'})
+        SET n.period    = 'Jurassique supérieur',
+            n.diet      = 'carnivore',
+            n.length_m  = 9.0,
+            n.weight_kg = 2300,
+            n.era_start = -156,
+            n.era_end   = -150
+        """,
+        """
+        MERGE (n:Dinosaur {name: 'Stegosaurus'})
+        SET n.period    = 'Jurassique supérieur',
+            n.diet      = 'herbivore',
+            n.length_m  = 9.0,
+            n.weight_kg = 3500,
+            n.era_start = -156,
+            n.era_end   = -150
+        """,
+        """
+        MERGE (n:Dinosaur {name: 'Triceratops'})
+        SET n.period    = 'Crétacé supérieur',
+            n.diet      = 'herbivore',
+            n.length_m  = 9.0,
+            n.weight_kg = 12000,
+            n.era_start = -68,
+            n.era_end   = -66
+        """,
+        """
+        MERGE (n:Dinosaur {name: 'Ankylosaurus'})
+        SET n.period    = 'Crétacé supérieur',
+            n.diet      = 'herbivore',
+            n.length_m  = 6.25,
+            n.weight_kg = 6000,
+            n.era_start = -68,
+            n.era_end   = -66
+        """,
+        """
+        MERGE (n:Dinosaur {name: 'Spinosaurus'})
+        SET n.period    = 'Crétacé moyen',
+            n.diet      = 'piscivore',
+            n.length_m  = 15.0,
+            n.weight_kg = 7000,
+            n.era_start = -112,
+            n.era_end   = -93
+        """,
+        """
+        MERGE (n:Dinosaur {name: 'Protoceratops'})
+        SET n.period    = 'Crétacé supérieur',
+            n.diet      = 'herbivore',
+            n.length_m  = 1.8,
+            n.weight_kg = 177,
+            n.era_start = -83,
+            n.era_end   = -70
+        """,
+        """
+        MERGE (n:Dinosaur {name: 'Iguanodon'})
+        SET n.period    = 'Crétacé inférieur',
+            n.diet      = 'herbivore',
+            n.length_m  = 10.0,
+            n.weight_kg = 3000,
+            n.era_start = -140,
+            n.era_end   = -100
+        """,
+        """
+        MERGE (n:Dinosaur {name: 'Carnotaurus'})
+        SET n.period    = 'Crétacé supérieur',
+            n.diet      = 'carnivore',
+            n.length_m  = 8.0,
+            n.weight_kg = 1500,
+            n.era_start = -72,
+            n.era_end   = -69
+        """,
+        """
+        MERGE (n:Dinosaur {name: 'Argentinosaurus'})
+        SET n.period    = 'Crétacé supérieur',
+            n.diet      = 'herbivore',
+            n.length_m  = 35.0,
+            n.weight_kg = 70000,
+            n.era_start = -96,
+            n.era_end   = -90
+        """,
+        """
+        MERGE (n:Dinosaur {name: 'Parasaurolophus'})
+        SET n.period    = 'Crétacé supérieur',
+            n.diet      = 'herbivore',
+            n.length_m  = 9.5,
+            n.weight_kg = 2500,
+            n.era_start = -76,
+            n.era_end   = -73
+        """,
+
+        # Additional site nodes
+        """
+        MERGE (n:Site {name: 'Kem Kem Beds'})
+        SET n.country = 'Maroc', n.lat = 30.5, n.lon = -4.5
+        """,
+        """
+        MERGE (n:Site {name: 'Bernissart'})
+        SET n.country = 'Belgique', n.lat = 50.5, n.lon = 3.7
+        """,
+        """
+        MERGE (n:Site {name: 'Neuquén'})
+        SET n.country = 'Argentine', n.lat = -38.9, n.lon = -68.1
+        """,
+        """
+        MERGE (n:Site {name: 'Two Medicine Formation'})
+        SET n.country = 'USA', n.lat = 48.3, n.lon = -112.5
+        """,
+
+        # LOCATED_IN – new dinosaurs
+        """
+        MATCH (dino:Dinosaur {name: 'Allosaurus'}),
+              (cont:Continent {name: 'Amérique du Nord'})
+        MERGE (dino)-[:LOCATED_IN {period: 'Jurassique supérieur'}]->(cont)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Stegosaurus'}),
+              (cont:Continent {name: 'Amérique du Nord'})
+        MERGE (dino)-[:LOCATED_IN {period: 'Jurassique supérieur'}]->(cont)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Triceratops'}),
+              (cont:Continent {name: 'Amérique du Nord'})
+        MERGE (dino)-[:LOCATED_IN {period: 'Crétacé supérieur'}]->(cont)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Ankylosaurus'}),
+              (cont:Continent {name: 'Amérique du Nord'})
+        MERGE (dino)-[:LOCATED_IN {period: 'Crétacé supérieur'}]->(cont)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Spinosaurus'}),
+              (cont:Continent {name: 'Afrique'})
+        MERGE (dino)-[:LOCATED_IN {period: 'Crétacé moyen'}]->(cont)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Protoceratops'}),
+              (cont:Continent {name: 'Asie'})
+        MERGE (dino)-[:LOCATED_IN {period: 'Crétacé supérieur'}]->(cont)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Iguanodon'}),
+              (cont:Continent {name: 'Europe'})
+        MERGE (dino)-[:LOCATED_IN {period: 'Crétacé inférieur'}]->(cont)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Carnotaurus'}),
+              (cont:Continent {name: 'Amérique du Sud'})
+        MERGE (dino)-[:LOCATED_IN {period: 'Crétacé supérieur'}]->(cont)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Argentinosaurus'}),
+              (cont:Continent {name: 'Amérique du Sud'})
+        MERGE (dino)-[:LOCATED_IN {period: 'Crétacé supérieur'}]->(cont)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Parasaurolophus'}),
+              (cont:Continent {name: 'Amérique du Nord'})
+        MERGE (dino)-[:LOCATED_IN {period: 'Crétacé supérieur'}]->(cont)
+        """,
+
+        # FOSSIL_DISCOVERED_IN – new dinosaurs
+        """
+        MATCH (dino:Dinosaur {name: 'Allosaurus'}),
+              (site:Site {name: 'Morrison Formation'})
+        MERGE (dino)-[:FOSSIL_DISCOVERED_IN]->(site)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Stegosaurus'}),
+              (site:Site {name: 'Morrison Formation'})
+        MERGE (dino)-[:FOSSIL_DISCOVERED_IN]->(site)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Triceratops'}),
+              (site:Site {name: 'Hell Creek'})
+        MERGE (dino)-[:FOSSIL_DISCOVERED_IN]->(site)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Ankylosaurus'}),
+              (site:Site {name: 'Hell Creek'})
+        MERGE (dino)-[:FOSSIL_DISCOVERED_IN]->(site)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Spinosaurus'}),
+              (site:Site {name: 'Kem Kem Beds'})
+        MERGE (dino)-[:FOSSIL_DISCOVERED_IN]->(site)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Protoceratops'}),
+              (site:Site {name: 'Djadokhta'})
+        MERGE (dino)-[:FOSSIL_DISCOVERED_IN]->(site)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Iguanodon'}),
+              (site:Site {name: 'Bernissart'})
+        MERGE (dino)-[:FOSSIL_DISCOVERED_IN]->(site)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Carnotaurus'}),
+              (site:Site {name: 'Neuquén'})
+        MERGE (dino)-[:FOSSIL_DISCOVERED_IN]->(site)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Argentinosaurus'}),
+              (site:Site {name: 'Neuquén'})
+        MERGE (dino)-[:FOSSIL_DISCOVERED_IN]->(site)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Parasaurolophus'}),
+              (site:Site {name: 'Two Medicine Formation'})
+        MERGE (dino)-[:FOSSIL_DISCOVERED_IN]->(site)
+        """,
+        """
+        MATCH (dino:Dinosaur {name: 'Diplodocus'}),
+              (site:Site {name: 'Morrison Formation'})
+        MERGE (dino)-[:FOSSIL_DISCOVERED_IN]->(site)
+        """,
+
+        # PREYS_ON – extended
+        """
+        MATCH (pred:Dinosaur {name: 'Tyrannosaurus rex'}),
+              (prey:Dinosaur {name: 'Triceratops'})
+        MERGE (pred)-[:PREYS_ON]->(prey)
+        """,
+        """
+        MATCH (pred:Dinosaur {name: 'Tyrannosaurus rex'}),
+              (prey:Dinosaur {name: 'Ankylosaurus'})
+        MERGE (pred)-[:PREYS_ON]->(prey)
+        """,
+        """
+        MATCH (pred:Dinosaur {name: 'Tyrannosaurus rex'}),
+              (prey:Dinosaur {name: 'Parasaurolophus'})
+        MERGE (pred)-[:PREYS_ON]->(prey)
+        """,
+        """
+        MATCH (pred:Dinosaur {name: 'Allosaurus'}),
+              (prey:Dinosaur {name: 'Stegosaurus'})
+        MERGE (pred)-[:PREYS_ON]->(prey)
+        """,
+        """
+        MATCH (pred:Dinosaur {name: 'Allosaurus'}),
+              (prey:Dinosaur {name: 'Diplodocus'})
+        MERGE (pred)-[:PREYS_ON]->(prey)
+        """,
+        """
+        MATCH (pred:Dinosaur {name: 'Allosaurus'}),
+              (prey:Dinosaur {name: 'Brachiosaurus'})
+        MERGE (pred)-[:PREYS_ON]->(prey)
+        """,
+        """
+        MATCH (pred:Dinosaur {name: 'Velociraptor'}),
+              (prey:Dinosaur {name: 'Protoceratops'})
+        MERGE (pred)-[:PREYS_ON]->(prey)
+        """,
+        """
+        MATCH (pred:Dinosaur {name: 'Carnotaurus'}),
+              (prey:Dinosaur {name: 'Argentinosaurus'})
+        MERGE (pred)-[:PREYS_ON]->(prey)
+        """,
+
+        # COEXISTS_WITH – extended
+        """
+        MATCH (a:Dinosaur {name: 'Allosaurus'}),
+              (b:Dinosaur {name: 'Stegosaurus'})
+        MERGE (a)-[:COEXISTS_WITH {period: 'Jurassique supérieur'}]->(b)
+        """,
+        """
+        MATCH (a:Dinosaur {name: 'Allosaurus'}),
+              (b:Dinosaur {name: 'Diplodocus'})
+        MERGE (a)-[:COEXISTS_WITH {period: 'Jurassique supérieur'}]->(b)
+        """,
+        """
+        MATCH (a:Dinosaur {name: 'Allosaurus'}),
+              (b:Dinosaur {name: 'Brachiosaurus'})
+        MERGE (a)-[:COEXISTS_WITH {period: 'Jurassique supérieur'}]->(b)
+        """,
+        """
+        MATCH (a:Dinosaur {name: 'Triceratops'}),
+              (b:Dinosaur {name: 'Tyrannosaurus rex'})
+        MERGE (a)-[:COEXISTS_WITH {period: 'Crétacé supérieur'}]->(b)
+        """,
+        """
+        MATCH (a:Dinosaur {name: 'Ankylosaurus'}),
+              (b:Dinosaur {name: 'Tyrannosaurus rex'})
+        MERGE (a)-[:COEXISTS_WITH {period: 'Crétacé supérieur'}]->(b)
+        """,
+        """
+        MATCH (a:Dinosaur {name: 'Ankylosaurus'}),
+              (b:Dinosaur {name: 'Triceratops'})
+        MERGE (a)-[:COEXISTS_WITH {period: 'Crétacé supérieur'}]->(b)
+        """,
+        """
+        MATCH (a:Dinosaur {name: 'Parasaurolophus'}),
+              (b:Dinosaur {name: 'Triceratops'})
+        MERGE (a)-[:COEXISTS_WITH {period: 'Crétacé supérieur'}]->(b)
+        """,
+        """
+        MATCH (a:Dinosaur {name: 'Protoceratops'}),
+              (b:Dinosaur {name: 'Velociraptor'})
+        MERGE (a)-[:COEXISTS_WITH {period: 'Crétacé supérieur'}]->(b)
+        """,
+        """
+        MATCH (a:Dinosaur {name: 'Carnotaurus'}),
+              (b:Dinosaur {name: 'Argentinosaurus'})
+        MERGE (a)-[:COEXISTS_WITH {period: 'Crétacé supérieur'}]->(b)
+        """,
     ],
 
     # ── PostGIS – SQL statements ─────────────────────────────────────────────
@@ -332,6 +642,54 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
              ST_SetSRID(ST_MakePoint(-50.0, 35.0), 4326),
              ARRAY['Diplodocus', 'Allosaurus', 'Stegosaurus'],
              -154, -152)
+        ON CONFLICT (name) DO NOTHING
+        """,
+        """
+        INSERT INTO fossil_sites
+            (name, country, era, location_modern, location_pangaea,
+             dinosaurs_found, period_start, period_end)
+        VALUES
+            ('Kem Kem Beds', 'Maroc', 'Crétacé moyen',
+             ST_SetSRID(ST_MakePoint(-4.5, 30.5), 4326),
+             ST_SetSRID(ST_MakePoint(10.0, 5.0), 4326),
+             ARRAY['Spinosaurus', 'Carcharodontosaurus', 'Deltadromeus'],
+             -112, -93)
+        ON CONFLICT (name) DO NOTHING
+        """,
+        """
+        INSERT INTO fossil_sites
+            (name, country, era, location_modern, location_pangaea,
+             dinosaurs_found, period_start, period_end)
+        VALUES
+            ('Bernissart', 'Belgique', 'Crétacé inférieur',
+             ST_SetSRID(ST_MakePoint(3.7, 50.5), 4326),
+             ST_SetSRID(ST_MakePoint(15.0, 42.0), 4326),
+             ARRAY['Iguanodon'],
+             -140, -100)
+        ON CONFLICT (name) DO NOTHING
+        """,
+        """
+        INSERT INTO fossil_sites
+            (name, country, era, location_modern, location_pangaea,
+             dinosaurs_found, period_start, period_end)
+        VALUES
+            ('Neuquén', 'Argentine', 'Crétacé supérieur',
+             ST_SetSRID(ST_MakePoint(-68.1, -38.9), 4326),
+             ST_SetSRID(ST_MakePoint(-55.0, -45.0), 4326),
+             ARRAY['Argentinosaurus', 'Carnotaurus', 'Giganotosaurus'],
+             -96, -69)
+        ON CONFLICT (name) DO NOTHING
+        """,
+        """
+        INSERT INTO fossil_sites
+            (name, country, era, location_modern, location_pangaea,
+             dinosaurs_found, period_start, period_end)
+        VALUES
+            ('Two Medicine Formation', 'USA', 'Crétacé supérieur',
+             ST_SetSRID(ST_MakePoint(-112.5, 48.3), 4326),
+             ST_SetSRID(ST_MakePoint(-48.0, 36.0), 4326),
+             ARRAY['Parasaurolophus', 'Maiasaura', 'Troodon'],
+             -83, -70)
         ON CONFLICT (name) DO NOTHING
         """,
 
@@ -434,6 +792,16 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
     rdfs:range  :PaleoContinent ;
     rdfs:label  "sous-continent de"@fr .
 
+:preysOn a owl:ObjectProperty ;
+    rdfs:domain :Dinosaur ;
+    rdfs:range  :Dinosaur ;
+    rdfs:label  "chasse"@fr .
+
+:coexistsWith a owl:ObjectProperty ;
+    rdfs:domain :Dinosaur ;
+    rdfs:range  :Dinosaur ;
+    rdfs:label  "coexiste avec"@fr .
+
 # ── Data properties ─────────────────────────────────────────────────────────
 :period     a owl:DatatypeProperty ; rdfs:range xsd:string  ; rdfs:label "période"@fr .
 :diet       a owl:DatatypeProperty ; rdfs:range xsd:string  ; rdfs:label "régime"@fr .
@@ -457,7 +825,9 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
     :eraStart    "-68"^^xsd:integer ;
     :eraEnd      "-66"^^xsd:integer ;
     :locatedIn   :AmeriqueduNord ;
-    :foundAtSite :HellCreek .
+    :foundAtSite :HellCreek ;
+    :preysOn     :Triceratops, :Ankylosaurus, :Parasaurolophus ;
+    :coexistsWith :Triceratops, :Ankylosaurus, :Parasaurolophus, :Velociraptor .
 
 :Brachiosaurus a :Dinosaur ;
     rdfs:label   "Brachiosaurus" ;
@@ -468,7 +838,8 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
     :eraStart    "-154"^^xsd:integer ;
     :eraEnd      "-150"^^xsd:integer ;
     :locatedIn   :Gondwana ;
-    :foundAtSite :Tendaguru .
+    :foundAtSite :Tendaguru ;
+    :coexistsWith :Diplodocus .
 
 :Velociraptor a :Dinosaur ;
     rdfs:label   "Velociraptor" ;
@@ -479,7 +850,9 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
     :eraStart    "-75"^^xsd:integer ;
     :eraEnd      "-71"^^xsd:integer ;
     :locatedIn   :Asie ;
-    :foundAtSite :Djadokhta .
+    :foundAtSite :Djadokhta ;
+    :preysOn     :Protoceratops ;
+    :coexistsWith :Protoceratops, :TyrannosaurusRex .
 
 :Archaeopteryx a :Dinosaur ;
     rdfs:label   "Archaeopteryx" ;
@@ -501,7 +874,128 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
     :eraStart    "-154"^^xsd:integer ;
     :eraEnd      "-152"^^xsd:integer ;
     :locatedIn   :AmeriqueduNord ;
-    :foundAtSite :MorrisonFormation .
+    :foundAtSite :MorrisonFormation ;
+    :coexistsWith :Brachiosaurus, :Allosaurus, :Stegosaurus .
+
+:Allosaurus a :Dinosaur ;
+    rdfs:label   "Allosaurus" ;
+    :period      "Jurassique supérieur" ;
+    :diet        "carnivore" ;
+    :lengthM     "9.0"^^xsd:decimal ;
+    :weightKg    "2300"^^xsd:decimal ;
+    :eraStart    "-156"^^xsd:integer ;
+    :eraEnd      "-150"^^xsd:integer ;
+    :locatedIn   :AmeriqueduNord ;
+    :foundAtSite :MorrisonFormation ;
+    :preysOn     :Stegosaurus, :Diplodocus, :Brachiosaurus ;
+    :coexistsWith :Stegosaurus, :Diplodocus, :Brachiosaurus .
+
+:Stegosaurus a :Dinosaur ;
+    rdfs:label   "Stegosaurus" ;
+    :period      "Jurassique supérieur" ;
+    :diet        "herbivore" ;
+    :lengthM     "9.0"^^xsd:decimal ;
+    :weightKg    "3500"^^xsd:decimal ;
+    :eraStart    "-156"^^xsd:integer ;
+    :eraEnd      "-150"^^xsd:integer ;
+    :locatedIn   :AmeriqueduNord ;
+    :foundAtSite :MorrisonFormation ;
+    :coexistsWith :Allosaurus, :Diplodocus .
+
+:Triceratops a :Dinosaur ;
+    rdfs:label   "Triceratops" ;
+    :period      "Crétacé supérieur" ;
+    :diet        "herbivore" ;
+    :lengthM     "9.0"^^xsd:decimal ;
+    :weightKg    "12000"^^xsd:decimal ;
+    :eraStart    "-68"^^xsd:integer ;
+    :eraEnd      "-66"^^xsd:integer ;
+    :locatedIn   :AmeriqueduNord ;
+    :foundAtSite :HellCreek ;
+    :coexistsWith :TyrannosaurusRex, :Ankylosaurus, :Parasaurolophus .
+
+:Ankylosaurus a :Dinosaur ;
+    rdfs:label   "Ankylosaurus" ;
+    :period      "Crétacé supérieur" ;
+    :diet        "herbivore" ;
+    :lengthM     "6.25"^^xsd:decimal ;
+    :weightKg    "6000"^^xsd:decimal ;
+    :eraStart    "-68"^^xsd:integer ;
+    :eraEnd      "-66"^^xsd:integer ;
+    :locatedIn   :AmeriqueduNord ;
+    :foundAtSite :HellCreek ;
+    :coexistsWith :TyrannosaurusRex, :Triceratops, :Parasaurolophus .
+
+:Spinosaurus a :Dinosaur ;
+    rdfs:label   "Spinosaurus" ;
+    :period      "Crétacé moyen" ;
+    :diet        "piscivore" ;
+    :lengthM     "15.0"^^xsd:decimal ;
+    :weightKg    "7000"^^xsd:decimal ;
+    :eraStart    "-112"^^xsd:integer ;
+    :eraEnd      "-93"^^xsd:integer ;
+    :locatedIn   :Afrique ;
+    :foundAtSite :KemKemBeds .
+
+:Protoceratops a :Dinosaur ;
+    rdfs:label   "Protoceratops" ;
+    :period      "Crétacé supérieur" ;
+    :diet        "herbivore" ;
+    :lengthM     "1.8"^^xsd:decimal ;
+    :weightKg    "177"^^xsd:decimal ;
+    :eraStart    "-83"^^xsd:integer ;
+    :eraEnd      "-70"^^xsd:integer ;
+    :locatedIn   :Asie ;
+    :foundAtSite :Djadokhta ;
+    :coexistsWith :Velociraptor .
+
+:Iguanodon a :Dinosaur ;
+    rdfs:label   "Iguanodon" ;
+    :period      "Crétacé inférieur" ;
+    :diet        "herbivore" ;
+    :lengthM     "10.0"^^xsd:decimal ;
+    :weightKg    "3000"^^xsd:decimal ;
+    :eraStart    "-140"^^xsd:integer ;
+    :eraEnd      "-100"^^xsd:integer ;
+    :locatedIn   :Europe ;
+    :foundAtSite :Bernissart .
+
+:Carnotaurus a :Dinosaur ;
+    rdfs:label   "Carnotaurus" ;
+    :period      "Crétacé supérieur" ;
+    :diet        "carnivore" ;
+    :lengthM     "8.0"^^xsd:decimal ;
+    :weightKg    "1500"^^xsd:decimal ;
+    :eraStart    "-72"^^xsd:integer ;
+    :eraEnd      "-69"^^xsd:integer ;
+    :locatedIn   :AmeriqueduSud ;
+    :foundAtSite :Neuquen ;
+    :preysOn     :Argentinosaurus ;
+    :coexistsWith :Argentinosaurus .
+
+:Argentinosaurus a :Dinosaur ;
+    rdfs:label   "Argentinosaurus" ;
+    :period      "Crétacé supérieur" ;
+    :diet        "herbivore" ;
+    :lengthM     "35.0"^^xsd:decimal ;
+    :weightKg    "70000"^^xsd:decimal ;
+    :eraStart    "-96"^^xsd:integer ;
+    :eraEnd      "-90"^^xsd:integer ;
+    :locatedIn   :AmeriqueduSud ;
+    :foundAtSite :Neuquen ;
+    :coexistsWith :Carnotaurus .
+
+:Parasaurolophus a :Dinosaur ;
+    rdfs:label   "Parasaurolophus" ;
+    :period      "Crétacé supérieur" ;
+    :diet        "herbivore" ;
+    :lengthM     "9.5"^^xsd:decimal ;
+    :weightKg    "2500"^^xsd:decimal ;
+    :eraStart    "-76"^^xsd:integer ;
+    :eraEnd      "-73"^^xsd:integer ;
+    :locatedIn   :AmeriqueduNord ;
+    :foundAtSite :TwoMedicineFormation ;
+    :coexistsWith :Triceratops, :Ankylosaurus .
 
 # ── Individuals – Fossil sites ──────────────────────────────────────────────
 :HellCreek a :FossilSite ;
@@ -554,6 +1048,46 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
     :pangaeaLat "35.0"^^xsd:decimal ;
     :pangaeaLon "-50.0"^^xsd:decimal .
 
+:KemKemBeds a :FossilSite ;
+    rdfs:label  "Kem Kem Beds" ;
+    :country    "Maroc" ;
+    :eraStart   "-112"^^xsd:integer ;
+    :eraEnd     "-93"^^xsd:integer ;
+    :modernLat  "30.5"^^xsd:decimal ;
+    :modernLon  "-4.5"^^xsd:decimal ;
+    :pangaeaLat "5.0"^^xsd:decimal ;
+    :pangaeaLon "10.0"^^xsd:decimal .
+
+:Bernissart a :FossilSite ;
+    rdfs:label  "Bernissart" ;
+    :country    "Belgique" ;
+    :eraStart   "-140"^^xsd:integer ;
+    :eraEnd     "-100"^^xsd:integer ;
+    :modernLat  "50.5"^^xsd:decimal ;
+    :modernLon  "3.7"^^xsd:decimal ;
+    :pangaeaLat "42.0"^^xsd:decimal ;
+    :pangaeaLon "15.0"^^xsd:decimal .
+
+:Neuquen a :FossilSite ;
+    rdfs:label  "Neuquén" ;
+    :country    "Argentine" ;
+    :eraStart   "-96"^^xsd:integer ;
+    :eraEnd     "-69"^^xsd:integer ;
+    :modernLat  "-38.9"^^xsd:decimal ;
+    :modernLon  "-68.1"^^xsd:decimal ;
+    :pangaeaLat "-45.0"^^xsd:decimal ;
+    :pangaeaLon "-55.0"^^xsd:decimal .
+
+:TwoMedicineFormation a :FossilSite ;
+    rdfs:label  "Two Medicine Formation" ;
+    :country    "USA" ;
+    :eraStart   "-83"^^xsd:integer ;
+    :eraEnd     "-70"^^xsd:integer ;
+    :modernLat  "48.3"^^xsd:decimal ;
+    :modernLon  "-112.5"^^xsd:decimal ;
+    :pangaeaLat "36.0"^^xsd:decimal ;
+    :pangaeaLon "-48.0"^^xsd:decimal .
+
 # ── Individuals – Paleo-continents ──────────────────────────────────────────
 :Pangee a :PaleoContinent ;
     rdfs:label  "Pangée"@fr ;
@@ -605,6 +1139,18 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
     :eraEnd         "0"^^xsd:integer ;
     :subContinentOf :Laurasia .
 """,
+
+    # ── Suggestions UI ────────────────────────────────────────────────────────
+    suggestions=[
+        "Quels dinosaures vivaient en Asie ?",
+        "Quels sites ont livré des fossiles de Vélociraptor ?",
+        "Compare la taille du T-rex et du Vélociraptor.",
+        "Montre les relations prédateur-proie du Jurassique.",
+        "Quels sont les plus grands herbivores connus ?",
+        "Où vivait le Spinosaurus et que mangeait-il ?",
+        "Quels dinosaures coexistaient en Amérique du Nord ?",
+        "Quel est le site fossilifère le plus riche d'Amérique du Sud ?",
+    ],
 
     # ── ChromaDB – documents à vectoriser ────────────────────────────────────
     chroma_documents=[
@@ -693,6 +1239,151 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
                 "au Jurassique. Tous les dinosaures connus vivaient sur ses fragments."
             ),
             "metadata": {"type": "continent", "name": "Pangée", "period": "Trias"},
+        },
+        {
+            "text": (
+                "L'Allosaurus est un dinosaure carnivore du Jurassique supérieur "
+                "(-156 à -150 Ma), mesurant 9 mètres pour 2 300 kg. "
+                "Prédateur dominant de son époque, il chassait le Stegosaurus, le Diplodocus "
+                "et le Brachiosaurus. Ses fossiles proviennent de la Morrison Formation (USA). "
+                "Il coexistait avec Stegosaurus, Diplodocus et Brachiosaurus."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Allosaurus", "period": "Jurassique supérieur"},
+        },
+        {
+            "text": (
+                "Le Stegosaurus est un dinosaure herbivore du Jurassique supérieur "
+                "(-156 à -150 Ma), mesurant 9 mètres pour 3 500 kg. "
+                "Il est reconnaissable à ses grandes plaques dorsales et à son queue à pointes. "
+                "Proie principale de l'Allosaurus, il vivait en Amérique du Nord. "
+                "Ses fossiles viennent de la Morrison Formation (USA)."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Stegosaurus", "period": "Jurassique supérieur"},
+        },
+        {
+            "text": (
+                "Le Triceratops est un dinosaure herbivore du Crétacé supérieur "
+                "(-68 à -66 Ma), mesurant 9 mètres pour 12 000 kg. "
+                "Doté de trois cornes et d'une large collerette osseuse, il était la proie "
+                "principale du Tyrannosaurus rex. Il coexistait avec Ankylosaurus et "
+                "Parasaurolophus sur le site de Hell Creek (USA)."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Triceratops", "period": "Crétacé supérieur"},
+        },
+        {
+            "text": (
+                "L'Ankylosaurus est un dinosaure herbivore du Crétacé supérieur "
+                "(-68 à -66 Ma), mesurant 6,25 mètres pour 6 000 kg. "
+                "Son corps était recouvert d'une armure osseuse et sa queue se terminait "
+                "par une massue. Il était chassé par le Tyrannosaurus rex. "
+                "Ses fossiles proviennent du site de Hell Creek (USA)."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Ankylosaurus", "period": "Crétacé supérieur"},
+        },
+        {
+            "text": (
+                "Le Spinosaurus est un dinosaure piscivore du Crétacé moyen "
+                "(-112 à -93 Ma), mesurant 15 mètres pour 7 000 kg. "
+                "C'est l'un des plus grands prédateurs terrestres connus. Il vivait en Afrique "
+                "du Nord, principalement en bord de fleuves. Ses fossiles ont été découverts "
+                "dans les Kem Kem Beds, au Maroc."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Spinosaurus", "period": "Crétacé moyen"},
+        },
+        {
+            "text": (
+                "Le Protoceratops est un dinosaure herbivore du Crétacé supérieur "
+                "(-83 à -70 Ma), mesurant 1,8 mètre pour 177 kg. "
+                "Il vivait en Asie centrale et était la proie principale du Velociraptor. "
+                "Le célèbre fossile des 'Dinosaures combattants' montre un Velociraptor "
+                "et un Protoceratops figés en plein combat. Site : Djadokhta, Mongolie."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Protoceratops", "period": "Crétacé supérieur"},
+        },
+        {
+            "text": (
+                "L'Iguanodon est un dinosaure herbivore du Crétacé inférieur "
+                "(-140 à -100 Ma), mesurant 10 mètres pour 3 000 kg. "
+                "Il est l'un des premiers dinosaures décrits scientifiquement. "
+                "Il vivait en Europe. Ses fossiles les plus célèbres ont été découverts "
+                "dans la mine de Bernissart, en Belgique."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Iguanodon", "period": "Crétacé inférieur"},
+        },
+        {
+            "text": (
+                "Le Carnotaurus est un dinosaure carnivore du Crétacé supérieur "
+                "(-72 à -69 Ma), mesurant 8 mètres pour 1 500 kg. "
+                "Il est caractérisé par ses deux petites cornes au-dessus des yeux. "
+                "Prédateur agile d'Amérique du Sud, il chassait notamment l'Argentinosaurus. "
+                "Ses fossiles proviennent de la région de Neuquén, en Argentine."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Carnotaurus", "period": "Crétacé supérieur"},
+        },
+        {
+            "text": (
+                "L'Argentinosaurus est un dinosaure herbivore du Crétacé supérieur "
+                "(-96 à -90 Ma), mesurant 35 mètres pour 70 000 kg. "
+                "C'est l'un des plus grands animaux terrestres ayant jamais existé. "
+                "Il vivait en Amérique du Sud et était chassé par le Carnotaurus. "
+                "Ses fossiles ont été découverts dans la région de Neuquén, en Argentine."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Argentinosaurus", "period": "Crétacé supérieur"},
+        },
+        {
+            "text": (
+                "Le Parasaurolophus est un dinosaure herbivore du Crétacé supérieur "
+                "(-76 à -73 Ma), mesurant 9,5 mètres pour 2 500 kg. "
+                "Il est reconnaissable à sa longue crête creuse sur le crâne, utilisée "
+                "pour communiquer par sons. Il coexistait avec Triceratops et Ankylosaurus "
+                "en Amérique du Nord. Fossiles : Two Medicine Formation (USA)."
+            ),
+            "metadata": {"type": "dinosaur", "name": "Parasaurolophus", "period": "Crétacé supérieur"},
+        },
+        {
+            "text": (
+                "Le site des Kem Kem Beds (Maroc) est un gisement fossilifère du "
+                "Crétacé moyen (-112 à -93 Ma) situé à 30.5°N, -4.5°E. "
+                "On y a découvert des fossiles de Spinosaurus, Carcharodontosaurus et Deltadromeus. "
+                "C'était un environnement fluvial avec une faune de prédateurs exceptionnelle."
+            ),
+            "metadata": {"type": "site", "name": "Kem Kem Beds", "country": "Maroc"},
+        },
+        {
+            "text": (
+                "Le site de Bernissart (Belgique) est un gisement fossilifère du "
+                "Crétacé inférieur (-140 à -100 Ma) situé à 50.5°N, 3.7°E. "
+                "En 1878, des mineurs y ont découvert 38 squelettes d'Iguanodon, "
+                "constituant l'une des plus importantes découvertes paléontologiques d'Europe."
+            ),
+            "metadata": {"type": "site", "name": "Bernissart", "country": "Belgique"},
+        },
+        {
+            "text": (
+                "Le site de Neuquén (Argentine) est un gisement fossilifère du "
+                "Crétacé supérieur (-96 à -69 Ma) situé à -38.9°N, -68.1°E. "
+                "C'est l'un des sites les plus riches au monde, ayant livré des fossiles "
+                "d'Argentinosaurus, Carnotaurus et Giganotosaurus."
+            ),
+            "metadata": {"type": "site", "name": "Neuquén", "country": "Argentine"},
+        },
+        {
+            "text": (
+                "La chaîne alimentaire du Crétacé supérieur en Amérique du Nord : "
+                "le Tyrannosaurus rex était le super-prédateur dominant. "
+                "Il chassait le Triceratops, l'Ankylosaurus et le Parasaurolophus. "
+                "Ces herbivores coexistaient tous sur le site de Hell Creek (-68 à -66 Ma)."
+            ),
+            "metadata": {"type": "food_chain", "period": "Crétacé supérieur", "region": "Amérique du Nord"},
+        },
+        {
+            "text": (
+                "La chaîne alimentaire du Jurassique supérieur en Amérique du Nord : "
+                "l'Allosaurus était le principal prédateur de la Morrison Formation. "
+                "Il chassait le Stegosaurus, le Diplodocus et le Brachiosaurus. "
+                "Ces espèces coexistaient toutes entre -156 et -150 Ma."
+            ),
+            "metadata": {"type": "food_chain", "period": "Jurassique supérieur", "region": "Amérique du Nord"},
         },
     ],
 )
