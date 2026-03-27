@@ -11,7 +11,10 @@
     <ChatPrompt
       ref="chatPromptRef"
       :is-streaming="isStreaming"
+      :available-agents="availableAgents"
+      :selected-agents="selectedAgents"
       @submit="send"
+      @update:selected-agents="selectedAgents = $event"
     />
   </div>
 </template>
@@ -21,13 +24,18 @@ import { ref, reactive, nextTick, onMounted } from 'vue'
 import ChatHeader from './ChatView/ChatHeader.vue'
 import ChatMessages from './ChatView/ChatMessages.vue'
 import ChatPrompt from './ChatView/ChatPrompt.vue'
-import { type Message } from '@/types'
+import { type Message, type AgentInfo } from '@/types'
 
 const suggestions    = ref<string[]>([])
 const messages    = ref<Message[]>([])
 const sessionId   = ref<string | null>(null)
 const isStreaming  = ref(false)
 const isThinking   = ref(false)
+
+/** Agents that are currently enabled in the backend configuration. */
+const availableAgents = ref<AgentInfo[]>([])
+/** Agent keys the user currently wants to query (defaults to all active). */
+const selectedAgents  = ref<string[]>([])
 
 const chatMessagesRef = ref<InstanceType<typeof ChatMessages> | null>(null)
 const chatPromptRef   = ref<InstanceType<typeof ChatPrompt>   | null>(null)
@@ -36,11 +44,23 @@ let _id = 0
 const uid = () => `m${++_id}`
 
 onMounted(async () => {
+  // Fetch theme suggestions
   try {
     const res = await fetch('/api/suggestions')
     if (res.ok) {
       const data = await res.json()
       suggestions.value = data.suggestions ?? []
+    }
+  } catch { /* silently ignore */ }
+
+  // Fetch available agents from backend config
+  try {
+    const res = await fetch('/api/agents')
+    if (res.ok) {
+      const data = await res.json()
+      availableAgents.value = data.agents as AgentInfo[]
+      // Default: all active agents selected
+      selectedAgents.value = availableAgents.value.map(a => a.key)
     }
   } catch { /* silently ignore */ }
 })
@@ -68,7 +88,7 @@ async function send(text: string) {
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, session_id: sessionId.value }),
+      body: JSON.stringify({ message: text, session_id: sessionId.value, selected_agents: selectedAgents.value }),
     })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     if (!res.body) throw new Error('No body')

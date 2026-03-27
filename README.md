@@ -22,36 +22,63 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 ## Multi-agent architecture
 
 ```
-User query
+User query  +  selected_agents? (optional)
     │
     ▼
-┌───────────────────────────────────────────────────────┐
-│                   Master Agent                        │
-│                                                       │
-│  ┌─────────┐   Send fan-out   ┌──────────────────┐    │
-│  │ router  │─────────────────►│ neo4j_agent      │─┐  │
-│  │  (LLM + │                  │ (Cypher / Neo4j) │ │  │
-│  │  struct)│─────────────────►│ rdf_agent        │─┤  │
-│  └─────────┘                  │ (SPARQL/GraphDB) │ │  │
-│                               │ vector_agent     │─┤  │
-│                               │ (Chroma embeds)  │ │  │
-│                               │ postgis_agent    │─┘  │
-│                               │ (PostGIS SQL)    │    │
-│                               └──────────────────┘    │
-│                                       │               │
-│                               ┌───────▼──────┐        │
-│                               │  merge node  │        │
-│                               │ (synthesise) │        │
-│                               └───────┬──────┘        │
-└───────────────────────────────────────┼───────────────┘
-                                        ▼
-                                   Streamed answer (SSE)
+┌───────────────────────────────────────────────────────────┐
+│                      Master Agent                         │
+│                                                           │
+│  config flags (enabled/disabled)                          │
+│       ∩  user selection (selected_agents)                 │
+│       = eligible pool                                     │
+│               │                                           │
+│          ┌────▼────┐   Send fan-out   ┌────────────────┐  │
+│          │ router  │─────────────────►│ neo4j_agent    │─┐│
+│          │ (LLM +  │                  │ (Cypher/Neo4j) │ ││
+│          │ struct) │─────────────────►│ rdf_agent      │─┤│
+│          └─────────┘                  │ (SPARQL/GDB)   │ ││
+│                                       │ vector_agent   │─┤│
+│                                       │ (Chroma embed) │ ││
+│                                       │ postgis_agent  │─┘│
+│                                       │ (PostGIS SQL)  │  │
+│                                       └────────────────┘  │
+│                                               │           │
+│                                       ┌───────▼──────┐    │
+│                                       │  merge node  │    │
+│                                       │ (synthesise) │    │
+│                                       └───────┬──────┘    │
+└───────────────────────────────────────────────┼───────────┘
+                                                ▼
+                                         Streamed answer (SSE)
 ```
 
-The **router** uses an LLM with structured output to select the minimum relevant
-set of sub-agents.  Each sub-agent runs its own ReAct loop (LLM + tools) and
-writes its result into a shared `sub_results` dict.  The **merge** node then
-synthesises all results into a final streamed answer.
+The **router** selects the minimum set of relevant sub-agents from an *eligible
+pool* constrained by two layers:
+
+1. **Server-side config** — each sub-agent can be individually enabled or
+   disabled via environment variables (all default to `true`).  Disabled agents
+   are excluded from the graph entirely.
+2. **User selection** — a caller can pass `"selected_agents": ["neo4j", "vector"]`
+   in the `POST /api/chat` request body to restrict routing to a specific subset.
+   An empty list (or omitting the field) means *"no preference"* — the router
+   considers all active agents.
+
+Within the eligible pool, the router LLM (structured output) picks the agents
+that best suit the query.  Each selected agent runs its own ReAct loop (LLM +
+tools) and writes its result into a shared `sub_results` dict.  The **merge**
+node then synthesises all results into a final streamed answer.
+
+### Agent enable / disable flags
+
+| Variable | Default | Description |
+|---|---|---|
+| `NEO4J_AGENT_ENABLED` | `true` | Knowledge Graph agent (Cypher / Neo4j) |
+| `RDF_AGENT_ENABLED` | `true` | RDF/Linked Data agent (SPARQL / GraphDB) |
+| `VECTOR_AGENT_ENABLED` | `true` | Semantic search agent (ChromaDB) |
+| `POSTGIS_AGENT_ENABLED` | `true` | Spatial SQL agent (PostGIS) |
+
+Set any flag to `false` in `.env` to exclude that agent from all routing decisions.
+The orchestrator always keeps at least one agent active as a fallback (defaults to `neo4j`).
 
 ### SSE event types
 

@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
 from pydantic import BaseModel
 
-from app.agent.master import agent_graph
+from app.agent.master import agent_graph, get_active_agents
 from app.agent.state import AgentState
 from app.db.redis_client import load_session, save_session
 from app.db.themes import get_active_theme
@@ -25,10 +25,22 @@ _AGENT_LABELS: dict[str, str] = {
     "router": "Router",
 }
 
+# Human-readable labels indexed by the short agent key
+_AGENT_UI_LABELS: dict[str, str] = {
+    "neo4j": "Neo4j",
+    "rdf": "RDF/SPARQL",
+    "vector": "Vector",
+    "postgis": "PostGIS",
+    "map": "Map",
+}
+
 
 class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
+    # Agents the user explicitly wants to query.
+    # An empty list (or omitting the field) means "use all active agents".
+    selected_agents: list[str] | None = None
 
 
 class SessionResponse(BaseModel):
@@ -78,6 +90,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
     initial_state: AgentState = {
         "messages": history,
         "session_id": session_id,
+        "selected_agents": body.selected_agents or [],
         "agents_to_call": [],
         "sub_results": {},
         "geojson": None,
@@ -180,3 +193,19 @@ async def chat(body: ChatRequest) -> StreamingResponse:
 @router.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
+
+
+@router.get("/agents")
+async def list_agents() -> dict:
+    """Return the list of sub-agents currently enabled in the backend configuration.
+
+    The frontend uses this to render the agent-selector toggle UI and to know
+    which agents it can include in ``selected_agents`` when calling ``/api/chat``.
+    """
+    active = get_active_agents()
+    return {
+        "agents": [
+            {"key": k, "label": _AGENT_UI_LABELS.get(k, k)}
+            for k in active
+        ]
+    }

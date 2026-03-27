@@ -16,6 +16,10 @@ class AgentState(TypedDict):
     messages: Annotated[Sequence[BaseMessage], operator.add]
     session_id: str
 
+    # Agents explicitly requested by the user.  An empty list means
+    # "no preference – let the router decide among all active agents".
+    selected_agents: list[str]
+
     # Set by the router node: which sub-agents should be invoked
     agents_to_call: list[str]
 

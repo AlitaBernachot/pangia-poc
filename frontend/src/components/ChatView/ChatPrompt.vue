@@ -17,15 +17,28 @@
       />
       <!-- Footer -->
       <div class="flex items-center justify-between gap-2 px-3 pb-3 pt-1">
-        <div class="flex items-center gap-1">
+        <!-- Agent selector toggles -->
+        <div class="flex items-center gap-1 flex-wrap">
           <Button severity="secondary" size="small" rounded text class="text-xs! text-white/50! gap-1.5!">
             <i class="pi pi-paperclip text-[11px]" />
             Attach
           </Button>
-          <Button severity="secondary" size="small" rounded text class="text-xs! text-white/50! gap-1.5!">
-            <i class="pi pi-globe text-[11px]" />
-            All Sources
-          </Button>
+          <template v-if="availableAgents.length > 0">
+            <button
+              v-for="agent in availableAgents"
+              :key="agent.key"
+              type="button"
+              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors duration-150 cursor-pointer select-none"
+              :class="isAgentSelected(agent.key)
+                ? agentActiveClass(agent.label)
+                : 'border-white/15 text-white/30 bg-transparent hover:text-white/50'"
+              :title="`${isAgentSelected(agent.key) ? 'Deselect' : 'Select'} ${agent.label}`"
+              @click="toggleAgent(agent.key)"
+            >
+              <span>{{ agentIcon(agent.label) }}</span>
+              {{ agent.label }}
+            </button>
+          </template>
         </div>
         <Button
           icon="pi pi-arrow-up"
@@ -45,12 +58,48 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
 import Button from 'primevue/button'
+import { type AgentInfo, agentIcon } from '@/types'
 
-const props = defineProps<{ isStreaming: boolean }>()
-const emit = defineEmits<{ submit: [text: string] }>()
+const props = defineProps<{
+  isStreaming: boolean
+  availableAgents: AgentInfo[]
+  selectedAgents: string[]
+}>()
+
+const emit = defineEmits<{
+  submit: [text: string]
+  'update:selectedAgents': [keys: string[]]
+}>()
 
 const draft    = ref('')
 const inputRef = ref<HTMLTextAreaElement | null>(null)
+
+/** Color classes for each agent when its toggle is active. */
+const _agentColors: Record<string, string> = {
+  'Neo4j':      'border-[#4ade80] text-[#4ade80] bg-[rgba(74,222,128,0.10)]',
+  'RDF/SPARQL': 'border-[#fb923c] text-[#fb923c] bg-[rgba(251,146,60,0.10)]',
+  'Vector':     'border-[#a78bfa] text-[#a78bfa] bg-[rgba(167,139,250,0.10)]',
+  'PostGIS':    'border-[#38bdf8] text-[#38bdf8] bg-[rgba(56,189,248,0.10)]',
+}
+function agentActiveClass(label: string): string {
+  return _agentColors[label] ?? 'border-white/40 text-white/80 bg-white/5'
+}
+
+function isAgentSelected(key: string): boolean {
+  return props.selectedAgents.includes(key)
+}
+
+/** Toggle an agent on/off.  At least one must remain selected. */
+function toggleAgent(key: string) {
+  const current = props.selectedAgents
+  if (current.includes(key)) {
+    if (current.length > 1) {
+      emit('update:selectedAgents', current.filter(k => k !== key))
+    }
+  } else {
+    emit('update:selectedAgents', [...current, key])
+  }
+}
 
 function autoResize() {
   const el = inputRef.value
@@ -78,3 +127,4 @@ function focus() {
 
 defineExpose({ submitText, focus })
 </script>
+

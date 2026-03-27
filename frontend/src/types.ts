@@ -20,6 +20,11 @@ export interface Message {
   geojson?: Record<string, unknown> | null
 }
 
+export interface AgentInfo {
+  key: string
+  label: string
+}
+
 export const AGENT_COLORS: Record<string, { text: string; border: string; bg: string }> = {
   'Neo4j':      { text: '#4ade80', border: '#4ade80', bg: 'rgba(74,222,128,0.1)'  },
   'RDF/SPARQL': { text: '#fb923c', border: '#fb923c', bg: 'rgba(251,146,60,0.1)'  },
