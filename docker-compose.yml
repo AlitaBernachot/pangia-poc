@@ -1,22 +1,5 @@
 services:
-  # ── Frontend2 (Vue 3 + PrimeVue + Tailwind) ─────────────────────────────────
-  frontend2:
-    build:
-      context: ./frontend2
-      dockerfile: Dockerfile
-      target: builder
-    ports:
-      - "3001:5174"
-    volumes:
-      - ./frontend2/src:/app/src
-      - ./frontend2/index.html:/app/index.html
-      - /app/node_modules
-    environment:
-      - BACKEND_URL=http://backend:8000
-    command: npm run dev -- --host
-    restart: unless-stopped
-
-  # ── Frontend (Vue 3 + Vite dev server) ──────────────────────────────────────
+  # ── Frontend (Vue 3 + PrimeVue + Tailwind) ──────────────────────────────────────
   frontend:
     build:
       context: ./frontend

@@ -11,7 +11,7 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5174,
+    port: 5173,
     proxy: {
       '/api': {
         target: process.env.BACKEND_URL ?? 'http://localhost:8000',
