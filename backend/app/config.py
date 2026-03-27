@@ -53,6 +53,28 @@ class Settings(BaseSettings):
     map_agent_enabled: bool = True
     data_gouv_agent_enabled: bool = True
 
+    # Per-agent model configuration
+    # For each agent set <AGENT>_MODEL_PROVIDER and <AGENT>_MODEL_NAME to
+    # override the model used by that agent.  Leave empty ("") to fall back to
+    # the global OPENAI_MODEL / OPENAI_API_KEY values above.
+    # Supported providers: "openai" (default), "anthropic", "ollama".
+    router_model_provider: str = ""
+    router_model_name: str = ""
+    neo4j_agent_model_provider: str = ""
+    neo4j_agent_model_name: str = ""
+    rdf_agent_model_provider: str = ""
+    rdf_agent_model_name: str = ""
+    vector_agent_model_provider: str = ""
+    vector_agent_model_name: str = ""
+    postgis_agent_model_provider: str = ""
+    postgis_agent_model_name: str = ""
+    map_agent_model_provider: str = ""
+    map_agent_model_name: str = ""
+    data_gouv_agent_model_provider: str = ""
+    data_gouv_agent_model_name: str = ""
+    merge_model_provider: str = ""
+    merge_model_name: str = ""
+
     # Arize Phoenix (agent observability)
     phoenix_collector_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project_name: str = "pangia-geoia"

@@ -6,10 +6,9 @@ Exposed as a single async function `run` usable as a LangGraph node.
 """
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
 
+from app.agent.model_config import build_llm, get_agent_model_config
 from app.agent.state import AgentState
-from app.config import get_settings
 from app.db.chroma_client import similarity_search, add_documents
 from app.db.themes import get_active_theme
 
@@ -62,13 +61,7 @@ _TOOL_MAP = {t.name: t for t in VECTOR_TOOLS}
 
 async def run(state: AgentState) -> dict:
     """LangGraph node: run the Vector sub-agent ReAct loop."""
-    settings = get_settings()
-    llm = ChatOpenAI(
-        model=settings.openai_model,
-        temperature=settings.openai_temperature,
-        api_key=settings.openai_api_key,
-        streaming=True,
-    ).bind_tools(VECTOR_TOOLS)
+    llm = build_llm(get_agent_model_config("vector_agent"), streaming=True).bind_tools(VECTOR_TOOLS)
 
     user_query = next(
         (m.content for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),

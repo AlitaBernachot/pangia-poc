@@ -9,10 +9,9 @@ import json
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
 
+from app.agent.model_config import build_llm, get_agent_model_config
 from app.agent.state import AgentState
-from app.config import get_settings
 from app.db.neo4j_client import run_query, run_readonly_query
 from app.db.themes import get_active_theme
 
@@ -93,13 +92,7 @@ _TOOL_MAP = {t.name: t for t in NEO4J_TOOLS}
 
 async def run(state: AgentState) -> dict:
     """LangGraph node: run the Neo4j sub-agent ReAct loop."""
-    settings = get_settings()
-    llm = ChatOpenAI(
-        model=settings.openai_model,
-        temperature=settings.openai_temperature,
-        api_key=settings.openai_api_key,
-        streaming=True,
-    ).bind_tools(NEO4J_TOOLS)
+    llm = build_llm(get_agent_model_config("neo4j_agent"), streaming=True).bind_tools(NEO4J_TOOLS)
 
     # Extract the latest user query
     user_query = next(
