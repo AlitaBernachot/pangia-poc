@@ -21,6 +21,7 @@ _AGENT_LABELS: dict[str, str] = {
     "vector_agent": "Vector",
     "postgis_agent": "PostGIS",
     "map_agent": "Map",
+    "data_gouv_agent": "Data.gouv.fr",
     "merge": "Synthesiser",
     "router": "Router",
 }
@@ -32,6 +33,7 @@ _AGENT_UI_LABELS: dict[str, str] = {
     "vector": "Vector",
     "postgis": "PostGIS",
     "map": "Map",
+    "data_gouv": "Data.gouv.fr",
 }
 
 

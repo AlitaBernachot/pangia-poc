@@ -36,14 +36,16 @@ export const AGENT_COLORS: Record<string, { text: string; border: string; bg: st
   'Vector':     { text: '#a78bfa', border: '#a78bfa', bg: 'rgba(167,139,250,0.1)' },
   'PostGIS':    { text: '#38bdf8', border: '#38bdf8', bg: 'rgba(56,189,248,0.1)'  },
   'Map':        { text: '#fbbf24', border: '#fbbf24', bg: 'rgba(251,191,36,0.1)'  },
+  'Data.gouv.fr': { text: '#f43f5e', border: '#f43f5e', bg: 'rgba(244,63,94,0.1)'   },
 }
 
 export const AGENT_ICONS: Record<string, string> = {
-  'Neo4j':      '🔷',
-  'RDF/SPARQL': '🔗',
-  'Vector':     '🧲',
-  'PostGIS':    '🗺️',
+  'Neo4j':        '🔷',
+  'RDF/SPARQL':   '🔗',
+  'Vector':       '🧲',
+  'PostGIS':      '🗺️',
   'Map':        '📍',
+  'Data.gouv.fr': '🇫🇷',
 }
 
 export function agentIcon(agent: string): string {

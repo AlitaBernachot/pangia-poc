@@ -38,6 +38,7 @@ from app.agent.map_agent import run as map_run
 from app.agent.neo4j_agent import run as neo4j_run
 from app.agent.postgis_agent import run as postgis_run
 from app.agent.rdf_agent import run as rdf_run
+from app.agent.specialized.data_gouv_agent import run as data_gouv_run
 from app.agent.state import AgentState
 from app.agent.vector_agent import run as vector_run
 from app.config import get_settings
@@ -50,6 +51,7 @@ AGENT_LABELS = {
     "vector": "Vector Search (Chroma)",
     "postgis": "PostGIS Spatial SQL",
     "map": "Map Agent (GeoJSON)",
+    "data_gouv": "Data.gouv.fr Open Data",
 }
 
 _AGENT_DESCRIPTIONS = {
@@ -75,6 +77,12 @@ _AGENT_DESCRIPTIONS = {
         "               and retrieving entities with their geographic coordinates\n"
         "               when precise location data is needed for mapping."
     ),
+    "data_gouv": (
+        "  • data_gouv – French government open-data (data.gouv.fr via MCP).\n"
+        "               Best for: searching French official datasets, government statistics,\n"
+        "               public-sector open data, administrative boundaries, environmental\n"
+        "               records, and any question whose answer is likely in French open data."
+    ),
 }
 
 # Theme-specific routing hints.
@@ -97,6 +105,7 @@ _AGENT_NODES: dict[str, tuple[str, Any]] = {
     "rdf": ("rdf_agent", rdf_run),
     "vector": ("vector_agent", vector_run),
     "postgis": ("postgis_agent", postgis_run),
+    "data_gouv": ("data_gouv_agent", data_gouv_run),
 }
 
 MERGE_SYSTEM = """You are the synthesis module of the PangIA GeoIA platform.
@@ -123,6 +132,11 @@ def get_active_agents() -> list[str]:
     Parallel sub-agents: neo4j, rdf, vector, postgis.
     map is handled as a sequential post-processing step and NOT routed to by the
     router; it is gated by MAP_AGENT_ENABLED separately.
+    The master orchestrator is always active.  Sub-agents can be disabled
+    individually via ``NEO4J_AGENT_ENABLED``, ``RDF_AGENT_ENABLED``,
+    ``VECTOR_AGENT_ENABLED``, ``POSTGIS_AGENT_ENABLED``, and
+    ``DATA_GOUV_AGENT_ENABLED`` environment variables (all default to
+    ``true``).
     """
     settings = get_settings()
     flags: dict[str, bool] = {
@@ -130,6 +144,7 @@ def get_active_agents() -> list[str]:
         "rdf": settings.rdf_agent_enabled,
         "vector": settings.vector_agent_enabled,
         "postgis": settings.postgis_agent_enabled,
+        "data_gouv": settings.data_gouv_agent_enabled,
     }
     active = [name for name, enabled in flags.items() if enabled]
     # Guard: always keep at least one agent to avoid an empty graph
@@ -165,7 +180,7 @@ def _build_router_system(available_agents: list[str]) -> str:
 # ─── Structured routing output ────────────────────────────────────────────────
 
 class RoutingDecision(BaseModel):
-    agents: list[Literal["neo4j", "rdf", "vector", "postgis"]]
+    agents: list[Literal["neo4j", "rdf", "vector", "postgis", "data_gouv"]]
     reasoning: str
 
 
