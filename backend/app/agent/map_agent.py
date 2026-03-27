@@ -20,10 +20,9 @@ from typing import Any
 import httpx
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
 
+from app.agent.model_config import build_llm, get_agent_model_config
 from app.agent.state import AgentState
-from app.config import get_settings
 
 # ─── System prompt ────────────────────────────────────────────────────────────
 
@@ -301,8 +300,6 @@ async def run(state: AgentState) -> dict:
     geographic coordinates to build a GeoJSON FeatureCollection.  Skips the
     LLM entirely when no coordinate-like content is detected.
     """
-    settings = get_settings()
-
     sub_results: dict[str, str] = state.get("sub_results", {})
     user_query = next(
         (m.content for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
@@ -321,12 +318,7 @@ async def run(state: AgentState) -> dict:
     if not _COORD_HINT_RE.search(combined_check):
         return {"sub_results": {"map": ""}, "geojson": None}
 
-    llm = ChatOpenAI(
-        model=settings.openai_model,
-        temperature=settings.openai_temperature,
-        api_key=settings.openai_api_key,
-        streaming=True,
-    ).bind_tools(MAP_TOOLS)
+    llm = build_llm(get_agent_model_config("map_agent"), streaming=True).bind_tools(MAP_TOOLS)
 
     # Primary LLM input: enriched context from other agents + original question
     map_input = (

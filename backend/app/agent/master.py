@@ -29,12 +29,12 @@ the graph.  The user may narrow the parallel agents via `state["selected_agents"
 from typing import Any, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from langgraph.types import Send
 from pydantic import BaseModel
 
 from app.agent.map_agent import run as map_run
+from app.agent.model_config import build_llm, get_agent_model_config
 from app.agent.neo4j_agent import run as neo4j_run
 from app.agent.postgis_agent import run as postgis_run
 from app.agent.rdf_agent import run as rdf_run
@@ -186,15 +186,6 @@ class RoutingDecision(BaseModel):
 
 # ─── Helper ───────────────────────────────────────────────────────────────────
 
-def _build_llm(streaming: bool = False) -> ChatOpenAI:
-    settings = get_settings()
-    return ChatOpenAI(
-        model=settings.openai_model,
-        temperature=settings.openai_temperature,
-        api_key=settings.openai_api_key,
-        streaming=streaming,
-    )
-
 
 def _last_human_message(state: AgentState) -> str:
     return next(
@@ -227,7 +218,7 @@ def router_node(state: AgentState) -> dict:
     else:
         available = active
 
-    llm = _build_llm().with_structured_output(RoutingDecision)
+    llm = build_llm(get_agent_model_config("router")).with_structured_output(RoutingDecision)
     query = _last_human_message(state)
     decision: RoutingDecision = llm.invoke(
         [SystemMessage(content=_build_router_system(available)), HumanMessage(content=query)]
@@ -247,7 +238,7 @@ def router_node(state: AgentState) -> dict:
 
 async def merge_node(state: AgentState) -> dict:
     """Synthesise sub-agent results into a final answer."""
-    llm = _build_llm(streaming=True)
+    llm = build_llm(get_agent_model_config("merge"), streaming=True)
     query = _last_human_message(state)
 
     sub_results: dict[str, str] = state.get("sub_results", {})

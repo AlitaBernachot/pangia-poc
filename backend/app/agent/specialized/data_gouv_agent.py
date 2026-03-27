@@ -9,9 +9,9 @@ server via the ``langchain-mcp-adapters`` library.
 Exposed as a single async function `run` usable as a LangGraph node.
 """
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
-from langchain_openai import ChatOpenAI
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
+from app.agent.model_config import build_llm, get_agent_model_config
 from app.agent.state import AgentState
 from app.config import get_settings
 
@@ -60,12 +60,7 @@ async def run(state: AgentState) -> dict:
     )
     tools = await mcp_client.get_tools()
 
-    llm = ChatOpenAI(
-        model=settings.openai_model,
-        temperature=settings.openai_temperature,
-        api_key=settings.openai_api_key,
-        streaming=True,
-    ).bind_tools(tools)
+    llm = build_llm(get_agent_model_config("data_gouv_agent"), streaming=True).bind_tools(tools)
 
     tool_map = {t.name: t for t in tools}
     messages = [
