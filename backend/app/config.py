@@ -38,8 +38,8 @@ class Settings(BaseSettings):
     # Seeding (dev / demo mode only – set to false in production)
     seed_db: bool = False
     # Theme to seed.  Must match a module name under app/db/themes/.
-    # Built-in themes: dinosaurs
-    seed_theme: str = "dinosaurs"
+    # Built-in themes: dinosaurs, pandemic
+    seed_theme: str = "pandemic"
 
     # data.gouv.fr MCP agent
     data_gouv_mcp_url: str = "https://mcp.data.gouv.fr/mcp"
