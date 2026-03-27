@@ -25,29 +25,35 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 User query  +  selected_agents? (optional)
     │
     ▼
-┌───────────────────────────────────────────────────────────┐
-│                      Master Agent                         │
-│                                                           │
-│  config flags (enabled/disabled)                          │
-│       ∩  user selection (selected_agents)                 │
-│       = eligible pool                                     │
-│               │                                           │
-│          ┌────▼────┐   Send fan-out   ┌────────────────┐  │
-│          │ router  │─────────────────►│ neo4j_agent    │─┐│
-│          │ (LLM +  │                  │ (Cypher/Neo4j) │ ││
-│          │ struct) │─────────────────►│ rdf_agent      │─┤│
-│          └─────────┘                  │ (SPARQL/GDB)   │ ││
-│                                       │ vector_agent   │─┤│
-│                                       │ (Chroma embed) │ ││
-│                                       │ postgis_agent  │─┘│
-│                                       │ (PostGIS SQL)  │  │
-│                                       └────────────────┘  │
-│                                               │           │
-│                                       ┌───────▼──────┐    │
-│                                       │  merge node  │    │
-│                                       │ (synthesise) │    │
-│                                       └───────┬──────┘    │
-└───────────────────────────────────────────────┼───────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                         Master Agent                             │
+│                                                                  │
+│  config flags (enabled/disabled)                                 │
+│       ∩  user selection (selected_agents)                        │
+│       = eligible pool                                            │
+│               │                                                  │
+│          ┌────▼────┐   Send fan-out   ┌──────────────────────┐   │
+│          │ router  │─────────────────►│ neo4j_agent          │─┐ │
+│          │ (LLM +  │                  │ (Cypher / Neo4j)     │ │ │
+│          │ struct) │─────────────────►│ rdf_agent            │─┤ │
+│          └─────────┘                  │ (SPARQL / GraphDB)   │ │ │
+│                                       │ vector_agent         │─┤ │
+│                                       │ (Chroma embeddings)  │ │ │
+│                                       │ postgis_agent        │─┘ │
+│                                       │ (PostGIS SQL)        │   │
+│                                       └──────────────────────┘   │
+│                          (barrier: wait for all parallel agents)  │
+│                                               │                  │
+│                                       ┌───────▼──────────┐       │
+│                                       │   map_agent      │       │
+│                                       │ (GeoJSON / map)  │       │
+│                                       └───────┬──────────┘       │
+│                                               │                  │
+│                                       ┌───────▼──────────┐       │
+│                                       │   merge node     │       │
+│                                       │  (synthesise)    │       │
+│                                       └───────┬──────────┘       │
+└───────────────────────────────────────────────┼──────────────────┘
                                                 ▼
                                          Streamed answer (SSE)
 ```
@@ -80,6 +86,37 @@ node then synthesises all results into a final streamed answer.
 
 Set any flag to `false` in `.env` to exclude that agent from all routing decisions.
 The orchestrator always keeps at least one agent active as a fallback (defaults to `neo4j`).
+
+### Per-agent LLM configuration
+
+Every agent (including the router and the merge node) can use a **different LLM model and provider** independently of the global `OPENAI_MODEL` setting.  Two environment variables control each agent:
+
+| Variable pattern | Example value | Description |
+|---|---|---|
+| `<AGENT>_MODEL_PROVIDER` | `openai`, `anthropic`, `ollama` | Provider for this agent. Leave empty to use the global provider. |
+| `<AGENT>_MODEL_NAME` | `gpt-4o`, `claude-3-5-sonnet-latest`, `llama3` | Model name for this agent. Leave empty to fall back to `OPENAI_MODEL`. |
+
+Available `<AGENT>` prefixes: `ROUTER`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_AGENT`, `POSTGIS_AGENT`, `MAP_AGENT`, `DATA_GOUV_AGENT`, `MERGE`.
+
+Example `.env` — use a powerful model for the router and merge, a cheaper one for sub-agents:
+
+```env
+# Global fallback
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+
+# Router and synthesis need stronger reasoning
+ROUTER_MODEL_PROVIDER=openai
+ROUTER_MODEL_NAME=gpt-4o
+MERGE_MODEL_PROVIDER=openai
+MERGE_MODEL_NAME=gpt-4o
+
+# Use a local Ollama model for the vector agent
+VECTOR_AGENT_MODEL_PROVIDER=ollama
+VECTOR_AGENT_MODEL_NAME=llama3
+```
+
+Leave both variables empty (the default) to use the global `OPENAI_MODEL` for every agent.
 
 ### SSE event types
 
