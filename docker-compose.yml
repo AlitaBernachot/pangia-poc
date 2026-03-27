@@ -1,5 +1,5 @@
 services:
-  # ── Frontend (Vue 3 + Vite dev server) ──────────────────────────────────────
+  # ── Frontend (Vue 3 + PrimeVue + Tailwind) ──────────────────────────────────────
   frontend:
     build:
       context: ./frontend
@@ -11,9 +11,12 @@ services:
       - ./frontend/src:/app/src
       - ./frontend/index.html:/app/index.html
       - /app/node_modules  # preserve container node_modules
+    environment:
+      - BACKEND_URL=http://backend:8000
     command: npm run dev -- --host
-    depends_on:
-      - backend
+    # depends_on:
+    #   backend:
+    #     condition: service_healthy
     restart: unless-stopped
 
   # ── Backend (FastAPI + LangGraph multi-agent) ──────────────────────────────
@@ -52,8 +55,14 @@ services:
       - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
       - PHOENIX_PROJECT_NAME=${PHOENIX_PROJECT_NAME:-pangia-geoia}
     volumes:
-      - ./backend/app:/app/app
+      - ./backend/app:/backend/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       neo4j:
         condition: service_healthy

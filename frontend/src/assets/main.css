@@ -1,0 +1,62 @@
+@import "tailwindcss/theme.css" layer(tailwind-base);
+@import "tailwindcss/utilities.css" layer(tailwind-utilities);
+@import "primeicons/primeicons.css";
+
+:root {
+  color-scheme: dark;
+}
+
+html, body, #app {
+  height: 100%;
+  margin: 0;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+
+/* v-html rendered markdown */
+.prose-msg {
+  line-height: 1.5;
+}
+.prose-msg code {
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+  font-size: 0.85em;
+  font-family: 'Fira Mono', monospace;
+}
+.prose-msg strong { font-weight: 600; }
+.prose-msg h1, .prose-msg h2, .prose-msg h3 {
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.4em;
+  line-height: 1.3;
+}
+.prose-msg h1 { font-size: 1.2em; }
+.prose-msg h2 { font-size: 1.1em; }
+.prose-msg h3 { font-size: 1em; }
+.prose-msg ul, .prose-msg ol {
+  padding-left: 1.4em;
+  margin: 0.2em 0;
+}
+.prose-msg ul { list-style-type: disc; }
+.prose-msg ol { list-style-type: decimal; }
+.prose-msg li { margin: 0; line-height: 1.5; }
+.prose-msg li p { margin: 0; }
+.prose-msg p { margin: 0.3em 0; }
+.prose-msg p:first-child { margin-top: 0; }
+.prose-msg p:last-child  { margin-bottom: 0; }
+.prose-msg pre {
+  background: rgba(255,255,255,0.07);
+  border-radius: 6px;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.prose-msg pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 0.82em;
+}

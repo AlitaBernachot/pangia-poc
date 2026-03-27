@@ -124,6 +124,8 @@ Override `PHOENIX_PROJECT_NAME` in `.env` to organise traces across multiple env
 pangia-poc/
 ├── docker-compose.yml
 ├── .env.example
+├── docs/
+│   └── banner.png
 ├── backend/
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -131,7 +133,7 @@ pangia-poc/
 │       ├── main.py              # FastAPI app factory + lifespan
 │       ├── config.py            # Pydantic settings
 │       ├── api/
-│       │   └── routes.py        # POST /api/chat  SSE endpoint
+│       │   └── routes.py        # POST /api/chat (SSE), GET /api/suggestions
 │       ├── agent/
 │       │   ├── state.py         # AgentState (messages, agents_to_call, sub_results)
 │       │   ├── master.py        # Master orchestrator (router → fan-out → merge)
@@ -144,17 +146,30 @@ pangia-poc/
 │           ├── graphdb_client.py
 │           ├── chroma_client.py
 │           ├── postgis_client.py
-│           └── redis_client.py
+│           ├── redis_client.py
+│           ├── seed.py          # Seed runner (reads active theme, populates all stores)
+│           └── themes/
+│               ├── __init__.py  # SeedTheme dataclass + get_active_theme()
+│               └── dinosaurs.py # Built-in seed theme (Mesozoic palaeontology)
 └── frontend/
     ├── Dockerfile
     ├── nginx.conf
     ├── package.json
     ├── vite.config.ts
     └── src/
-        ├── main.ts
-        ├── App.vue
+        ├── main.ts              # PrimeVue setup + theme (Yellow/Aura preset)
+        ├── types.ts             # Message, AgentActivity types + helpers
+        ├── assets/
+        │   └── main.css
         └── components/
-            └── ChatInterface.vue   # Routing banner + per-agent panels + synthesis stream
+            ├── ChatView.vue             # Root chat controller (SSE, state)
+            └── ChatView/
+                ├── ChatHeader.vue       # Session ID display
+                ├── ChatMessages.vue     # Message list + suggestions
+                ├── ChatMessage.vue      # Router: user vs agent
+                ├── ChatUserMessage.vue  # User bubble
+                ├── ChatAgentMessage.vue # Agent bubble (activity panels + answer)
+                └── ChatPrompt.vue       # Textarea + send button
 ```
 
 ## Development (without Docker)
@@ -177,3 +192,75 @@ npm install --legacy-peer-deps
 npm run dev
 # → http://localhost:5173 (proxies /api to localhost:8000)
 ```
+
+---
+
+## Seed themes
+
+The application is populated with sample data at startup via a **seed theme**.
+The active theme is selected by the `SEED_THEME` environment variable (default: `dinosaurs`).
+Seeding is controlled by `SEED_DB` (default: `true`); set it to `false` in production.
+
+Each theme provides data for all four datastores (Neo4j, PostGIS, GraphDB, ChromaDB)
+as well as the schema prompts, agent guidelines, and UI suggestions used by the agents.
+
+### Switching the theme
+
+Set `SEED_THEME` in your `.env` before starting the stack:
+
+```bash
+SEED_THEME=my_theme docker compose up --build
+```
+
+### Adding a new theme
+
+1. Create `backend/app/db/themes/<my_theme>.py` and expose a `theme` variable of
+   type `SeedTheme` (see `backend/app/db/themes/__init__.py` for the full dataclass).
+   Use `backend/app/db/themes/dinosaurs.py` as a reference implementation.
+
+2. Fill in **all relevant fields** of `SeedTheme`:
+
+   | Field | Purpose |
+   |---|---|
+   | `neo4j_statements` | Idempotent Cypher statements (MERGE) to seed the graph |
+   | `postgis_statements` | DDL + DML SQL statements for tables and rows |
+   | `graphdb_named_graph` + `graphdb_turtle` | Named graph URI and Turtle RDF content |
+   | `chroma_documents` | List of `{"text": str, "metadata": dict}` docs to embed |
+   | `neo4j_schema_prompt` | Graph schema description injected into the Neo4j agent |
+   | `postgis_schema_prompt` | Table/column description injected into the PostGIS agent |
+   | `rdf_schema_prompt` | Ontology description injected into the RDF agent |
+   | `neo4j_guidelines` | Theme-specific query hints for the Neo4j agent |
+   | `postgis_guidelines` | Theme-specific query hints for the PostGIS agent |
+   | `rdf_guidelines` | Theme-specific query hints for the RDF agent |
+   | `vector_guidelines` | Theme-specific hints for the Vector agent |
+   | `suggestions` | Example prompts shown in the chat UI |
+
+3. Set `SEED_THEME=<my_theme>` and start the stack.
+
+---
+
+## Adding a new sub-agent
+
+Sub-agents live in `backend/app/agent/`.  To add one:
+
+1. **Create `backend/app/agent/<name>_agent.py`** with an `async def run(state: AgentState) -> dict` function.
+   Follow the existing agents as a template (ReAct loop: LLM + tools, write result to `sub_results`).
+
+2. **Connect it to the master orchestrator** in `backend/app/agent/master.py`:
+   - Declare it as a valid literal in `RoutingDecision.agents`.
+   - Add an import and a `Send` mapping in `fan_out_node`.
+   - Register it in `AGENT_LABELS`.
+   - Update `ROUTER_SYSTEM` to include its description and routing rules.
+
+3. **Write a clear `_BASE_SYSTEM_PROMPT`** for the agent. Keep generic query mechanics
+   (tool selection, output format, error handling) in the base prompt in the agent file.
+   Move anything **specific to the active dataset** into the theme's corresponding
+   `<store>_guidelines` field so any future theme can override it without touching agent code.
+
+4. **Define the database schema** in the seed theme's `<store>_schema_prompt` field
+   (node labels, relationship types, table columns, ontology prefixes, etc.).
+   The more precise the schema description, the better the LLM will generate correct queries.
+
+5. **Expose a `GET /api/suggestions`** update is automatic — suggestions are already
+   served from the active theme's `suggestions` list.
+

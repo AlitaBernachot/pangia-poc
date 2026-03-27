@@ -46,17 +46,23 @@ sub-agents should be invoked to answer it.
 
 Available sub-agents:
   • neo4j   – Knowledge Graph (Cypher queries against Neo4j).
-              Best for: entity relationships, graph traversals, structured facts.
+              Best for: entity relationships, graph traversals, structured facts,
+              fossil site discovery ("which sites yielded fossils of X",
+              "where were X fossils found"), predator/prey chains, co-existence
+              between species, species locations, migrations.
   • rdf     – RDF/SPARQL (SPARQL queries against GraphDB).
               Best for: ontologies, linked data, semantic relationships, GeoSPARQL.
   • vector  – Semantic search (embedding similarity via ChromaDB).
-              Best for: free-text similarity, document retrieval, concept proximity.
+              Best for: free-text similarity, document retrieval, concept proximity,
+              general descriptive questions ("tell me about X").
   • postgis – Spatial SQL (PostGIS queries against PostgreSQL).
               Best for: geometric computations, spatial intersections, distances,
               area calculations, coordinate transformations.
 
 Rules:
   - Select the minimum set of agents needed to answer the question well.
+  - Questions about which sites found/yielded/contain fossils of a species → neo4j.
+  - Questions about species relationships (predator, prey, coexists) → neo4j.
   - A question about semantic similarity alone needs only "vector".
   - A question about spatial distance needs only "postgis".
   - A complex question might legitimately need several agents.
@@ -72,6 +78,8 @@ Your job:
 2. Remove redundancy; reconcile any contradictions by noting them clearly.
 3. Cite the source agent(s) when referencing specific facts.
 4. Use plain, accessible language appropriate for a geographic information system.
+5. Whenever a geographic location, site, or place is mentioned, **always include
+   its coordinates (latitude, longitude)** if they were provided by any sub-agent.
 """
 
 AGENT_LABELS = {

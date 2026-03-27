@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from app.agent.master import agent_graph
 from app.agent.state import AgentState
 from app.db.redis_client import load_session, save_session
+from app.db.themes import get_active_theme
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -45,6 +46,14 @@ def _sse(data: dict) -> str:
 
 def _node_from_event(event: dict) -> str:
     return event.get("metadata", {}).get("langgraph_node", "")
+
+
+# ─── Suggestions endpoint ─────────────────────────────────────────────────────
+
+@router.get("/suggestions")
+async def suggestions() -> dict:
+    theme = get_active_theme()
+    return {"suggestions": theme.suggestions}
 
 
 # ─── SSE streaming endpoint ───────────────────────────────────────────────────

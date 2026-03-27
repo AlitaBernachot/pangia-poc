@@ -25,17 +25,27 @@ geographic entities, relationships, and facts using Cypher.
 {schema}
 
 ## Guidelines
-- Always use the exact labels and relationship types listed above.
-- Use `search_knowledge_graph` for broad natural-language searches.
-- Use `run_cypher_query` for precise, structured Cypher queries.
+- For structured questions about specific entities and their relationships, use
+  `run_cypher_query` directly with a precise MATCH query.
+- Use `search_knowledge_graph` only for broad exploratory searches where you do
+  not know the exact entity name.
+- When returning sites or geographic entities, **always include all available
+  coordinates** (lat, lon, or equivalent properties) in the query results and
+  in your answer.
 - Always explain what you found and cite the relevant nodes/relationships.
 - If the graph contains no relevant data, say so clearly.
-"""
+{extra_guidelines}"""
 
 
 def _build_system_prompt() -> str:
-    schema = get_active_theme().neo4j_schema_prompt.strip()
-    return _BASE_SYSTEM_PROMPT.format(schema=schema or "(no schema defined for this theme)")
+    theme = get_active_theme()
+    schema = theme.neo4j_schema_prompt.strip()
+    guidelines = theme.neo4j_guidelines.strip()
+    extra = f"\n## Theme-specific guidelines\n{guidelines}" if guidelines else ""
+    return _BASE_SYSTEM_PROMPT.format(
+        schema=schema or "(no schema defined for this theme)",
+        extra_guidelines=extra,
+    )
 
 _MAX_ITERATIONS = 5
 
