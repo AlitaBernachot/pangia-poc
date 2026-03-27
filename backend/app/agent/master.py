@@ -3,25 +3,28 @@ Master orchestrator agent (PangIA GeoIA).
 
 Topology
 --------
-        ┌──────────────────────────────────────────────┐
-        │                  master graph                │
-        │                                              │
+        ┌──────────────────────────────────────────────────────┐
+        │                  master graph                        │
+        │                                                      │
   entry ─► router ──[Send fan-out]──► neo4j_agent ──┐  │
         │          │                                  │  │
         │          ├──────────────► rdf_agent ────────┤  │
         │          │                                  │  │
         │          ├──────────────► vector_agent ─────┤  │
         │          │                                  │  │
-        │          └──────────────► postgis_agent ────┘  │
+        │          ├──────────────► postgis_agent ────┤  │
+        │          │                                  │  │
+        │          └──────────────► map_agent ─────────┘  │
         │                               │               │
         │                            merge ──► END       │
         └──────────────────────────────────────────────┘
 
 The *router* node uses an LLM with structured output to decide which subset of
-the four sub-agents is relevant for a given query.  Sub-agents run
-(conceptually in parallel via LangGraph's Send API) and each writes its result
-into `state["sub_results"][agent_name]`.  The *merge* node synthesises all
-collected results into a final conversational answer.
+the sub-agents is relevant for a given query.  Sub-agents run (conceptually in
+parallel via LangGraph's Send API) and each writes its result into
+`state["sub_results"][agent_name]`.  The *map_agent* additionally writes a
+GeoJSON FeatureCollection to `state["geojson"]`.  The *merge* node synthesises
+all collected results into a final conversational answer.
 """
 from typing import Literal
 
@@ -31,6 +34,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.types import Send
 from pydantic import BaseModel
 
+from app.agent.map_agent import run as map_run
 from app.agent.neo4j_agent import run as neo4j_run
 from app.agent.postgis_agent import run as postgis_run
 from app.agent.rdf_agent import run as rdf_run
@@ -58,6 +62,10 @@ Available sub-agents:
   • postgis – Spatial SQL (PostGIS queries against PostgreSQL).
               Best for: geometric computations, spatial intersections, distances,
               area calculations, coordinate transformations.
+  • map     – Geographic visualisation (GeoJSON structuring).
+              Best for: any request that mentions displaying, showing, or mapping
+              locations on a map; extracting coordinates from text; geocoding
+              addresses; building GeoJSON for map display.
 
 Rules:
   - Select the minimum set of agents needed to answer the question well.
@@ -65,13 +73,14 @@ Rules:
   - Questions about species relationships (predator, prey, coexists) → neo4j.
   - A question about semantic similarity alone needs only "vector".
   - A question about spatial distance needs only "postgis".
+  - Any question asking to show, display, or map locations on a map → include "map".
   - A complex question might legitimately need several agents.
   - Always include at least one agent.
 """
 
 MERGE_SYSTEM = """You are the synthesis module of the PangIA GeoIA platform.
 You will receive the original user question and the individual answers from one or
-more specialised sub-agents (Neo4j, RDF/SPARQL, Vector, PostGIS).
+more specialised sub-agents (Neo4j, RDF/SPARQL, Vector, PostGIS, Map).
 
 Your job:
 1. Merge the sub-agent answers into a single, coherent, well-structured response.
@@ -80,6 +89,7 @@ Your job:
 4. Use plain, accessible language appropriate for a geographic information system.
 5. Whenever a geographic location, site, or place is mentioned, **always include
    its coordinates (latitude, longitude)** if they were provided by any sub-agent.
+6. If the Map agent was invoked, mention that an interactive map has been generated.
 """
 
 AGENT_LABELS = {
@@ -87,13 +97,14 @@ AGENT_LABELS = {
     "rdf": "RDF / SPARQL (GraphDB)",
     "vector": "Vector Search (Chroma)",
     "postgis": "PostGIS Spatial SQL",
+    "map": "Map Agent (GeoJSON)",
 }
 
 
 # ─── Structured routing output ────────────────────────────────────────────────
 
 class RoutingDecision(BaseModel):
-    agents: list[Literal["neo4j", "rdf", "vector", "postgis"]]
+    agents: list[Literal["neo4j", "rdf", "vector", "postgis", "map"]]
     reasoning: str
 
 
@@ -130,6 +141,7 @@ def router_node(state: AgentState) -> dict:
     return {
         "agents_to_call": agents,
         "sub_results": {},
+        "geojson": None,
     }
 
 
@@ -182,6 +194,7 @@ def build_graph():
     workflow.add_node("rdf_agent", rdf_run)
     workflow.add_node("vector_agent", vector_run)
     workflow.add_node("postgis_agent", postgis_run)
+    workflow.add_node("map_agent", map_run)
     workflow.add_node("merge", merge_node)
 
     # Edges
@@ -189,12 +202,13 @@ def build_graph():
     workflow.add_conditional_edges(
         "router",
         dispatch_agents,
-        ["neo4j_agent", "rdf_agent", "vector_agent", "postgis_agent", "merge"],
+        ["neo4j_agent", "rdf_agent", "vector_agent", "postgis_agent", "map_agent", "merge"],
     )
     workflow.add_edge("neo4j_agent", "merge")
     workflow.add_edge("rdf_agent", "merge")
     workflow.add_edge("vector_agent", "merge")
     workflow.add_edge("postgis_agent", "merge")
+    workflow.add_edge("map_agent", "merge")
     workflow.add_edge("merge", END)
 
     return workflow.compile()

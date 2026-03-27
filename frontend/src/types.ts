@@ -17,6 +17,7 @@ export interface Message {
   streaming?: boolean
   routingAgents?: string[]
   agentActivity?: AgentActivity[]
+  geojson?: Record<string, unknown> | null
 }
 
 export const AGENT_COLORS: Record<string, { text: string; border: string; bg: string }> = {
@@ -24,6 +25,7 @@ export const AGENT_COLORS: Record<string, { text: string; border: string; bg: st
   'RDF/SPARQL': { text: '#fb923c', border: '#fb923c', bg: 'rgba(251,146,60,0.1)'  },
   'Vector':     { text: '#a78bfa', border: '#a78bfa', bg: 'rgba(167,139,250,0.1)' },
   'PostGIS':    { text: '#38bdf8', border: '#38bdf8', bg: 'rgba(56,189,248,0.1)'  },
+  'Map':        { text: '#fbbf24', border: '#fbbf24', bg: 'rgba(251,191,36,0.1)'  },
 }
 
 export const AGENT_ICONS: Record<string, string> = {
@@ -31,6 +33,7 @@ export const AGENT_ICONS: Record<string, string> = {
   'RDF/SPARQL': '🔗',
   'Vector':     '🧲',
   'PostGIS':    '🗺️',
+  'Map':        '📍',
 }
 
 export function agentIcon(agent: string): string {

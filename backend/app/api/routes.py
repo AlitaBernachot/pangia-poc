@@ -20,6 +20,7 @@ _AGENT_LABELS: dict[str, str] = {
     "rdf_agent": "RDF/SPARQL",
     "vector_agent": "Vector",
     "postgis_agent": "PostGIS",
+    "map_agent": "Map",
     "merge": "Synthesiser",
     "router": "Router",
 }
@@ -79,6 +80,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         "session_id": session_id,
         "agents_to_call": [],
         "sub_results": {},
+        "geojson": None,
     }
 
     async def event_stream() -> AsyncGenerator[str, None]:
@@ -106,6 +108,14 @@ async def chat(body: ChatRequest) -> StreamingResponse:
                         agents = output.get("agents_to_call", [])
                         if agents:
                             yield _sse({"type": "routing", "agents": agents})
+
+                # ── Map agent GeoJSON output ───────────────────────────────
+                elif kind == "on_chain_end" and node == "map_agent":
+                    output = event.get("data", {}).get("output", {})
+                    if isinstance(output, dict):
+                        geojson = output.get("geojson")
+                        if geojson and isinstance(geojson, dict):
+                            yield _sse({"type": "geojson", "data": geojson})
 
                 # ── Token streaming ───────────────────────────────────────
                 elif kind == "on_chat_model_stream":

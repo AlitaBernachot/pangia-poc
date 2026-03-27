@@ -131,6 +131,10 @@ async function send(text: string) {
           case 'error':
             aiMsg.content += `\n\n⚠️ ${ev.content as string}`
             break
+          case 'geojson':
+            aiMsg.geojson = ev.data as unknown as Record<string, unknown>
+            chatMessagesRef.value?.scrollToBottom()
+            break
           case 'done':
             aiMsg.streaming = false
             aiMsg.agentActivity?.forEach(a => { a.streaming = false })
