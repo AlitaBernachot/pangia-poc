@@ -56,9 +56,8 @@ _AGENT_DESCRIPTIONS = {
     "neo4j": (
         "  • neo4j   – Knowledge Graph (Cypher queries against Neo4j).\n"
         "               Best for: entity relationships, graph traversals, structured facts,\n"
-        "               fossil site discovery (\"which sites yielded fossils of X\",\n"
-        "               \"where were X fossils found\"), predator/prey chains, co-existence\n"
-        "               between species, species locations, migrations."
+        "               discovering entities and their associated locations or sites,\n"
+        "               relationship chains, co-occurrence, migrations, hierarchies."
     ),
     "rdf": (
         "  • rdf     – RDF/SPARQL (SPARQL queries against GraphDB).\n"
@@ -72,13 +71,22 @@ _AGENT_DESCRIPTIONS = {
     "postgis": (
         "  • postgis – Spatial SQL (PostGIS queries against PostgreSQL).\n"
         "               Best for: geometric computations, spatial intersections, distances,\n"
-        "               area calculations, coordinate transformations."
+        "               area calculations, coordinate transformations,\n"
+        "               and retrieving entities with their geographic coordinates\n"
+        "               when precise location data is needed for mapping."
     ),
 }
 
+# Theme-specific routing hints.
+# When adding a new theme, review and update these rules so the router correctly
+# combines agents for domain-specific questions (see README → “Adding a new theme”).
 _EXTRA_ROUTING_RULES = (
-    "  - Questions about which sites found/yielded/contain fossils of a species → neo4j.\n"
-    "  - Questions about species relationships (predator, prey, coexists) → neo4j."
+    "  - Questions asking WHERE entities were found, discovered, or are located\n"
+    "    → include BOTH neo4j (relationships) AND postgis (coordinates/geometry).\n"
+    "  - Questions asking to show, map, or visualise locations\n"
+    "    → include BOTH neo4j AND postgis so coordinates are available for the map.\n"
+    "  - Questions about relationships between entities (links, chains, co-occurrence)\n"
+    "    → neo4j."
 )
 
 # LangGraph node name → run function for each parallel sub-agent.

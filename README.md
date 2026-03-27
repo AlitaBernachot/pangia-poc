@@ -263,7 +263,21 @@ SEED_THEME=my_theme docker compose up --build
    | `vector_guidelines` | Theme-specific hints for the Vector agent |
    | `suggestions` | Example prompts shown in the chat UI |
 
-3. Set `SEED_THEME=<my_theme>` and start the stack.
+3. **Review the router's agent descriptions and routing rules** in
+   `backend/app/agent/master.py`:
+   - `_AGENT_DESCRIPTIONS` — the short capability blurb shown to the router LLM
+     for each agent.  If your theme stores data in a way that differs from the
+     generic description (e.g. PostGIS holds domain-specific tables with
+     coordinates), refine the description so the router knows to select that agent.
+   - `_EXTRA_ROUTING_RULES` — explicit rules that override or supplement the
+     router's judgment for common question patterns in your domain (e.g. "questions
+     about X location → include both neo4j and postgis").  Add domain-specific
+     rules here rather than embedding them in the agent descriptions.
+
+   Keep both sections as generic as possible; add only rules that are genuinely
+   necessary for correct routing in your theme.
+
+4. Set `SEED_THEME=<my_theme>` and start the stack.
 
 ---
 
