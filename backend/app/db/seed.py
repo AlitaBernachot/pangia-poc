@@ -2,7 +2,7 @@
 Database seeding for dev / demo mode.
 
 Activate by setting the environment variable  SEED_DB=true  (or 1 / yes).
-The seeding theme is controlled by  SEED_THEME  (default: ``dinosaurs``).
+The seeding theme is controlled by  SEED_THEME  (default: ``pandemic``).
 In production leave SEED_DB unset (defaults to false) so the seeding is
 never executed.
 
@@ -101,7 +101,7 @@ async def seed_all() -> None:
     """Load the configured theme and seed all datastores.
 
     Called at startup when ``SEED_DB=true``.  The active theme is read from
-    ``SEED_THEME`` (default: ``dinosaurs``).
+    ``SEED_THEME`` (default: ``pandemic``).
     """
     settings = get_settings()
     theme_name = settings.seed_theme

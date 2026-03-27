@@ -226,7 +226,7 @@ npm run dev
 ## Seed themes
 
 The application is populated with sample data at startup via a **seed theme**.
-The active theme is selected by the `SEED_THEME` environment variable (default: `dinosaurs`).
+The active theme is selected by the `SEED_THEME` environment variable (default: `pandemic`).
 Seeding is controlled by `SEED_DB` (default: `true`); set it to `false` in production.
 
 Each theme provides data for all four datastores (Neo4j, PostGIS, GraphDB, ChromaDB)

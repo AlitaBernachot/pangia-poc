@@ -260,6 +260,12 @@ def add_popup_content(geojson: str, popup_content: str) -> str:
             feature["properties"] = {}
         feature["properties"]["popup_content"] = popup_content
 
+    # Accept a raw array of Feature objects
+    if isinstance(data, list):
+        for feature in data:
+            if isinstance(feature, dict):
+                _enrich(feature)
+        return json.dumps({"type": "FeatureCollection", "features": data})
     if data.get("type") == "FeatureCollection":
         for feature in data.get("features", []):
             _enrich(feature)
@@ -267,7 +273,7 @@ def add_popup_content(geojson: str, popup_content: str) -> str:
     if data.get("type") == "Feature":
         _enrich(data)
         return json.dumps(data)
-    return "Expected a GeoJSON Feature or FeatureCollection."
+    return "Expected a GeoJSON Feature, FeatureCollection, or array of Features."
 
 
 MAP_TOOLS = [
