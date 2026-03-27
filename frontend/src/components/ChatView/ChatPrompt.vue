@@ -76,10 +76,11 @@ const inputRef = ref<HTMLTextAreaElement | null>(null)
 
 /** Color classes for each agent when its toggle is active. */
 const _agentColors: Record<string, string> = {
-  'Neo4j':      'border-[#4ade80] text-[#4ade80] bg-[rgba(74,222,128,0.10)]',
-  'RDF/SPARQL': 'border-[#fb923c] text-[#fb923c] bg-[rgba(251,146,60,0.10)]',
-  'Vector':     'border-[#a78bfa] text-[#a78bfa] bg-[rgba(167,139,250,0.10)]',
-  'PostGIS':    'border-[#38bdf8] text-[#38bdf8] bg-[rgba(56,189,248,0.10)]',
+  'Neo4j':        'border-[#4ade80] text-[#4ade80] bg-[rgba(74,222,128,0.10)]',
+  'RDF/SPARQL':   'border-[#fb923c] text-[#fb923c] bg-[rgba(251,146,60,0.10)]',
+  'Vector':       'border-[#a78bfa] text-[#a78bfa] bg-[rgba(167,139,250,0.10)]',
+  'PostGIS':      'border-[#38bdf8] text-[#38bdf8] bg-[rgba(56,189,248,0.10)]',
+  'Data.gouv.fr': 'border-[#f43f5e] text-[#f43f5e] bg-[rgba(244,63,94,0.10)]',
 }
 function agentActiveClass(label: string): string {
   return _agentColors[label] ?? 'border-white/40 text-white/80 bg-white/5'

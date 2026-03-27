@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     # Built-in themes: dinosaurs
     seed_theme: str = "dinosaurs"
 
+    # data.gouv.fr MCP agent
+    data_gouv_mcp_url: str = "https://mcp.data.gouv.fr/mcp"
+
     # Agent enable / disable flags  (master orchestrator is always active)
     # Set any of these to false via environment variable to disable that agent.
     neo4j_agent_enabled: bool = True
@@ -48,6 +51,7 @@ class Settings(BaseSettings):
     vector_agent_enabled: bool = True
     postgis_agent_enabled: bool = True
     map_agent_enabled: bool = True
+    data_gouv_agent_enabled: bool = True
 
     # Arize Phoenix (agent observability)
     phoenix_collector_endpoint: str = "http://localhost:6006/v1/traces"
