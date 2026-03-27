@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     # Built-in themes: dinosaurs
     seed_theme: str = "dinosaurs"
 
+    # Agent enable / disable flags  (master orchestrator is always active)
+    # Set any of these to false via environment variable to disable that agent.
+    neo4j_agent_enabled: bool = True
+    rdf_agent_enabled: bool = True
+    vector_agent_enabled: bool = True
+    postgis_agent_enabled: bool = True
+
     # Arize Phoenix (agent observability)
     phoenix_collector_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project_name: str = "pangia-geoia"

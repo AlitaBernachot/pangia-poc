@@ -105,6 +105,22 @@
 
     <!-- ── Input bar ──────────────────────────────────────────── -->
     <div class="input-bar">
+      <!-- Agent selector (shown only when ≥ 1 agent is available) -->
+      <div v-if="availableAgents.length > 0" class="agent-selector">
+        <span class="agent-selector-label">Agents:</span>
+        <button
+          v-for="agent in availableAgents"
+          :key="agent.key"
+          class="agent-toggle"
+          :class="[agent.key, { active: selectedAgents.includes(agent.key) }]"
+          :title="`${selectedAgents.includes(agent.key) ? 'Deselect' : 'Select'} ${agent.label}`"
+          @click="toggleAgent(agent.key)"
+        >
+          <span>{{ agentIcon(agent.label) }}</span>
+          {{ agent.label }}
+        </button>
+      </div>
+
       <div class="input-wrap">
         <textarea
           ref="inputRef"
@@ -138,7 +154,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, reactive } from 'vue'
+import { ref, nextTick, reactive, onMounted } from 'vue'
 
 /* ─── Types ──────────────────────────────────────────────────────────────────── */
 interface ToolActivity { tool: string; status: 'running' | 'done' }
@@ -158,6 +174,10 @@ interface Message {
   /** Per-agent intermediate activity panels */
   agentActivity?: AgentActivity[]
 }
+interface AgentInfo {
+  key: string
+  label: string
+}
 
 /* ─── State ──────────────────────────────────────────────────────────────────── */
 const messages    = ref<Message[]>([])
@@ -168,12 +188,32 @@ const isThinking   = ref(false)
 const messagesRef  = ref<HTMLElement | null>(null)
 const inputRef     = ref<HTMLTextAreaElement | null>(null)
 
+/** Agents that are enabled in the backend configuration. */
+const availableAgents = ref<AgentInfo[]>([])
+/** Keys of agents the user currently wants to query (defaults to all active). */
+const selectedAgents  = ref<string[]>([])
+
 const suggestions = [
   'What are the largest countries by area?',
   'Find cities within 100 km of a major river using spatial data.',
   'Show semantic relationships between mountain ranges.',
   'Query RDF data about European capitals.',
 ]
+
+/* ─── Lifecycle ───────────────────────────────────────────────────────────────── */
+onMounted(async () => {
+  try {
+    const res = await fetch('/api/agents')
+    if (res.ok) {
+      const data = await res.json()
+      availableAgents.value = data.agents as AgentInfo[]
+      // Default: all active agents selected
+      selectedAgents.value = availableAgents.value.map(a => a.key)
+    }
+  } catch {
+    // Silently ignore – backend will use all active agents as fallback
+  }
+})
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────────── */
 let _idCounter = 0
@@ -188,6 +228,18 @@ const AGENT_ICONS: Record<string, string> = {
 }
 function agentIcon(agent: string): string {
   return AGENT_ICONS[agent] ?? '🤖'
+}
+
+/** Toggle an agent on/off.  At least one agent must remain selected. */
+function toggleAgent(key: string) {
+  const idx = selectedAgents.value.indexOf(key)
+  if (idx >= 0) {
+    if (selectedAgents.value.length > 1) {
+      selectedAgents.value = selectedAgents.value.filter(k => k !== key)
+    }
+  } else {
+    selectedAgents.value = [...selectedAgents.value, key]
+  }
 }
 
 function scrollToBottom() {
@@ -250,7 +302,11 @@ async function sendMessage() {
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, session_id: sessionId.value }),
+      body: JSON.stringify({
+        message: text,
+        session_id: sessionId.value,
+        selected_agents: selectedAgents.value,
+      }),
     })
 
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -595,6 +651,45 @@ async function sendMessage() {
   font-family: 'Fira Mono', 'Consolas', monospace;
 }
 
+/* ─── Agent selector ────────────────────────────────────────────────────────── */
+.agent-selector {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.5rem 0.25rem 0.35rem;
+}
+
+.agent-selector-label {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.agent-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.18rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  transition: background 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s;
+  user-select: none;
+}
+.agent-toggle:hover { opacity: 0.85; }
+
+/* Active (selected) state per agent */
+.agent-toggle.active.neo4j    { color: #4ade80; border-color: #4ade80; background: rgba(74,222,128,0.10); }
+.agent-toggle.active.rdf      { color: #f59e0b; border-color: #f59e0b; background: rgba(245,158,11,0.10); }
+.agent-toggle.active.vector   { color: #a78bfa; border-color: #a78bfa; background: rgba(167,139,250,0.10); }
+.agent-toggle.active.postgis  { color: #38bdf8; border-color: #38bdf8; background: rgba(56,189,248,0.10); }
+
 /* ─── Input bar ─────────────────────────────────────────────────────────────── */
 .input-bar {
   flex-shrink: 0;
@@ -659,4 +754,5 @@ async function sendMessage() {
 .msg-enter-active { transition: all 0.25s ease; }
 .msg-enter-from { opacity: 0; transform: translateY(10px); }
 </style>
+
 
