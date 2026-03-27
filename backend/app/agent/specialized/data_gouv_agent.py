@@ -50,51 +50,51 @@ async def run(state: AgentState) -> dict:
         "",
     )
 
-    async with MultiServerMCPClient(
+    mcp_client = MultiServerMCPClient(
         {
             "data_gouv": {
                 "url": settings.data_gouv_mcp_url,
                 "transport": "streamable_http",
             }
         }
-    ) as mcp_client:
-        tools = mcp_client.get_tools()
+    )
+    tools = await mcp_client.get_tools()
 
-        llm = ChatOpenAI(
-            model=settings.openai_model,
-            temperature=settings.openai_temperature,
-            api_key=settings.openai_api_key,
-            streaming=True,
-        ).bind_tools(tools)
+    llm = ChatOpenAI(
+        model=settings.openai_model,
+        temperature=settings.openai_temperature,
+        api_key=settings.openai_api_key,
+        streaming=True,
+    ).bind_tools(tools)
 
-        tool_map = {t.name: t for t in tools}
-        messages = [
-            SystemMessage(content=_SYSTEM_PROMPT),
-            HumanMessage(content=user_query),
-        ]
+    tool_map = {t.name: t for t in tools}
+    messages = [
+        SystemMessage(content=_SYSTEM_PROMPT),
+        HumanMessage(content=user_query),
+    ]
 
-        for _ in range(_MAX_ITERATIONS):
-            response: AIMessage = await llm.ainvoke(messages)
-            messages.append(response)
+    for _ in range(_MAX_ITERATIONS):
+        response: AIMessage = await llm.ainvoke(messages)
+        messages.append(response)
 
-            if not getattr(response, "tool_calls", None):
-                break
+        if not getattr(response, "tool_calls", None):
+            break
 
-            for tc in response.tool_calls:
-                tool_fn = tool_map.get(tc["name"])
-                if tool_fn is None:
-                    result = (
-                        f"Unknown tool: {tc['name']}. "
-                        f"Available tools: {list(tool_map.keys())}"
-                    )
-                else:
-                    try:
-                        result = await tool_fn.ainvoke(tc["args"])
-                    except Exception as exc:
-                        result = f"Tool error: {exc}"
-                messages.append(
-                    ToolMessage(content=str(result), tool_call_id=tc["id"])
+        for tc in response.tool_calls:
+            tool_fn = tool_map.get(tc["name"])
+            if tool_fn is None:
+                result = (
+                    f"Unknown tool: {tc['name']}. "
+                    f"Available tools: {list(tool_map.keys())}"
                 )
+            else:
+                try:
+                    result = await tool_fn.ainvoke(tc["args"])
+                except Exception as exc:
+                    result = f"Tool error: {exc}"
+            messages.append(
+                ToolMessage(content=str(result), tool_call_id=tc["id"])
+            )
 
     result_content = (
         messages[-1].content if messages else "data.gouv.fr agent returned no result."
