@@ -6,6 +6,7 @@ that carries all Neo4j, PostGIS and GraphDB seed data for that topic.
 
 Available themes (value of the ``SEED_THEME`` env variable):
   - ``dinosaurs``  – Mesozoic palaeontology / Pangaea (default)
+  - ``pandemic``   – Major pandemic and epidemic outbreaks (COVID-19, Ebola, etc.)
 
 To add a new theme create ``themes/<name>.py`` with a ``theme`` attribute
 of type :class:`SeedTheme`.
