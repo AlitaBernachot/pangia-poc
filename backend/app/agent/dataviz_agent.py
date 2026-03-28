@@ -21,8 +21,21 @@ from typing import Any
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 
-from app.agent.model_config import build_llm, get_agent_model_config
+from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
+
+_json_decoder = json.JSONDecoder()
+
+
+def _lenient_json_loads(s: str) -> Any:
+    """Parse the first complete JSON value in *s*, ignoring any trailing content.
+
+    Unlike ``json.loads``, this does not raise ``JSONDecodeError`` for trailing
+    text that the LLM may append after a valid JSON value (e.g. a prose comment
+    or a closing brace from the outer tool-call object).
+    """
+    value, _ = _json_decoder.raw_decode(s.strip())
+    return value
 
 # ─── System prompt ────────────────────────────────────────────────────────────
 
@@ -69,12 +82,15 @@ question, then decide whether the data can be meaningfully visualised.
 - Use "bar" charts for comparisons, "line" for time-series / trends, "pie"
   for proportions (≤ 8 slices), "scatter" for correlations, "histogram"
   for distributions.
+- **Comparison rule**: when the user query contains a comparison notion
+  (keywords: compare, comparer, versus, vs, between, entre, différence,
+  difference, contrast, comparez, comparer), you MUST produce **both** a
+  "bar" chart AND a "pie" chart for the same data, sharing the same labels
+  and datasets. Both must be built with `build_chart` (two separate calls).
 - Keep KPI values as numbers when possible; include the unit separately.
 - Table columns should be short, clear header strings.
 - Keep all labels concise (≤ 40 characters).
 """
-
-_MAX_ITERATIONS = 5
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -134,13 +150,13 @@ def build_chart(
         return f"Invalid chart_type '{chart_type}'. Must be one of: {', '.join(sorted(valid_types))}."
 
     try:
-        labels = json.loads(labels_json)
-    except json.JSONDecodeError as exc:
+        labels = _lenient_json_loads(labels_json)
+    except (json.JSONDecodeError, ValueError) as exc:
         return f"Invalid labels_json: {exc}"
 
     try:
-        datasets = json.loads(datasets_json)
-    except json.JSONDecodeError as exc:
+        datasets = _lenient_json_loads(datasets_json)
+    except (json.JSONDecodeError, ValueError) as exc:
         return f"Invalid datasets_json: {exc}"
 
     if not isinstance(labels, list):
@@ -203,13 +219,13 @@ def build_table(title: str, columns_json: str, rows_json: str) -> str:
                    matching the column order.
     """
     try:
-        columns = json.loads(columns_json)
-    except json.JSONDecodeError as exc:
+        columns = _lenient_json_loads(columns_json)
+    except (json.JSONDecodeError, ValueError) as exc:
         return f"Invalid columns_json: {exc}"
 
     try:
-        rows = json.loads(rows_json)
-    except json.JSONDecodeError as exc:
+        rows = _lenient_json_loads(rows_json)
+    except (json.JSONDecodeError, ValueError) as exc:
         return f"Invalid rows_json: {exc}"
 
     if not isinstance(columns, list):
@@ -251,6 +267,13 @@ async def run(state: AgentState) -> dict:
     data, and produces structured chart / KPI / table payloads for the frontend.
     Skips the LLM entirely when no visualisable content is detected.
     """
+    try:
+        return await _run(state)
+    except Exception as exc:  # noqa: BLE001
+        return {"sub_results": {"dataviz": f"[DataViz agent unavailable: {exc}]"}, "dataviz": None}
+
+
+async def _run(state: AgentState) -> dict:
     sub_results: dict[str, str] = state.get("sub_results", {})
     user_query = next(
         (m.content for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
@@ -281,7 +304,13 @@ async def run(state: AgentState) -> dict:
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=dataviz_input)]
 
-    for _ in range(_MAX_ITERATIONS):
+    # Accumulate structured results from tool calls directly, so we don't
+    # depend on the LLM reproducing them in its final message.
+    collected_charts: list[dict[str, Any]] = []
+    collected_kpis: list[dict[str, Any]] = []
+    collected_tables: list[dict[str, Any]] = []
+
+    for _ in range(get_agent_max_iterations("dataviz_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
 
@@ -297,47 +326,46 @@ async def run(state: AgentState) -> dict:
                     result = await tool_fn.ainvoke(tc["args"])
                 except Exception as exc:
                     result = f"Tool error: {exc}"
+
+            # Collect structured output from each tool call
+            if isinstance(result, str) and not result.startswith(("Unknown tool", "Tool error", "Invalid")):
+                try:
+                    item = json.loads(result)
+                    if isinstance(item, dict):
+                        if tc["name"] == "build_chart" and "chart_type" in item:
+                            collected_charts.append(item)
+                        elif tc["name"] == "build_kpi" and "label" in item:
+                            collected_kpis.append(item)
+                        elif tc["name"] == "build_table" and "columns" in item:
+                            collected_tables.append(item)
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
             messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
 
-    result_content = messages[-1].content if messages else ""
-
-    # Extract structured dataviz payload from the agent's final response
+    # Build dataviz_data from collected tool results first (most reliable).
+    # Fall back to parsing the LLM's final message if no tools were called.
     dataviz_data: dict[str, Any] | None = None
     summary = "Data visualisation processed."
 
-    if result_content:
-        try:
-            parsed = json.loads(result_content)
-            if isinstance(parsed, dict) and (
-                "charts" in parsed or "kpis" in parsed or "tables" in parsed
-            ):
-                # Only store payload if it has at least one non-empty section
-                has_content = (
-                    (parsed.get("charts") or [])
-                    or (parsed.get("kpis") or [])
-                    or (parsed.get("tables") or [])
-                )
-                if has_content:
-                    dataviz_data = parsed
-                    parts = []
-                    if parsed.get("charts"):
-                        parts.append(f"{len(parsed['charts'])} chart(s)")
-                    if parsed.get("kpis"):
-                        parts.append(f"{len(parsed['kpis'])} KPI(s)")
-                    if parsed.get("tables"):
-                        parts.append(f"{len(parsed['tables'])} table(s)")
-                    summary = "Visualisations generated: " + ", ".join(parts) + "."
-        except (json.JSONDecodeError, ValueError):
-            # Fallback: search for JSON block in the text
-            match = re.search(
-                r'\{[^{}]*(?:"charts"|"kpis"|"tables")[^{}]*\}',
-                result_content,
-                re.DOTALL,
-            )
-            if match:
+    if collected_charts or collected_kpis or collected_tables:
+        dataviz_data = {
+            "charts": collected_charts,
+            "kpis": collected_kpis,
+            "tables": collected_tables,
+        }
+    else:
+        # No tool calls – try to parse the final LLM message as JSON
+        result_content = messages[-1].content if messages else ""
+        if result_content:
+            # Strip markdown code fences if present
+            stripped = re.sub(r"^```(?:json)?\s*|\s*```$", "", result_content.strip(), flags=re.MULTILINE)
+            for candidate in (stripped, result_content):
                 try:
-                    parsed = json.loads(match.group())
-                    if isinstance(parsed, dict):
+                    parsed = json.loads(candidate)
+                    if isinstance(parsed, dict) and (
+                        "charts" in parsed or "kpis" in parsed or "tables" in parsed
+                    ):
                         has_content = (
                             (parsed.get("charts") or [])
                             or (parsed.get("kpis") or [])
@@ -345,8 +373,19 @@ async def run(state: AgentState) -> dict:
                         )
                         if has_content:
                             dataviz_data = parsed
+                            break
                 except (json.JSONDecodeError, ValueError):
-                    pass
+                    continue
+
+    if dataviz_data:
+        parts = []
+        if dataviz_data.get("charts"):
+            parts.append(f"{len(dataviz_data['charts'])} chart(s)")
+        if dataviz_data.get("kpis"):
+            parts.append(f"{len(dataviz_data['kpis'])} KPI(s)")
+        if dataviz_data.get("tables"):
+            parts.append(f"{len(dataviz_data['tables'])} table(s)")
+        summary = "Visualisations generated: " + ", ".join(parts) + "."
 
     return {
         "sub_results": {"dataviz": summary},

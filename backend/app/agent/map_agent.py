@@ -21,7 +21,7 @@ import httpx
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 
-from app.agent.model_config import build_llm, get_agent_model_config
+from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
 
 # ─── System prompt ────────────────────────────────────────────────────────────
@@ -57,8 +57,6 @@ FeatureCollection that can be displayed on an interactive map.
   {{"geojson": null, "summary": "No geographic data found."}}
 - Keep popup content concise (2–4 lines of plain text or simple HTML).
 """
-
-_MAX_ITERATIONS = 6
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -300,6 +298,13 @@ async def run(state: AgentState) -> dict:
     geographic coordinates to build a GeoJSON FeatureCollection.  Skips the
     LLM entirely when no coordinate-like content is detected.
     """
+    try:
+        return await _run(state)
+    except Exception as exc:  # noqa: BLE001
+        return {"sub_results": {"map": f"[Map agent unavailable: {exc}]"}, "geojson": None}
+
+
+async def _run(state: AgentState) -> dict:
     sub_results: dict[str, str] = state.get("sub_results", {})
     user_query = next(
         (m.content for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
@@ -329,7 +334,7 @@ async def run(state: AgentState) -> dict:
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=map_input)]
 
-    for _ in range(_MAX_ITERATIONS):
+    for _ in range(get_agent_max_iterations("map_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
 

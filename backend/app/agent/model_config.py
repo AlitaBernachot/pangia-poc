@@ -150,3 +150,21 @@ def get_agent_model_config(agent_key: str) -> ModelConfig:
         temperature=settings.openai_temperature,
         api_key=settings.openai_api_key if settings.openai_api_key else None,
     )
+
+
+def get_agent_max_iterations(agent_key: str) -> int:
+    """Return the maximum ReAct loop iterations for *agent_key*.
+
+    Looks up ``<agent_key>_max_iterations`` from application settings.
+    A value of 0 (the default) means "use the global ``agent_max_iterations``".
+
+    Parameters
+    ----------
+    agent_key:
+        One of the keys in :data:`AGENT_NAMES` (e.g. ``"neo4j_agent"``).
+    """
+    from app.config import get_settings  # noqa: PLC0415
+
+    settings = get_settings()
+    per_agent: int = getattr(settings, f"{agent_key}_max_iterations", 0)
+    return per_agent if per_agent > 0 else settings.agent_max_iterations

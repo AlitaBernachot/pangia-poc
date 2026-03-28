@@ -39,8 +39,10 @@ User query  +  selected_agents? (optional)
 │          └─────────┘                  │ (SPARQL / GraphDB)   │ │ │
 │                                       │ vector_agent         │─┤ │
 │                                       │ (Chroma embeddings)  │ │ │
-│                                       │ postgis_agent        │─┘ │
-│                                       │ (PostGIS SQL)        │   │
+│                                       │ postgis_agent        │─┤ │
+│                                       │ (PostGIS SQL)        │ │ │
+│                                       │ data_gouv_agent      │─┘ │
+│                                       │ (data.gouv.fr MCP)   │   │
 │                                       └──────────────────────┘   │
 │                          (barrier: wait for all parallel agents)  │
 │                                               │                  │
@@ -95,11 +97,45 @@ streamed answer.
 | `RDF_AGENT_ENABLED` | `true` | RDF/Linked Data agent (SPARQL / GraphDB) |
 | `VECTOR_AGENT_ENABLED` | `true` | Semantic search agent (ChromaDB) |
 | `POSTGIS_AGENT_ENABLED` | `true` | Spatial SQL agent (PostGIS) |
+| `DATA_GOUV_AGENT_ENABLED` | `true` | French open-data agent (data.gouv.fr via MCP) |
 | `MAP_AGENT_ENABLED` | `true` | Geographic visualisation agent (GeoJSON / Leaflet map) |
 | `DATAVIZ_AGENT_ENABLED` | `true` | Data visualisation agent (charts, KPIs, tables) |
 
 Set any flag to `false` in `.env` to exclude that agent from all routing decisions.
 The orchestrator always keeps at least one agent active as a fallback (defaults to `neo4j`).
+
+### Agent fault tolerance
+
+Every agent's `run()` function wraps its logic in a top-level `try/except`.
+If an agent raises any exception (network error, 502 from an external MCP
+server, database unreachable, timeout, …), it catches it and returns a
+graceful fallback result — e.g. `[data.gouv agent unavailable: 502 Bad Gateway]`
+— stored in `sub_results` under its key.
+
+This means:
+- **The chain never crashes** because of a single failing agent.
+- All other agents (including `merge`) continue normally.
+- The final answer is synthesised from whatever results are available.
+- The error message is visible in the agent activity panel in the UI.
+
+### Agent ReAct loop iterations
+
+Each agent runs a ReAct loop (LLM call → tool call → observation → …).
+The number of iterations is configurable at two levels:
+
+| Variable | Default | Description |
+|---|---|---|
+| `AGENT_MAX_ITERATIONS` | `10` | Global fallback used by all agents |
+| `NEO4J_AGENT_MAX_ITERATIONS` | `0` | Neo4j agent override (0 = use global) |
+| `RDF_AGENT_MAX_ITERATIONS` | `0` | RDF/SPARQL agent override |
+| `VECTOR_AGENT_MAX_ITERATIONS` | `0` | Vector agent override |
+| `POSTGIS_AGENT_MAX_ITERATIONS` | `0` | PostGIS agent override |
+| `MAP_AGENT_MAX_ITERATIONS` | `0` | Map agent override |
+| `DATA_GOUV_AGENT_MAX_ITERATIONS` | `0` | data.gouv.fr agent override |
+| `DATAVIZ_AGENT_MAX_ITERATIONS` | `0` | DataViz agent override |
+
+Lower the value to reduce latency and cost; raise it for agents that need more
+tool-call steps (e.g. data.gouv or PostGIS on complex spatial queries).
 
 ### Per-agent LLM configuration
 
@@ -151,6 +187,20 @@ Leave both variables empty (the default) to use the global `OPENAI_MODEL` for ev
 
 The **DataViz Agent** (`dataviz_agent`) runs **sequentially after the Map agent**, reading the accumulated
 `sub_results` from all parallel sub-agents to detect and format numerical / statistical data.
+
+### Map Agent
+
+The **Map Agent** (`map_agent`) runs after the parallel data-source agents and extracts geographic
+coordinates from their `sub_results` to build a GeoJSON FeatureCollection rendered as an interactive
+Leaflet map in the UI.
+
+> **Note on iterations:** the Map Agent often requires **multiple ReAct loop iterations** to complete
+> its work — it typically needs one turn to call its coordinate-extraction tool, then one or more
+> additional turns to format the final GeoJSON output.  If the map is not appearing, the most common
+> cause is `MAP_AGENT_MAX_ITERATIONS` (or the global `AGENT_MAX_ITERATIONS`) being set too low.
+> The recommended minimum is **5**; the default is **10**.
+
+
 
 **Responsibilities:**
 - Detect visualisable data (counts, averages, distributions, time-series, proportions)
@@ -250,7 +300,11 @@ pangia-poc/
 │       │   ├── neo4j_agent.py   # Knowledge Graph sub-agent (Cypher)
 │       │   ├── rdf_agent.py     # RDF sub-agent (SPARQL / GraphDB)
 │       │   ├── vector_agent.py  # Vector sub-agent (ChromaDB)
-│       │   └── postgis_agent.py # Spatial SQL sub-agent (PostGIS)
+│       │   ├── postgis_agent.py # Spatial SQL sub-agent (PostGIS)
+│       │   ├── map_agent.py     # Map post-processor (GeoJSON)
+│       │   ├── dataviz_agent.py # DataViz post-processor (charts/KPIs/tables)
+│       │   └── specialized/
+│       │       └── data_gouv_agent.py # French open-data sub-agent (data.gouv.fr MCP)
 │       └── db/
 │           ├── neo4j_client.py
 │           ├── graphdb_client.py

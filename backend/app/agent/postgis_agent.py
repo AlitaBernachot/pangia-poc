@@ -7,7 +7,7 @@ Exposed as a single async function `run` usable as a LangGraph node.
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 
-from app.agent.model_config import build_llm, get_agent_model_config
+from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
 from app.db.postgis_client import run_spatial_query
 from app.db.themes import get_active_theme
@@ -40,9 +40,6 @@ def _build_system_prompt() -> str:
         extra_guidelines=extra,
     )
 
-_MAX_ITERATIONS = 5
-
-
 # ─── Tools ────────────────────────────────────────────────────────────────────
 
 @tool
@@ -63,6 +60,13 @@ _TOOL_MAP = {t.name: t for t in POSTGIS_TOOLS}
 
 async def run(state: AgentState) -> dict:
     """LangGraph node: run the PostGIS sub-agent ReAct loop."""
+    try:
+        return await _run(state)
+    except Exception as exc:  # noqa: BLE001
+        return {"sub_results": {"postgis": f"[PostGIS agent unavailable: {exc}]"}}
+
+
+async def _run(state: AgentState) -> dict:
     llm = build_llm(get_agent_model_config("postgis_agent"), streaming=True).bind_tools(POSTGIS_TOOLS)
 
     user_query = next(
@@ -72,7 +76,7 @@ async def run(state: AgentState) -> dict:
 
     messages = [SystemMessage(content=_build_system_prompt()), HumanMessage(content=user_query)]
 
-    for _ in range(_MAX_ITERATIONS):
+    for _ in range(get_agent_max_iterations("postgis_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
 

@@ -54,6 +54,22 @@ class Settings(BaseSettings):
     data_gouv_agent_enabled: bool = True
     dataviz_agent_enabled: bool = True
 
+    # Maximum number of LLM+tool iterations (ReAct loop) per agent.
+    # Each iteration = one LLM call + zero or more tool calls.
+    # Lower this to reduce latency / cost; raise it for complex multi-step tasks.
+    # Global fallback used when no per-agent value is set (or when set to 0).
+    agent_max_iterations: int = 10
+
+    # Per-agent max iterations overrides.
+    # Set to 0 (default) to fall back to the global AGENT_MAX_ITERATIONS value.
+    neo4j_agent_max_iterations: int = 0
+    rdf_agent_max_iterations: int = 0
+    vector_agent_max_iterations: int = 0
+    postgis_agent_max_iterations: int = 0
+    map_agent_max_iterations: int = 0
+    data_gouv_agent_max_iterations: int = 0
+    dataviz_agent_max_iterations: int = 0
+
     # Per-agent model configuration
     # For each agent set <AGENT>_MODEL_PROVIDER and <AGENT>_MODEL_NAME to
     # override the model used by that agent.  Leave empty ("") to fall back to
