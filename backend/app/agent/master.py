@@ -50,6 +50,7 @@ from app.agent.postgis_agent import run as postgis_run
 from app.agent.rdf_agent import run as rdf_run
 from app.agent.specialized.data_gouv_agent import run as data_gouv_run
 from app.agent.specialized.geo.geo_master_agent import run as geo_run
+from app.agent.specialized.geo_ogc.geo_ogc_agent import run as geo_ogc_run
 from app.agent.state import AgentState
 from app.agent.vector_agent import run as vector_run
 from app.config import get_settings
@@ -67,6 +68,7 @@ AGENT_LABELS = {
     "data_gouv": "Data.gouv.fr Open Data",
     "dataviz": "Data Visualisation",
     "geo": "Geospatial Analysis",
+    "geo_ogc": "OGC Web Services (WMS/WFS/WMTS)",
 }
 
 _AGENT_DESCRIPTIONS = {
@@ -106,6 +108,14 @@ _AGENT_DESCRIPTIONS = {
         "               optimisation, elevation profiles, geometry operations,\n"
         "               spatio-temporal analysis, and viewshed estimation."
     ),
+    "geo_ogc": (
+        "  • geo_ogc   – OGC web-service interaction (WMS, WFS, WMTS).\n"
+        "               Best for: discovering and interrogating OGC services (GetCapabilities),\n"
+        "               listing layers from WMS/WFS/WMTS endpoints, requesting WMS map images,\n"
+        "               retrieving WFS vector features as GeoJSON for spatial analysis,\n"
+        "               accessing WMTS tile services, and any question involving OGC-compliant\n"
+        "               geospatial web services."
+    ),
 }
 
 # Theme-specific routing hints.
@@ -121,7 +131,10 @@ _EXTRA_ROUTING_RULES = (
     "  - Questions about geocoding, distances, buffers, isochrones, proximity,\n"
     "    area calculation, hotspot detection, route optimisation, elevation,\n"
     "    geometry operations, spatio-temporal analysis, or viewshed estimation\n"
-    "    → geo."
+    "    → geo.\n"
+    "  - Questions about OGC web services (WMS, WFS, WMTS), GetCapabilities, GetMap,\n"
+    "    GetFeature, map tiles, or interacting with geospatial web service endpoints\n"
+    "    → geo_ogc."
 )
 
 # LangGraph node name → run function for each parallel sub-agent.
@@ -134,6 +147,7 @@ _AGENT_NODES: dict[str, tuple[str, Any]] = {
     "postgis": ("postgis_agent", postgis_run),
     "data_gouv": ("data_gouv_agent", data_gouv_run),
     "geo": ("geo_agent", geo_run),
+    "geo_ogc": ("geo_ogc_agent", geo_ogc_run),
 }
 
 MERGE_SYSTEM = """You are the synthesis module of the PangIA GeoIA platform.
@@ -175,6 +189,7 @@ def get_active_agents() -> list[str]:
         "postgis": settings.postgis_agent_enabled,
         "data_gouv": settings.data_gouv_agent_enabled,
         "geo": settings.geo_agent_enabled,
+        "geo_ogc": settings.geo_ogc_agent_enabled,
     }
     active = [name for name, enabled in flags.items() if enabled]
     # Guard: always keep at least one agent to avoid an empty graph

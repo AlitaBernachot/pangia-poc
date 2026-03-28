@@ -17,11 +17,13 @@ graph TD;
 	postgis_agent(postgis_agent)
 	data_gouv_agent(data_gouv_agent)
 	geo_agent(geo_agent)
+	geo_ogc_agent(geo_ogc_agent)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> router;
 	data_gouv_agent --> post_process_router;
 	dataviz_agent --> merge;
 	geo_agent --> post_process_router;
+	geo_ogc_agent --> post_process_router;
 	humanoutput_agent -.-> dataviz_agent;
 	humanoutput_agent -.-> mapviz_agent;
 	humanoutput_agent -.-> merge;
@@ -32,6 +34,7 @@ graph TD;
 	rdf_agent --> post_process_router;
 	router -.-> data_gouv_agent;
 	router -.-> geo_agent;
+	router -.-> geo_ogc_agent;
 	router -.-> merge;
 	router -.-> neo4j_agent;
 	router -.-> post_process_router;

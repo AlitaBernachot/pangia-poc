@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     data_gouv_agent_enabled: bool = True
     dataviz_agent_enabled: bool = True
     geo_agent_enabled: bool = True
+    geo_ogc_agent_enabled: bool = True
     humanoutput_agent_enabled: bool = True
 
     # Maximum number of LLM+tool iterations (ReAct loop) per agent.
@@ -73,6 +74,10 @@ class Settings(BaseSettings):
     dataviz_agent_max_iterations: int = 0
     geo_agent_max_iterations: int = 0
     humanoutput_agent_max_iterations: int = 0
+    geo_ogc_agent_max_iterations: int = 0
+    ogc_wms_agent_max_iterations: int = 0
+    ogc_wfs_agent_max_iterations: int = 0
+    ogc_wmts_agent_max_iterations: int = 0
     geo_address_agent_max_iterations: int = 0
     geo_spatial_parser_agent_max_iterations: int = 0
     geo_distance_agent_max_iterations: int = 0
@@ -141,6 +146,14 @@ class Settings(BaseSettings):
     geo_temporal_agent_model_name: str = ""
     geo_viewshed_agent_model_provider: str = ""
     geo_viewshed_agent_model_name: str = ""
+    geo_ogc_agent_model_provider: str = ""
+    geo_ogc_agent_model_name: str = ""
+    ogc_wms_agent_model_provider: str = ""
+    ogc_wms_agent_model_name: str = ""
+    ogc_wfs_agent_model_provider: str = ""
+    ogc_wfs_agent_model_name: str = ""
+    ogc_wmts_agent_model_provider: str = ""
+    ogc_wmts_agent_model_name: str = ""
     merge_model_provider: str = ""
     merge_model_name: str = ""
 

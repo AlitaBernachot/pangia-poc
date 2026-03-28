@@ -47,6 +47,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
     - [Adding a new theme](#adding-a-new-theme)
   - [Adding a new sub-agent](#adding-a-new-sub-agent)
   - [Geo Agent – Geospatial Analysis](#geo-agent--geospatial-analysis)
+  - [OGC Agent – OGC Web Services](#ogc-agent--ogc-web-services)
     - [Sub-agent hierarchy](#sub-agent-hierarchy)
     - [Configuration](#configuration-1)
     - [Notes](#notes)
@@ -599,3 +600,94 @@ Replace `<SUBAGENT>` with `ADDRESS`, `SPATIAL_PARSER`, `DISTANCE`, `BUFFER`,
   which is free and requires no API key.
 - For precise polygon operations (intersection, area, routing), the PostGIS agent
   (`postgis_agent.py`) with PostGIS SQL remains the recommended approach.
+
+---
+
+## OGC Agent – OGC Web Services
+
+The **OGC Agent** (`backend/app/agent/specialized/geo_ogc/geo_ogc_agent.py`) is a specialised
+orchestrator for interacting with OGC (Open Geospatial Consortium) compliant geospatial web
+services.  It is available as a parallel sub-agent in the master orchestrator (enabled by
+default via `GEO_OGC_AGENT_ENABLED=true`).
+
+When the master router selects `geo_ogc`, the OGC Agent uses its own internal LLM router
+to dispatch to the most appropriate OGC sub-agent(s) and merges their outputs.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           MASTER AGENT                                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         OGC AGENT (geo_ogc_agent)                           │
+│                                                                              │
+│  • OGC service discovery                                                     │
+│  • GetCapabilities interrogation                                             │
+│  • Layer / feature-type metadata retrieval                                   │
+│  • WMS → map images for visualisation                                        │
+│  • WFS → GeoJSON for spatial analysis                                        │
+│  • WMTS → pre-rendered tile access                                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │
+        ┌───────────────────────────┼───────────────────────────┐
+        ▼                           ▼                           ▼
+┌───────────────────┐     ┌───────────────────┐     ┌───────────────────┐
+│   WMS Agent       │     │   WFS Agent       │     │   WMTS Agent      │
+│ (ogc_wms)         │     │ (ogc_wfs)         │     │ (ogc_wmts)        │
+├───────────────────┤     ├───────────────────┤     ├───────────────────┤
+│ • GetCapabilities │     │ • GetCapabilities │     │ • GetCapabilities │
+│ • GetMap          │     │ • GetFeature      │     │ • GetTile         │
+│ • GetFeatureInfo  │     │ • DescribeFeature │     │ • List layers     │
+│ • List layers     │     │ • List layers     │     └───────────────────┘
+└───────────────────┘     └───────────────────┘
+```
+
+### Sub-agent hierarchy
+
+| Key | Agent file | Capability |
+|-----|-----------|------------|
+| `ogc_wms` | `geo_ogc/wms_agent.py` | WMS – GetCapabilities, GetMap, GetFeatureInfo, layer listing |
+| `ogc_wfs` | `geo_ogc/wfs_agent.py` | WFS – GetCapabilities, GetFeature, DescribeFeatureType, layer listing |
+| `ogc_wmts` | `geo_ogc/wmts_agent.py` | WMTS – GetCapabilities, GetTile, layer and tile matrix set listing |
+
+### Data logic library
+
+Non-LLM HTTP helper functions are located in `backend/libs/geo_ogc/`:
+
+| Module | Description |
+|--------|-------------|
+| `common.py` | Shared utilities (e.g. `base_url` – strips query parameters from service URLs) |
+| `wms.py` | `wms_get_capabilities`, `wms_get_map`, `wms_get_feature_info` |
+| `wfs.py` | `wfs_get_capabilities`, `wfs_get_feature`, `wfs_describe_feature_type` |
+| `wmts.py` | `wmts_get_capabilities`, `wmts_get_tile` |
+
+### Configuration
+
+| Environment variable | Default | Description |
+|---|---|---|
+| `GEO_OGC_AGENT_ENABLED` | `true` | Enable/disable the entire OGC Agent |
+| `GEO_OGC_AGENT_MODEL_PROVIDER` | `` | LLM provider for the OGC router and merge step |
+| `GEO_OGC_AGENT_MODEL_NAME` | `` | LLM model name (falls back to global `OPENAI_MODEL`) |
+| `GEO_OGC_AGENT_MAX_ITERATIONS` | `0` | Max ReAct loop iterations (0 = global default) |
+| `OGC_WMS_AGENT_MODEL_PROVIDER` | `` | Per-sub-agent model provider override (WMS) |
+| `OGC_WMS_AGENT_MODEL_NAME` | `` | Per-sub-agent model name override (WMS) |
+| `OGC_WMS_AGENT_MAX_ITERATIONS` | `0` | Per-sub-agent max iterations override (WMS) |
+| `OGC_WFS_AGENT_MODEL_PROVIDER` | `` | Per-sub-agent model provider override (WFS) |
+| `OGC_WFS_AGENT_MODEL_NAME` | `` | Per-sub-agent model name override (WFS) |
+| `OGC_WFS_AGENT_MAX_ITERATIONS` | `0` | Per-sub-agent max iterations override (WFS) |
+| `OGC_WMTS_AGENT_MODEL_PROVIDER` | `` | Per-sub-agent model provider override (WMTS) |
+| `OGC_WMTS_AGENT_MODEL_NAME` | `` | Per-sub-agent model name override (WMTS) |
+| `OGC_WMTS_AGENT_MAX_ITERATIONS` | `0` | Per-sub-agent max iterations override (WMTS) |
+
+### Notes
+
+- OGC services must be publicly accessible from the backend server.
+- WFS `GetFeature` requests default to `application/json` output format for GeoJSON
+  compatibility; not all WFS servers support this format – fallback to GML is handled
+  gracefully.
+- WMS `GetMap` returns base64-encoded image data included in the agent response payload.
+- WMTS tile coordinates (row/col) follow the standard OGC tile addressing scheme; consult
+  the `GetCapabilities` response to identify valid tile matrix sets and zoom levels.

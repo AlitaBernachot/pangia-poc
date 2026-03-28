@@ -136,6 +136,10 @@ AGENT_NAMES = [
     "geo_geometry_ops_agent",
     "geo_temporal_agent",
     "geo_viewshed_agent",
+    "geo_ogc_agent",
+    "ogc_wms_agent",
+    "ogc_wfs_agent",
+    "ogc_wmts_agent",
     "merge",
 ]
 
