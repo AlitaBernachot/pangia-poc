@@ -36,10 +36,11 @@ FeatureCollection that can be displayed on an interactive map.
    specialised sub-agents (e.g. Neo4j, PostGIS) enriched with coordinates, site
    names, and country information.
 2. For each location found in the context:
-   - If exact coordinates (lat/lon) are present in the text, use
-     `extract_geojson_from_text` passing the relevant excerpt.
-   - If only a name or address is given, use `geocode_address` to obtain
-     coordinates.
+   - If exact coordinates (lat/lon) or WKT/GeoJSON geometry are present in the
+     text, use `extract_geojson_from_text` passing the relevant excerpt.
+     **Do NOT call `geocode_address` when coordinates are already available.**
+   - If only a name or address is given (no coordinates at all), use
+     `geocode_address` to obtain coordinates.
 3. Use the site name and country from the context to set a meaningful `name`
    property on each feature.
 4. Collect all resulting Feature objects and assemble them into a single
@@ -53,6 +54,9 @@ FeatureCollection that can be displayed on an interactive map.
 
 ## Rules
 - GeoJSON coordinates are [longitude, latitude] (not lat, lon).
+- **Never geocode a location that already has coordinates or geometry** – this
+  wastes tokens and API calls.  Prefer `extract_geojson_from_text` over
+  `geocode_address` whenever numeric coordinates appear in the context.
 - If no geographic data can be extracted, return:
   {{"geojson": null, "summary": "No geographic data found."}}
 - Keep popup content concise (2–4 lines of plain text or simple HTML).
@@ -290,6 +294,12 @@ _COORD_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Detects WKT geometry strings in text (from PostGIS results)
+_WKT_IN_TEXT_RE = re.compile(
+    r"\b(POINT|LINESTRING|POLYGON|MULTIPOINT|MULTILINESTRING|MULTIPOLYGON)\s*\(",
+    re.IGNORECASE,
+)
+
 
 async def run(state: AgentState) -> dict:
     """LangGraph node: run the Map Agent after parallel sub-agents complete.
@@ -311,6 +321,22 @@ async def _run(state: AgentState) -> dict:
         "",
     )
 
+    # ── Fast path: PostGIS already extracted geometry ──────────────────────────
+    # When the PostGIS agent detected geometry columns in its query results and
+    # built a GeoJSON FeatureCollection, we can use it directly without invoking
+    # the LLM or calling geocode_address – saving tokens and latency.
+    postgis_geojson: dict[str, Any] | None = state.get("postgis_geojson")
+    if postgis_geojson and postgis_geojson.get("features"):
+        count = len(postgis_geojson["features"])
+        summary = (
+            f"Displaying {count} location{'s' if count != 1 else ''} "
+            "from spatial query results."
+        )
+        return {
+            "sub_results": {"map": summary},
+            "geojson": postgis_geojson,
+        }
+
     # Build enriched context from all sub-agent results
     sub_text = "\n\n".join(
         f"[{agent.upper()} RESULTS]:\n{result}"
@@ -319,8 +345,9 @@ async def _run(state: AgentState) -> dict:
     )
 
     # Quick heuristic: skip entirely if there is no geographic signal
+    # (lat/lon keywords, decimal coordinates, or WKT geometry strings)
     combined_check = f"{sub_text} {user_query}"
-    if not _COORD_HINT_RE.search(combined_check):
+    if not _COORD_HINT_RE.search(combined_check) and not _WKT_IN_TEXT_RE.search(combined_check):
         return {"sub_results": {"map": ""}, "geojson": None}
 
     llm = build_llm(get_agent_model_config("map_agent"), streaming=True).bind_tools(MAP_TOOLS)

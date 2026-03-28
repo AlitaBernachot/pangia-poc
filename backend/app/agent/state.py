@@ -27,6 +27,11 @@ class AgentState(TypedDict):
     # Results from parallel sub-agent branches are merged via _merge_dicts.
     sub_results: Annotated[dict[str, str], _merge_dicts]
 
+    # GeoJSON FeatureCollection extracted directly from PostGIS query results
+    # (populated by postgis_agent when geometry columns are detected).
+    # The map agent reads this to skip geocoding when geometry is already available.
+    postgis_geojson: dict[str, Any] | None
+
     # GeoJSON FeatureCollection produced by the map agent (None if not invoked).
     geojson: dict[str, Any] | None
 
