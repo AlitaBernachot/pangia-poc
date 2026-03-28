@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     map_agent_enabled: bool = True
     data_gouv_agent_enabled: bool = True
     dataviz_agent_enabled: bool = True
+    geo_agent_enabled: bool = True
 
     # Maximum number of LLM+tool iterations (ReAct loop) per agent.
     # Each iteration = one LLM call + zero or more tool calls.
@@ -69,6 +70,21 @@ class Settings(BaseSettings):
     map_agent_max_iterations: int = 0
     data_gouv_agent_max_iterations: int = 0
     dataviz_agent_max_iterations: int = 0
+    geo_agent_max_iterations: int = 0
+    geo_address_agent_max_iterations: int = 0
+    geo_spatial_parser_agent_max_iterations: int = 0
+    geo_distance_agent_max_iterations: int = 0
+    geo_buffer_agent_max_iterations: int = 0
+    geo_isochrone_agent_max_iterations: int = 0
+    geo_proximity_agent_max_iterations: int = 0
+    geo_intersection_agent_max_iterations: int = 0
+    geo_area_agent_max_iterations: int = 0
+    geo_hotspot_agent_max_iterations: int = 0
+    geo_shortest_path_agent_max_iterations: int = 0
+    geo_elevation_agent_max_iterations: int = 0
+    geo_geometry_ops_agent_max_iterations: int = 0
+    geo_temporal_agent_max_iterations: int = 0
+    geo_viewshed_agent_max_iterations: int = 0
 
     # Per-agent model configuration
     # For each agent set <AGENT>_MODEL_PROVIDER and <AGENT>_MODEL_NAME to
@@ -91,6 +107,36 @@ class Settings(BaseSettings):
     data_gouv_agent_model_name: str = ""
     dataviz_agent_model_provider: str = ""
     dataviz_agent_model_name: str = ""
+    geo_agent_model_provider: str = ""
+    geo_agent_model_name: str = ""
+    geo_address_agent_model_provider: str = ""
+    geo_address_agent_model_name: str = ""
+    geo_spatial_parser_agent_model_provider: str = ""
+    geo_spatial_parser_agent_model_name: str = ""
+    geo_distance_agent_model_provider: str = ""
+    geo_distance_agent_model_name: str = ""
+    geo_buffer_agent_model_provider: str = ""
+    geo_buffer_agent_model_name: str = ""
+    geo_isochrone_agent_model_provider: str = ""
+    geo_isochrone_agent_model_name: str = ""
+    geo_proximity_agent_model_provider: str = ""
+    geo_proximity_agent_model_name: str = ""
+    geo_intersection_agent_model_provider: str = ""
+    geo_intersection_agent_model_name: str = ""
+    geo_area_agent_model_provider: str = ""
+    geo_area_agent_model_name: str = ""
+    geo_hotspot_agent_model_provider: str = ""
+    geo_hotspot_agent_model_name: str = ""
+    geo_shortest_path_agent_model_provider: str = ""
+    geo_shortest_path_agent_model_name: str = ""
+    geo_elevation_agent_model_provider: str = ""
+    geo_elevation_agent_model_name: str = ""
+    geo_geometry_ops_agent_model_provider: str = ""
+    geo_geometry_ops_agent_model_name: str = ""
+    geo_temporal_agent_model_provider: str = ""
+    geo_temporal_agent_model_name: str = ""
+    geo_viewshed_agent_model_provider: str = ""
+    geo_viewshed_agent_model_name: str = ""
     merge_model_provider: str = ""
     merge_model_name: str = ""
 

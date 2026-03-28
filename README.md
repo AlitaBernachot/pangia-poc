@@ -330,7 +330,22 @@ pangia-poc/
 │       │   ├── map_agent.py     # Map post-processor (GeoJSON)
 │       │   ├── dataviz_agent.py # DataViz post-processor (charts/KPIs/tables)
 │       │   └── specialized/
-│       │       └── data_gouv_agent.py # French open-data sub-agent (data.gouv.fr MCP)
+│       │       ├── data_gouv_agent.py      # French open-data sub-agent (data.gouv.fr MCP)
+│       │       ├── geo_agent.py            # Geospatial orchestrator (routes to geo sub-agents)
+│       │       ├── geo_address_agent.py    # L1: Geocoder – address ↔ coordinates
+│       │       ├── geo_spatial_parser_agent.py # L1: SpatialParser – NL spatial understanding
+│       │       ├── geo_distance_agent.py   # L1: DistanceCalc – great-circle distances
+│       │       ├── geo_buffer_agent.py     # L1: BufferAnalyser – circular buffer zones
+│       │       ├── geo_isochrone_agent.py  # L1: Isochrone – accessibility zone estimation
+│       │       ├── geo_proximity_agent.py  # L2: Proximity – nearest-entity search
+│       │       ├── geo_intersection_agent.py # L2: Intersection – spatial overlap analysis
+│       │       ├── geo_area_agent.py       # L2: AreaCalculator – polygon surface areas
+│       │       ├── geo_hotspot_agent.py    # L2: Hotspot – cluster detection & density
+│       │       ├── geo_shortest_path_agent.py # L2: ShortestPath – route optimisation
+│       │       ├── geo_elevation_agent.py  # L3: Elevation – altitude retrieval (Open-Meteo)
+│       │       ├── geo_geometry_ops_agent.py # L3: GeometryOps – GeoJSON transformations
+│       │       ├── geo_temporal_agent.py   # L3: TemporalAnalyst – spatio-temporal patterns
+│       │       └── geo_viewshed_agent.py   # L3: Viewshed – geometric visibility analysis
 │       └── db/
 │           ├── neo4j_client.py
 │           ├── graphdb_client.py
@@ -468,3 +483,57 @@ Sub-agents live in `backend/app/agent/`.  To add one:
 5. **Expose a `GET /api/suggestions`** update is automatic — suggestions are already
    served from the active theme's `suggestions` list.
 
+---
+
+## Geo Agent – Geospatial Analysis
+
+The **Geo Agent** (`backend/app/agent/specialized/geo_agent.py`) is a specialised
+orchestrator for advanced geospatial analysis tasks.  It is available as a parallel
+sub-agent in the master orchestrator (enabled by default via `GEO_AGENT_ENABLED=true`).
+
+When the master router selects `geo`, the Geo Agent uses its own internal LLM router
+to dispatch to the most appropriate geo sub-agents and merges their outputs.
+
+### Sub-agent hierarchy
+
+| Level | Key | Agent file | Capability |
+|-------|-----|-----------|------------|
+| 1 – MVP | `geo_address` | `geo_address_agent.py` | Geocoder – address ↔ coordinates (Nominatim) |
+| 1 – MVP | `geo_spatial_parser` | `geo_spatial_parser_agent.py` | SpatialParser – natural language spatial understanding |
+| 1 – MVP | `geo_distance` | `geo_distance_agent.py` | DistanceCalc – great-circle distance calculations |
+| 1 – MVP | `geo_buffer` | `geo_buffer_agent.py` | BufferAnalyser – circular and multi-ring buffer zones |
+| 1 – MVP | `geo_isochrone` | `geo_isochrone_agent.py` | Isochrone – travel-time accessibility zones |
+| 2 – Evolution | `geo_proximity` | `geo_proximity_agent.py` | Proximity – nearest-entity search and ranking |
+| 2 – Evolution | `geo_intersection` | `geo_intersection_agent.py` | Intersection – bounding-box overlap and containment |
+| 2 – Evolution | `geo_area` | `geo_area_agent.py` | AreaCalculator – polygon surface area computation |
+| 2 – Evolution | `geo_hotspot` | `geo_hotspot_agent.py` | Hotspot – point-cluster detection and density |
+| 2 – Evolution | `geo_shortest_path` | `geo_shortest_path_agent.py` | ShortestPath – waypoint route optimisation |
+| 3 – Specialised | `geo_elevation` | `geo_elevation_agent.py` | Elevation – altitude retrieval (Open-Meteo API) |
+| 3 – Specialised | `geo_geometry_ops` | `geo_geometry_ops_agent.py` | GeometryOps – GeoJSON transformations and validation |
+| 3 – Specialised | `geo_temporal` | `geo_temporal_agent.py` | TemporalAnalyst – spatio-temporal pattern detection |
+| 3 – Specialised | `geo_viewshed` | `geo_viewshed_agent.py` | Viewshed – geometric visibility analysis |
+
+### Configuration
+
+| Environment variable | Default | Description |
+|---|---|---|
+| `GEO_AGENT_ENABLED` | `true` | Enable/disable the entire Geo Agent |
+| `GEO_AGENT_MODEL_PROVIDER` | `` | LLM provider for the internal geo router and merge step |
+| `GEO_AGENT_MODEL_NAME` | `` | LLM model name (falls back to global `OPENAI_MODEL`) |
+| `GEO_AGENT_MAX_ITERATIONS` | `0` | Max ReAct loop iterations (0 = global default) |
+| `GEO_<SUBAGENT>_AGENT_MODEL_PROVIDER` | `` | Per-sub-agent model provider override |
+| `GEO_<SUBAGENT>_AGENT_MODEL_NAME` | `` | Per-sub-agent model name override |
+| `GEO_<SUBAGENT>_AGENT_MAX_ITERATIONS` | `0` | Per-sub-agent max iterations override |
+
+Replace `<SUBAGENT>` with `ADDRESS`, `SPATIAL_PARSER`, `DISTANCE`, `BUFFER`,
+`ISOCHRONE`, `PROXIMITY`, `INTERSECTION`, `AREA`, `HOTSPOT`, `SHORTEST_PATH`,
+`ELEVATION`, `GEOMETRY_OPS`, `TEMPORAL`, or `VIEWSHED`.
+
+### Notes
+
+- Isochrone, buffer, and viewshed computations are **geometric approximations**
+  based on straight-line (great-circle) distances and do not use road networks or DEMs.
+- Elevation data is retrieved from the [Open-Meteo elevation API](https://open-meteo.com/)
+  which is free and requires no API key.
+- For precise polygon operations (intersection, area, routing), the PostGIS agent
+  (`postgis_agent.py`) with PostGIS SQL remains the recommended approach.
