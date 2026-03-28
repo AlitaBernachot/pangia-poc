@@ -26,16 +26,19 @@ Relationship types:
 """,
 
     postgis_schema_prompt="""\
+Schema: dinosaures
+
 Tables:
-- fossil_sites(id, name, country, era, location_modern GEOMETRY(POINT,4326),
-               location_pangaea GEOMETRY(POINT,4326), dinosaurs_found TEXT[],
-               period_start INTEGER, period_end INTEGER)
-- paleo_continents(id, name, period, geometry GEOMETRY(POLYGON,4326),
-                   parent_continent VARCHAR)
+- dinosaures.fossil_sites(id, name, country, era, location_modern GEOMETRY(POINT,4326),
+                          location_pangaea GEOMETRY(POINT,4326), dinosaurs_found TEXT[],
+                          period_start INTEGER, period_end INTEGER)
+- dinosaures.paleo_continents(id, name, period, geometry GEOMETRY(POLYGON,4326),
+                               parent_continent VARCHAR)
 
 Use PostGIS functions such as ST_Distance, ST_Contains, ST_Within, ST_Intersects,
 ST_DWithin, ST_AsText, ST_X/ST_Y to answer spatial questions.
 Distances are in metres (use /1000 to convert to km).
+Always qualify table names with the schema: dinosaures.<table>.
 """,
 
     rdf_schema_prompt="""\
@@ -557,9 +560,12 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
         # Ensure the PostGIS extension is available
         "CREATE EXTENSION IF NOT EXISTS postgis",
 
+        # Ensure the dinosaures schema exists
+        "CREATE SCHEMA IF NOT EXISTS dinosaures",
+
         # fossil_sites table
         """
-        CREATE TABLE IF NOT EXISTS fossil_sites (
+        CREATE TABLE IF NOT EXISTS dinosaures.fossil_sites (
             id               SERIAL PRIMARY KEY,
             name             VARCHAR(100) UNIQUE,
             country          VARCHAR(50),
@@ -574,7 +580,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
 
         # paleo_continents table
         """
-        CREATE TABLE IF NOT EXISTS paleo_continents (
+        CREATE TABLE IF NOT EXISTS dinosaures.paleo_continents (
             id               SERIAL PRIMARY KEY,
             name             VARCHAR(50) UNIQUE,
             period           VARCHAR(50),
@@ -585,7 +591,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
 
         # fossil_sites rows
         """
-        INSERT INTO fossil_sites
+        INSERT INTO dinosaures.fossil_sites
             (name, country, era, location_modern, location_pangaea,
              dinosaurs_found, period_start, period_end)
         VALUES
@@ -597,7 +603,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
         ON CONFLICT (name) DO NOTHING
         """,
         """
-        INSERT INTO fossil_sites
+        INSERT INTO dinosaures.fossil_sites
             (name, country, era, location_modern, location_pangaea,
              dinosaurs_found, period_start, period_end)
         VALUES
@@ -609,7 +615,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
         ON CONFLICT (name) DO NOTHING
         """,
         """
-        INSERT INTO fossil_sites
+        INSERT INTO dinosaures.fossil_sites
             (name, country, era, location_modern, location_pangaea,
              dinosaurs_found, period_start, period_end)
         VALUES
@@ -621,7 +627,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
         ON CONFLICT (name) DO NOTHING
         """,
         """
-        INSERT INTO fossil_sites
+        INSERT INTO dinosaures.fossil_sites
             (name, country, era, location_modern, location_pangaea,
              dinosaurs_found, period_start, period_end)
         VALUES
@@ -633,7 +639,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
         ON CONFLICT (name) DO NOTHING
         """,
         """
-        INSERT INTO fossil_sites
+        INSERT INTO dinosaures.fossil_sites
             (name, country, era, location_modern, location_pangaea,
              dinosaurs_found, period_start, period_end)
         VALUES
@@ -645,7 +651,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
         ON CONFLICT (name) DO NOTHING
         """,
         """
-        INSERT INTO fossil_sites
+        INSERT INTO dinosaures.fossil_sites
             (name, country, era, location_modern, location_pangaea,
              dinosaurs_found, period_start, period_end)
         VALUES
@@ -657,7 +663,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
         ON CONFLICT (name) DO NOTHING
         """,
         """
-        INSERT INTO fossil_sites
+        INSERT INTO dinosaures.fossil_sites
             (name, country, era, location_modern, location_pangaea,
              dinosaurs_found, period_start, period_end)
         VALUES
@@ -669,7 +675,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
         ON CONFLICT (name) DO NOTHING
         """,
         """
-        INSERT INTO fossil_sites
+        INSERT INTO dinosaures.fossil_sites
             (name, country, era, location_modern, location_pangaea,
              dinosaurs_found, period_start, period_end)
         VALUES
@@ -681,7 +687,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
         ON CONFLICT (name) DO NOTHING
         """,
         """
-        INSERT INTO fossil_sites
+        INSERT INTO dinosaures.fossil_sites
             (name, country, era, location_modern, location_pangaea,
              dinosaurs_found, period_start, period_end)
         VALUES
@@ -695,7 +701,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
 
         # paleo_continents rows
         """
-        INSERT INTO paleo_continents (name, period, geometry, parent_continent)
+        INSERT INTO dinosaures.paleo_continents (name, period, geometry, parent_continent)
         VALUES
             ('Pangée', 'Trias',
              ST_GeomFromText(
@@ -705,7 +711,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
         ON CONFLICT (name) DO NOTHING
         """,
         """
-        INSERT INTO paleo_continents (name, period, geometry, parent_continent)
+        INSERT INTO dinosaures.paleo_continents (name, period, geometry, parent_continent)
         VALUES
             ('Laurasia', 'Jurassique',
              ST_GeomFromText(
@@ -715,7 +721,7 @@ Always add GRAPH <http://pangia.io/graphs/dinosaurs> { ... } in queries.
         ON CONFLICT (name) DO NOTHING
         """,
         """
-        INSERT INTO paleo_continents (name, period, geometry, parent_continent)
+        INSERT INTO dinosaures.paleo_continents (name, period, geometry, parent_continent)
         VALUES
             ('Gondwana', 'Jurassique',
              ST_GeomFromText(

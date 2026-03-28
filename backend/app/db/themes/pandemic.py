@@ -31,15 +31,18 @@ Relationship types:
 """,
 
     postgis_schema_prompt="""\
+Schema: pandemic
+
 Tables:
-- outbreak_sites(id, pandemic_name, site_name, country, location GEOMETRY(POINT,4326),
-                 year_detected INTEGER, cases INTEGER, deaths INTEGER, notes TEXT)
-- affected_regions(id, pandemic_name, region_name, geometry GEOMETRY(POLYGON,4326),
-                   severity VARCHAR, year_start INTEGER, year_end INTEGER)
+- pandemic.outbreak_sites(id, pandemic_name, site_name, country, location GEOMETRY(POINT,4326),
+                           year_detected INTEGER, cases INTEGER, deaths INTEGER, notes TEXT)
+- pandemic.affected_regions(id, pandemic_name, region_name, geometry GEOMETRY(POLYGON,4326),
+                             severity VARCHAR, year_start INTEGER, year_end INTEGER)
 
 Use PostGIS functions such as ST_Distance, ST_Contains, ST_Within, ST_Intersects,
 ST_DWithin, ST_AsText, ST_X/ST_Y to answer spatial questions.
 Distances are in metres (use /1000 to convert to km).
+Always qualify table names with the schema: pandemic.<table>.
 """,
 
     rdf_schema_prompt="""\
@@ -469,9 +472,12 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
     postgis_statements=[
         "CREATE EXTENSION IF NOT EXISTS postgis",
 
+        # Ensure the pandemic schema exists
+        "CREATE SCHEMA IF NOT EXISTS pandemic",
+
         # outbreak_sites table
         """
-        CREATE TABLE IF NOT EXISTS outbreak_sites (
+        CREATE TABLE IF NOT EXISTS pandemic.outbreak_sites (
             id            SERIAL PRIMARY KEY,
             pandemic_name VARCHAR(100),
             site_name     VARCHAR(150),
@@ -486,7 +492,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
 
         # affected_regions table
         """
-        CREATE TABLE IF NOT EXISTS affected_regions (
+        CREATE TABLE IF NOT EXISTS pandemic.affected_regions (
             id            SERIAL PRIMARY KEY,
             pandemic_name VARCHAR(100),
             region_name   VARCHAR(150) UNIQUE,
@@ -499,7 +505,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
 
         # ── COVID-19 origin & major hotspot sites ─────────────────────────────
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('COVID-19', 'Wuhan', 'China',
@@ -509,7 +515,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('COVID-19', 'New York City', 'USA',
@@ -519,7 +525,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('COVID-19', 'Bergamo', 'Italy',
@@ -529,7 +535,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('COVID-19', 'Manaus', 'Brazil',
@@ -539,7 +545,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('COVID-19', 'Mumbai', 'India',
@@ -551,7 +557,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
 
         # ── Ebola 2014-2016 West Africa sites ────────────────────────────────
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('Ebola 2014-2016', 'Guéckédou', 'Guinea',
@@ -561,7 +567,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('Ebola 2014-2016', 'Freetown', 'Sierra Leone',
@@ -571,7 +577,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('Ebola 2014-2016', 'Monrovia', 'Liberia',
@@ -583,7 +589,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
 
         # ── Ebola DRC 2018-2020 sites ─────────────────────────────────────────
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('Ebola DRC 2018-2020', 'Beni', 'Democratic Republic of the Congo',
@@ -593,7 +599,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('Ebola DRC 2018-2020', 'Butembo', 'Democratic Republic of the Congo',
@@ -605,7 +611,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
 
         # ── SARS 2002-2003 sites ──────────────────────────────────────────────
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('SARS 2002-2003', 'Guangdong', 'China',
@@ -615,7 +621,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('SARS 2002-2003', 'Hong Kong', 'China',
@@ -625,7 +631,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('SARS 2002-2003', 'Toronto', 'Canada',
@@ -637,7 +643,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
 
         # ── MERS sites ────────────────────────────────────────────────────────
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('MERS', 'Jeddah', 'Saudi Arabia',
@@ -647,7 +653,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('MERS', 'Seoul', 'South Korea',
@@ -659,7 +665,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
 
         # ── Spanish Flu sites ────────────────────────────────────────────────
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('Spanish Flu', 'Camp Funston', 'USA',
@@ -669,7 +675,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('Spanish Flu', 'Philadelphia', 'USA',
@@ -681,7 +687,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
 
         # ── HIV/AIDS sites ────────────────────────────────────────────────────
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('HIV/AIDS', 'Kinshasa', 'Democratic Republic of the Congo',
@@ -691,7 +697,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('HIV/AIDS', 'San Francisco', 'USA',
@@ -703,7 +709,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
 
         # ── Cholera 7th Pandemic sites ────────────────────────────────────────
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('Cholera 7th Pandemic', 'Sanaa', 'Yemen',
@@ -713,7 +719,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('Cholera 7th Pandemic', 'Port-au-Prince', 'Haiti',
@@ -725,7 +731,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
 
         # ── Black Death site ──────────────────────────────────────────────────
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('Black Death', 'Caffa (Feodosia)', 'Ukraine',
@@ -735,7 +741,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT DO NOTHING
         """,
         """
-        INSERT INTO outbreak_sites
+        INSERT INTO pandemic.outbreak_sites
             (pandemic_name, site_name, country, location, year_detected, cases, deaths, notes)
         VALUES
             ('Black Death', 'Florence', 'Italy',
@@ -747,7 +753,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
 
         # ── Affected region polygons ──────────────────────────────────────────
         """
-        INSERT INTO affected_regions (pandemic_name, region_name, geometry, severity, year_start, year_end)
+        INSERT INTO pandemic.affected_regions (pandemic_name, region_name, geometry, severity, year_start, year_end)
         VALUES (
             'COVID-19', 'East Asia initial wave',
             ST_GeomFromText(
@@ -757,7 +763,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT (region_name) DO NOTHING
         """,
         """
-        INSERT INTO affected_regions (pandemic_name, region_name, geometry, severity, year_start, year_end)
+        INSERT INTO pandemic.affected_regions (pandemic_name, region_name, geometry, severity, year_start, year_end)
         VALUES (
             'COVID-19', 'Western Europe COVID-19',
             ST_GeomFromText(
@@ -767,7 +773,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT (region_name) DO NOTHING
         """,
         """
-        INSERT INTO affected_regions (pandemic_name, region_name, geometry, severity, year_start, year_end)
+        INSERT INTO pandemic.affected_regions (pandemic_name, region_name, geometry, severity, year_start, year_end)
         VALUES (
             'Ebola 2014-2016', 'West Africa Ebola belt',
             ST_GeomFromText(
@@ -777,7 +783,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT (region_name) DO NOTHING
         """,
         """
-        INSERT INTO affected_regions (pandemic_name, region_name, geometry, severity, year_start, year_end)
+        INSERT INTO pandemic.affected_regions (pandemic_name, region_name, geometry, severity, year_start, year_end)
         VALUES (
             'HIV/AIDS', 'Sub-Saharan Africa HIV belt',
             ST_GeomFromText(
@@ -787,7 +793,7 @@ Always add GRAPH <http://pangia.io/graphs/pandemic> { ... } in queries.
         ON CONFLICT (region_name) DO NOTHING
         """,
         """
-        INSERT INTO affected_regions (pandemic_name, region_name, geometry, severity, year_start, year_end)
+        INSERT INTO pandemic.affected_regions (pandemic_name, region_name, geometry, severity, year_start, year_end)
         VALUES (
             'Black Death', 'Europe Black Death extent',
             ST_GeomFromText(
