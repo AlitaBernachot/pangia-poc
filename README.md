@@ -394,6 +394,22 @@ Seeding is controlled by `SEED_DB` (default: `true`); set it to `false` in produ
 Each theme provides data for all four datastores (Neo4j, PostGIS, GraphDB, ChromaDB)
 as well as the schema prompts, agent guidelines, and UI suggestions used by the agents.
 
+### PostGIS schema isolation
+
+Each built-in theme stores its PostGIS tables in a **dedicated PostgreSQL schema**
+(not in the default `public` schema):
+
+| Theme | PostgreSQL schema | Tables |
+|---|---|---|
+| `dinosaurs` | `dinosaures` | `dinosaures.fossil_sites`, `dinosaures.paleo_continents` |
+| `pandemic` | `pandemic` | `pandemic.outbreak_sites`, `pandemic.affected_regions` |
+
+The schema is created automatically during seeding (`CREATE SCHEMA IF NOT EXISTS …`).
+When adding a new theme, follow the same convention: create a schema named after the
+theme and qualify every table reference with that schema (e.g. `myschema.mytable`).
+Update `postgis_schema_prompt` to include the schema name so the PostGIS agent
+generates correctly qualified queries.
+
 ### Switching the theme
 
 Set `SEED_THEME` in your `.env` before starting the stack:
@@ -413,11 +429,11 @@ SEED_THEME=my_theme docker compose up --build
    | Field | Purpose |
    |---|---|
    | `neo4j_statements` | Idempotent Cypher statements (MERGE) to seed the graph |
-   | `postgis_statements` | DDL + DML SQL statements for tables and rows |
+   | `postgis_statements` | DDL + DML SQL statements for tables and rows — **always start with `CREATE SCHEMA IF NOT EXISTS <schema>` and qualify every table with that schema** |
    | `graphdb_named_graph` + `graphdb_turtle` | Named graph URI and Turtle RDF content |
    | `chroma_documents` | List of `{"text": str, "metadata": dict}` docs to embed |
    | `neo4j_schema_prompt` | Graph schema description injected into the Neo4j agent |
-   | `postgis_schema_prompt` | Table/column description injected into the PostGIS agent |
+   | `postgis_schema_prompt` | Table/column description injected into the PostGIS agent — **include the schema name and a reminder to qualify table names** |
    | `rdf_schema_prompt` | Ontology description injected into the RDF agent |
    | `neo4j_guidelines` | Theme-specific query hints for the Neo4j agent |
    | `postgis_guidelines` | Theme-specific query hints for the PostGIS agent |
