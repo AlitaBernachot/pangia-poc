@@ -117,7 +117,7 @@ AGENT_NAMES = [
     "rdf_agent",
     "vector_agent",
     "postgis_agent",
-    "map_agent",
+    "mapviz_agent",
     "data_gouv_agent",
     "dataviz_agent",
     "humanoutput_agent",

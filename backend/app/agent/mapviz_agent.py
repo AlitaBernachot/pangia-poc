@@ -352,7 +352,7 @@ async def _run(state: AgentState) -> dict:
             }
         return {"sub_results": {"map": ""}, "geojson": None}
 
-    llm = build_llm(get_agent_model_config("map_agent"), streaming=True).bind_tools(MAP_TOOLS)
+    llm = build_llm(get_agent_model_config("mapviz_agent"), streaming=True).bind_tools(MAP_TOOLS)
 
     # Primary LLM input: enriched context from other agents + original question
     map_input = (
@@ -363,7 +363,7 @@ async def _run(state: AgentState) -> dict:
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=map_input)]
 
-    for _ in range(get_agent_max_iterations("map_agent")):
+    for _ in range(get_agent_max_iterations("mapviz_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
 

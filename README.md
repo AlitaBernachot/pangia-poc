@@ -86,7 +86,7 @@ User query  +  selected_agents? (optional)
 │                                  (decides map/dataviz/both)      │
 │                             ┌─────────┴──────────┐              │
 │                    ┌────────▼────────┐  ┌─────────▼──────────┐  │
-│                    │   map_agent     │  │   dataviz_agent    │  │
+│                    │   mapviz_agent   │  │   dataviz_agent    │  │
 │                    │ (GeoJSON / map) │  │ (charts/KPI/tbl)   │  │
 │                    └────────┬────────┘  └─────────┬──────────┘  │
 │                             └─────────┬───────────┘              │
@@ -121,7 +121,7 @@ tools) and writes its result into a shared `sub_results` dict.
 After all data-source agents complete, a **`post_process_router`** barrier routes
 to **`humanoutput_agent`**, which inspects `sub_results` and the user query to
 decide whether a map, charts/tables, both, or neither are appropriate.  It then
-fans out (via Send) only to the agents that are relevant — `map_agent`,
+fans out (via Send) only to the agents that are relevant — `mapviz_agent`,
 `dataviz_agent`, or both — and writes its decision to `state["output_decision"]`.
 The **merge** node then waits for all post-processors and synthesises the results
 into a final streamed answer.
@@ -135,7 +135,7 @@ into a final streamed answer.
 | `VECTOR_AGENT_ENABLED` | `true` | Semantic search agent (ChromaDB) |
 | `POSTGIS_AGENT_ENABLED` | `true` | Spatial SQL agent (PostGIS) |
 | `DATA_GOUV_AGENT_ENABLED` | `true` | French open-data agent (data.gouv.fr via MCP) |
-| `MAP_AGENT_ENABLED` | `true` | Geographic visualisation agent (GeoJSON / Leaflet map) |
+| `MAPVIZ_AGENT_ENABLED` | `true` | Geographic visualisation agent (GeoJSON / Leaflet map) |
 | `DATAVIZ_AGENT_ENABLED` | `true` | Data visualisation agent (charts, KPIs, tables) |
 | `HUMANOUTPUT_AGENT_ENABLED` | `true` | Output decision agent (routes to map/dataviz selectively) |
 
@@ -168,7 +168,7 @@ The number of iterations is configurable at two levels:
 | `RDF_AGENT_MAX_ITERATIONS` | `0` | RDF/SPARQL agent override |
 | `VECTOR_AGENT_MAX_ITERATIONS` | `0` | Vector agent override |
 | `POSTGIS_AGENT_MAX_ITERATIONS` | `0` | PostGIS agent override |
-| `MAP_AGENT_MAX_ITERATIONS` | `0` | Map agent override |
+| `MAPVIZ_AGENT_MAX_ITERATIONS` | `0` | Map agent override |
 | `DATA_GOUV_AGENT_MAX_ITERATIONS` | `0` | data.gouv.fr agent override |
 | `DATAVIZ_AGENT_MAX_ITERATIONS` | `0` | DataViz agent override |
 
@@ -184,7 +184,7 @@ Every agent (including the router and the merge node) can use a **different LLM 
 | `<AGENT>_MODEL_PROVIDER` | `openai`, `anthropic`, `ollama` | Provider for this agent. Leave empty to use the global provider. |
 | `<AGENT>_MODEL_NAME` | `gpt-4o`, `claude-3-5-sonnet-latest`, `llama3` | Model name for this agent. Leave empty to fall back to `OPENAI_MODEL`. |
 
-Available `<AGENT>` prefixes: `ROUTER`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_AGENT`, `POSTGIS_AGENT`, `MAP_AGENT`, `DATA_GOUV_AGENT`, `DATAVIZ_AGENT`, `MERGE`.
+Available `<AGENT>` prefixes: `ROUTER`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_AGENT`, `POSTGIS_AGENT`, `MAPVIZ_AGENT`, `DATA_GOUV_AGENT`, `DATAVIZ_AGENT`, `MERGE`.
 
 Example `.env` — use a powerful model for the router and merge, a cheaper one for sub-agents:
 
@@ -224,7 +224,7 @@ Leave both variables empty (the default) to use the global `OPENAI_MODEL` for ev
 ### Human Output Agent
 
 The **Human Output Agent** (`humanoutput_agent`) sits **between `post_process_router`
-and `map_agent` / `dataviz_agent`** in the pipeline.  Its job is to analyse the
+and `mapviz_agent` / `dataviz_agent`** in the pipeline.  Its job is to analyse the
 data already gathered by the parallel sub-agents (plus the original user query)
 and decide which visualisation components — a map, charts/tables, both, or
 neither — are worth rendering.
@@ -240,7 +240,7 @@ neither — are worth rendering.
    so downstream agents always have a chance to run.
 
 The agent can be disabled by setting `HUMANOUTPUT_AGENT_ENABLED=false`. When
-disabled the pipeline falls back to calling both `map_agent` and `dataviz_agent`
+disabled the pipeline falls back to calling both `mapviz_agent` and `dataviz_agent`
 unconditionally (legacy behaviour).
 
 ### Data Visualisation Agent
@@ -250,14 +250,14 @@ The **DataViz Agent** (`dataviz_agent`) runs **sequentially after the Map agent*
 
 ### Map Agent
 
-The **Map Agent** (`map_agent`) runs after the parallel data-source agents and extracts geographic
+The **Map Agent** (`mapviz_agent`) runs after the parallel data-source agents and extracts geographic
 coordinates from their `sub_results` to build a GeoJSON FeatureCollection rendered as an interactive
 Leaflet map in the UI.
 
 > **Note on iterations:** the Map Agent often requires **multiple ReAct loop iterations** to complete
 > its work — it typically needs one turn to call its coordinate-extraction tool, then one or more
 > additional turns to format the final GeoJSON output.  If the map is not appearing, the most common
-> cause is `MAP_AGENT_MAX_ITERATIONS` (or the global `AGENT_MAX_ITERATIONS`) being set too low.
+> cause is `MAPVIZ_AGENT_MAX_ITERATIONS` (or the global `AGENT_MAX_ITERATIONS`) being set too low.
 > The recommended minimum is **5**; the default is **10**.
 
 
@@ -361,7 +361,7 @@ pangia-poc/
 │       │   ├── rdf_agent.py     # RDF sub-agent (SPARQL / GraphDB)
 │       │   ├── vector_agent.py  # Vector sub-agent (ChromaDB)
 │       │   ├── postgis_agent.py # Spatial SQL sub-agent (PostGIS)
-│       │   ├── map_agent.py     # Map post-processor (GeoJSON)
+│       │   ├── mapviz_agent.py  # Map post-processor (GeoJSON)
 │       │   ├── dataviz_agent.py # DataViz post-processor (charts/KPIs/tables)
 │   ├── humanoutput_agent.py # Output decision agent (routes to map/dataviz)
 │       │   └── specialized/

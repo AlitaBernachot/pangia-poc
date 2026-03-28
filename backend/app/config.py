@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     rdf_agent_enabled: bool = True
     vector_agent_enabled: bool = True
     postgis_agent_enabled: bool = True
-    map_agent_enabled: bool = True
+    mapviz_agent_enabled: bool = True
     data_gouv_agent_enabled: bool = True
     dataviz_agent_enabled: bool = True
     geo_agent_enabled: bool = True
@@ -68,7 +68,7 @@ class Settings(BaseSettings):
     rdf_agent_max_iterations: int = 0
     vector_agent_max_iterations: int = 0
     postgis_agent_max_iterations: int = 0
-    map_agent_max_iterations: int = 0
+    mapviz_agent_max_iterations: int = 0
     data_gouv_agent_max_iterations: int = 0
     dataviz_agent_max_iterations: int = 0
     geo_agent_max_iterations: int = 0
@@ -103,8 +103,8 @@ class Settings(BaseSettings):
     vector_agent_model_name: str = ""
     postgis_agent_model_provider: str = ""
     postgis_agent_model_name: str = ""
-    map_agent_model_provider: str = ""
-    map_agent_model_name: str = ""
+    mapviz_agent_model_provider: str = ""
+    mapviz_agent_model_name: str = ""
     data_gouv_agent_model_provider: str = ""
     data_gouv_agent_model_name: str = ""
     dataviz_agent_model_provider: str = ""

@@ -1,7 +1,7 @@
 """Human Output Agent – decides whether map and/or dataviz visualisations are
 needed for the current response.
 
-This agent sits **above** :mod:`map_agent` and :mod:`dataviz_agent` in the
+This agent sits **above** :mod:`mapviz_agent` and :mod:`dataviz_agent` in the
 pipeline.  It inspects the combined ``sub_results`` text and the current user
 query, then produces an :class:`~app.agent.state.AgentState` fragment with an
 ``output_decision`` key:
@@ -9,7 +9,7 @@ query, then produces an :class:`~app.agent.state.AgentState` fragment with an
 .. code-block:: python
 
     {
-        "needs_map": bool,      # True → invoke map_agent downstream
+        "needs_map": bool,      # True → invoke mapviz_agent downstream
         "needs_dataviz": bool,  # True → invoke dataviz_agent downstream
     }
 
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 # ── Heuristic patterns ────────────────────────────────────────────────────────
 
-# Coordinate-level signals (same as map_agent)
+# Coordinate-level signals (same as mapviz_agent)
 _COORD_HINT_RE = re.compile(
     r"lat(?:itude)?|lon(?:gitude)?|°[NS]|°[EW]|\b\d{1,3}\.\d+\b",
     re.IGNORECASE,
