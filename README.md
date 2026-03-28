@@ -19,6 +19,32 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 
 ---
 
+## Table of Contents
+
+- [Multi-agent architecture](#multi-agent-architecture)
+  - [Agent enable / disable flags](#agent-enable--disable-flags)
+  - [Agent fault tolerance](#agent-fault-tolerance)
+  - [Agent ReAct loop iterations](#agent-react-loop-iterations)
+  - [Per-agent LLM configuration](#per-agent-llm-configuration)
+  - [SSE event types](#sse-event-types)
+  - [Data Visualisation Agent](#data-visualisation-agent)
+  - [Map Agent](#map-agent)
+- [Quick Start](#quick-start)
+  - [1. Configure environment](#1-configure-environment)
+  - [2. Start all services](#2-start-all-services)
+- [Observability (Arize Phoenix)](#observability-arize-phoenix)
+  - [Configuration](#configuration)
+- [Project structure](#project-structure)
+- [Development (without Docker)](#development-without-docker)
+  - [Backend](#backend)
+  - [Frontend](#frontend)
+- [Seed themes](#seed-themes)
+  - [Switching the theme](#switching-the-theme)
+  - [Adding a new theme](#adding-a-new-theme)
+- [Adding a new sub-agent](#adding-a-new-sub-agent)
+
+---
+
 ## Multi-agent architecture
 
 ```
@@ -228,7 +254,7 @@ The DataViz agent can be **disabled without affecting any other agent** by setti
 
 ---
 
-
+## Quick Start
 
 ### 1. Configure environment
 
