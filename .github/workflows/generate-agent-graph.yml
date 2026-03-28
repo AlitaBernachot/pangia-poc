@@ -1,48 +1,48 @@
-name: Generate Agent Workflow Graph
+# name: Generate Agent Workflow Graph
 
-on:
-  push:
-    paths:
-      - "backend/app/agent/master.py"
-      - "backend/app/agent/generate_graph.py"
-      - ".github/workflows/generate-agent-graph.yml"
+# on:
+#   push:
+#     paths:
+#       - "backend/app/agent/master.py"
+#       - "backend/app/agent/generate_graph.py"
+#       - ".github/workflows/generate-agent-graph.yml"
 
-permissions:
-  contents: write
+# permissions:
+#   contents: write
 
-jobs:
-  generate-graph:
-    name: Regenerate GRAPH.md
-    runs-on: ubuntu-latest
+# jobs:
+#   generate-graph:
+#     name: Regenerate GRAPH.md
+#     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          # GITHUB_TOKEN is used for checkout. Note: pushes made with this token
-          # will NOT trigger other workflows (GitHub's recursive prevention).
-          # The [skip ci] tag in the commit message is kept as an extra guard.
-          token: ${{ secrets.GITHUB_TOKEN }}
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+#         with:
+#           # GITHUB_TOKEN is used for checkout. Note: pushes made with this token
+#           # will NOT trigger other workflows (GitHub's recursive prevention).
+#           # The [skip ci] tag in the commit message is kept as an extra guard.
+#           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+#       - name: Set up Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: "3.12"
 
-      - name: Generate Mermaid graph
-        run: python backend/app/agent/generate_graph.py
+#       - name: Generate Mermaid graph
+#         run: python backend/app/agent/generate_graph.py
 
-      - name: Print generated graph
-        run: cat backend/app/agent/GRAPH.md
+#       - name: Print generated graph
+#         run: cat backend/app/agent/GRAPH.md
 
-      - name: Commit updated GRAPH.md
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add backend/app/agent/GRAPH.md
-          if git diff --cached --quiet; then
-            echo "GRAPH.md is already up-to-date — nothing to commit."
-          else
-            git commit -m "docs(agent): regenerate GRAPH.md [skip ci]"
-            git push
-          fi
+#       - name: Commit updated GRAPH.md
+#         run: |
+#           git config user.name  "github-actions[bot]"
+#           git config user.email "github-actions[bot]@users.noreply.github.com"
+#           git add backend/app/agent/GRAPH.md
+#           if git diff --cached --quiet; then
+#             echo "GRAPH.md is already up-to-date — nothing to commit."
+#           else
+#             git commit -m "docs(agent): regenerate GRAPH.md [skip ci]"
+#             git push
+#           fi

@@ -42,6 +42,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
     - [Backend](#backend)
     - [Frontend](#frontend)
   - [Seed themes](#seed-themes)
+    - [PostGIS schema isolation](#postgis-schema-isolation)
     - [Switching the theme](#switching-the-theme)
     - [Adding a new theme](#adding-a-new-theme)
   - [Adding a new sub-agent](#adding-a-new-sub-agent)
@@ -54,8 +55,8 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 
 ## Multi-agent architecture
 
-> 📊 **Interactive diagram:** [`backend/app/agent/GRAPH.md`](backend/app/agent/GRAPH.md)  
-> The Mermaid workflow graph is auto-generated at build time and kept in sync with the code.
+> 📊 **Mermaid graph:** [`backend/app/agent/mermaid_graph/master_graph.mmd`](backend/app/agent/mermaid_graph/master_graph.mmd)  
+> The Mermaid workflow graph is auto-generated at startup and kept in sync with the code.
 
 ```
 User query  +  selected_agents? (optional)

@@ -32,6 +32,8 @@ both, or neither.  Finally *merge* synthesises all results into a final answer.
 Only agents that are **enabled** in the application configuration are added to
 the graph.  The user may narrow the parallel agents via `state["selected_agents"]`.
 """
+import logging
+import os
 from typing import Any, Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -51,6 +53,8 @@ from app.agent.specialized.geo.geo_master_agent import run as geo_run
 from app.agent.state import AgentState
 from app.agent.vector_agent import run as vector_run
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 # ─── Agent metadata ────────────────────────────────────────────────────────────
 
@@ -453,3 +457,11 @@ def build_graph():
 
 # Module-level compiled graph reused across requests
 agent_graph = build_graph()
+
+# Write the Mermaid diagram of the compiled graph to a file for documentation
+_mermaid_dir = os.path.join(os.path.dirname(__file__), "mermaid_graph")
+os.makedirs(_mermaid_dir, exist_ok=True)
+_mermaid_path = os.path.join(_mermaid_dir, "master_graph.mmd")
+with open(_mermaid_path, "w", encoding="utf-8") as _f:
+    _f.write(agent_graph.get_graph().draw_mermaid())
+logger.info("Mermaid graph written to %s", _mermaid_path)
