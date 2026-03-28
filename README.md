@@ -25,6 +25,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
   - [Table of Contents](#table-of-contents)
   - [Multi-agent architecture](#multi-agent-architecture)
     - [Agent enable / disable flags](#agent-enable--disable-flags)
+    - [Input Guardrails](#input-guardrails)
     - [Agent fault tolerance](#agent-fault-tolerance)
     - [Agent ReAct loop iterations](#agent-react-loop-iterations)
     - [Per-agent LLM configuration](#per-agent-llm-configuration)
@@ -65,46 +66,36 @@ User query  +  selected_agents? (optional)
 ┌──────────────────────────────────────────────────────────────────┐
 │                         Master Agent                             │
 │                                                                  │
-│  config flags (enabled/disabled)                                 │
-│       ∩  user selection (selected_agents)                        │
-│       = eligible pool                                            │
-│               │                                                  │
-│          ┌────▼────┐   Send fan-out   ┌──────────────────────┐   │
-│          │ router  │─────────────────►│ neo4j_agent          │─┐ │
-│          │ (LLM +  │                  │ (Cypher / Neo4j)     │ │ │
-│          │ struct) │─────────────────►│ rdf_agent            │─┤ │
-│          └─────────┘                  │ (SPARQL / GraphDB)   │ │ │
-│                                       │ vector_agent         │─┤ │
-│                                       │ (Chroma embeddings)  │ │ │
-│                                       │ postgis_agent        │─┤ │
-│                                       │ (PostGIS SQL)        │ │ │
-│                                       │ data_gouv_agent      │─┘ │
-│                                       │ (data.gouv.fr MCP)   │   │
-│                                       └──────────────────────┘   │
-│                          (barrier: wait for all parallel agents)  │
-│                                               │                  │
-│                                  post_process_router             │
-│                                  (synchronisation barrier)       │
-│                                               │                  │
-│                                    humanoutput_agent             │
-│                                  (decides map/dataviz/both)      │
-│                             ┌─────────┴──────────┐              │
-│                    ┌────────▼────────┐  ┌─────────▼──────────┐  │
-│                    │   mapviz_agent   │  │   dataviz_agent    │  │
-│                    │ (GeoJSON / map) │  │ (charts/KPI/tbl)   │  │
-│                    └────────┬────────┘  └─────────┬──────────┘  │
-│                             └─────────┬───────────┘              │
-│                                       │                          │
-│                                       │                          │
-│                                       │ (barrier: wait for both) │
-│                                       │                          │
-│                                       ┌───────▼──────────┐       │
-│                                       │   merge node     │       │
-│                                       │  (synthesise)    │       │
-│                                       └───────┬──────────┘       │
-└───────────────────────────────────────────────┼──────────────────┘
-                                                ▼
-                                         Streamed answer (SSE)
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │                   INPUT GUARDRAILS                          │ │
+│  │  (verification before processing)                           │ │
+│  ├─────────────────────────────────────────────────────────────┤ │
+│  │  • Content filtering (toxicity, PII)                        │ │
+│  │  • Intent validation (malicious)                            │ │
+│  │  • Rate limiting                           HTTP layer       │ │
+│  │  • Authentication / Authorisation          HTTP layer       │ │
+│  └────────────────────────┬────────────────────────────────────┘ │
+│              blocked ◄────┤────► allowed                         │
+│              (END)        │                                      │
+│                      ┌────▼────┐                                 │
+│  config flags         │ router  │   Send fan-out   ┌────────────┐│
+│       ∩  user sel.    │ (LLM +  │─────────────────►│ neo4j_agt  ││
+│       = eligible pool │ struct) │─────────────────►│ rdf_agent  ││
+│                       └─────────┘─────────────────►│ vector_agt ││
+│                                  ─────────────────►│ postgis_agt││
+│                                                     └─────┬──────┘│
+│                                  (barrier: wait for all)  │      │
+│                                             post_process_router   │
+│                                                     │            │
+│                                          humanoutput_agent        │
+│                                     ┌───────┴───────┐            │
+│                              mapviz_agent  dataviz_agent          │
+│                                     └───────┬───────┘            │
+│                                          merge node               │
+│                                         (synthesise)              │
+└───────────────────────────────────────────┼──────────────────────┘
+                                            ▼
+                                     Streamed answer (SSE)
 ```
 
 The **router** selects the minimum set of relevant sub-agents from an *eligible
@@ -145,6 +136,44 @@ into a final streamed answer.
 
 Set any flag to `false` in `.env` to exclude that agent from all routing decisions.
 The orchestrator always keeps at least one agent active as a fallback (defaults to `neo4j`).
+
+### Input Guardrails
+
+A security layer (`backend/app/security/`) is applied **before** the master
+agent processes any user request.  It is split across two stages:
+
+**HTTP layer** (handled in `routes.py` before the LangGraph graph is invoked):
+
+| Check | Description |
+|---|---|
+| Rate limiting | Counts requests per session using a Redis fixed-window counter. Returns HTTP 429 when the limit is exceeded. |
+| Authentication | Verifies the `X-API-Key` header against the configured secret. Returns HTTP 401 when the key is absent or invalid. Disabled by default. |
+
+**LangGraph layer** (`guardrail_node` — first node in the master graph):
+
+| Check | Description |
+|---|---|
+| PII filtering | Regex-based detection of emails, phone numbers, credit-card numbers, IBANs, IP addresses, and French NIR/SSN numbers. Blocks requests containing PII. |
+| Toxicity classification | LLM-based classification (single structured-output call) that flags hateful, abusive, or harmful content. |
+| Intent validation | LLM-based detection of prompt injection, jailbreak attempts, data-exfiltration requests, and other adversarial patterns. |
+
+When a check fails the `blocked_output` node sends a human-readable rejection
+message back to the frontend via SSE — no sub-agent is ever invoked.
+
+#### Guardrail configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `GUARDRAIL_ENABLED` | `true` | Master switch — set to `false` to bypass all checks |
+| `GUARDRAIL_CONTENT_FILTER_ENABLED` | `true` | Enable content-filtering checks (PII + toxicity) |
+| `GUARDRAIL_PII_FILTER_ENABLED` | `true` | Enable regex-based PII detection |
+| `GUARDRAIL_TOXICITY_FILTER_ENABLED` | `true` | Enable LLM toxicity classification |
+| `GUARDRAIL_INTENT_VALIDATION_ENABLED` | `true` | Enable LLM malicious-intent detection |
+| `GUARDRAIL_RATE_LIMIT_ENABLED` | `true` | Enable Redis rate limiting |
+| `GUARDRAIL_RATE_LIMIT_MAX_REQUESTS` | `60` | Max requests allowed per window |
+| `GUARDRAIL_RATE_LIMIT_WINDOW_SECONDS` | `60` | Window duration in seconds |
+| `GUARDRAIL_AUTH_ENABLED` | `false` | Enable API-key authentication |
+| `GUARDRAIL_API_KEY` | `""` | Secret key value (set in `.env`, never commit) |
 
 ### Agent fault tolerance
 

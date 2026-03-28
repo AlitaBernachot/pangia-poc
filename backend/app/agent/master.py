@@ -53,6 +53,11 @@ from app.agent.specialized.geo.geo_master_agent import run as geo_run
 from app.agent.state import AgentState
 from app.agent.vector_agent import run as vector_run
 from app.config import get_settings
+from app.security.input_guardrail import (
+    blocked_output_node,
+    guardrail_dispatch,
+    guardrail_node,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -387,17 +392,34 @@ def build_graph():
     If DATAVIZ_AGENT_ENABLED is False, dataviz_agent is never added.
     If HUMANOUTPUT_AGENT_ENABLED is False, the decision step is skipped.
     If both map and dataviz are disabled, the pipeline proceeds directly to merge.
+    If GUARDRAIL_ENABLED is True (default), a guardrail node sits at the entry
+    point and can short-circuit execution before the router is invoked.
     """
     active = get_active_agents()
     map_enabled = is_map_enabled()
     dataviz_enabled = is_dataviz_enabled()
     humanoutput_enabled = is_humanoutput_enabled()
+    guardrail_enabled = get_settings().guardrail_enabled
 
     workflow = StateGraph(AgentState)
 
     # Core nodes (always present)
     workflow.add_node("router", router_node)
     workflow.add_node("merge", merge_node)
+
+    # ── Input guardrail (optional, enabled by default) ─────────────────────────
+    if guardrail_enabled:
+        workflow.add_node("guardrail", guardrail_node)
+        workflow.add_node("blocked_output", blocked_output_node)
+        workflow.add_edge("blocked_output", END)
+        workflow.set_entry_point("guardrail")
+        workflow.add_conditional_edges(
+            "guardrail",
+            guardrail_dispatch,
+            ["router", "blocked_output"],
+        )
+    else:
+        workflow.set_entry_point("router")
 
     # Post-processing: mapviz_agent and dataviz_agent run in parallel after sub-agents,
     # optionally gated by humanoutput_agent which decides which ones to invoke.
@@ -444,7 +466,6 @@ def build_graph():
         active_node_names.append(node_name)
 
     # Router → fan-out edge
-    workflow.set_entry_point("router")
     workflow.add_conditional_edges(
         "router",
         dispatch_agents,

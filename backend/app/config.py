@@ -144,6 +144,32 @@ class Settings(BaseSettings):
     merge_model_provider: str = ""
     merge_model_name: str = ""
 
+    # ── Input Guardrails ──────────────────────────────────────────────────────
+    # Master switch – set to false to bypass all guardrail checks.
+    guardrail_enabled: bool = True
+
+    # Content filtering
+    # Scan for PII patterns (email, phone, credit card, …) using regex.
+    guardrail_content_filter_enabled: bool = True
+    guardrail_pii_filter_enabled: bool = True
+    # Classify toxicity / harmful content using the LLM (adds one LLM call).
+    guardrail_toxicity_filter_enabled: bool = True
+
+    # Intent validation – detect prompt-injection / jailbreak (adds one LLM call).
+    guardrail_intent_validation_enabled: bool = True
+
+    # Rate limiting (Redis-backed fixed-window counter).
+    guardrail_rate_limit_enabled: bool = True
+    # Maximum number of requests allowed per session within the window.
+    guardrail_rate_limit_max_requests: int = 60
+    # Window duration in seconds.
+    guardrail_rate_limit_window_seconds: int = 60
+
+    # Authentication – require X-API-Key header when enabled.
+    guardrail_auth_enabled: bool = False
+    # Secret API key value (set this in .env; never commit the real key).
+    guardrail_api_key: str = ""
+
     # Arize Phoenix (agent observability)
     phoenix_collector_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project_name: str = "pangia-geoia"
