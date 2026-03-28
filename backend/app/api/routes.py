@@ -20,7 +20,7 @@ _AGENT_LABELS: dict[str, str] = {
     "rdf_agent": "RDF/SPARQL",
     "vector_agent": "Vector",
     "postgis_agent": "PostGIS",
-    "map_agent": "Map",
+    "mapviz_agent": "Map",
     "data_gouv_agent": "Data.gouv.fr",
     "dataviz_agent": "DataViz",
     "merge": "Synthesiser",
@@ -128,7 +128,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
                             yield _sse({"type": "routing", "agents": agents})
 
                 # ── Map agent GeoJSON output ───────────────────────────────
-                elif kind == "on_chain_end" and node == "map_agent":
+                elif kind == "on_chain_end" and node == "mapviz_agent":
                     output = event.get("data", {}).get("output", {})
                     if isinstance(output, dict):
                         geojson = output.get("geojson")

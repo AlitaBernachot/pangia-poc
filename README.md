@@ -21,27 +21,34 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 
 ## Table of Contents
 
-- [Multi-agent architecture](#multi-agent-architecture)
-  - [Agent enable / disable flags](#agent-enable--disable-flags)
-  - [Agent fault tolerance](#agent-fault-tolerance)
-  - [Agent ReAct loop iterations](#agent-react-loop-iterations)
-  - [Per-agent LLM configuration](#per-agent-llm-configuration)
-  - [SSE event types](#sse-event-types)
-  - [Data Visualisation Agent](#data-visualisation-agent)
-  - [Map Agent](#map-agent)
-- [Quick Start](#quick-start)
-  - [1. Configure environment](#1-configure-environment)
-  - [2. Start all services](#2-start-all-services)
-- [Observability (Arize Phoenix)](#observability-arize-phoenix)
-  - [Configuration](#configuration)
-- [Project structure](#project-structure)
-- [Development (without Docker)](#development-without-docker)
-  - [Backend](#backend)
-  - [Frontend](#frontend)
-- [Seed themes](#seed-themes)
-  - [Switching the theme](#switching-the-theme)
-  - [Adding a new theme](#adding-a-new-theme)
-- [Adding a new sub-agent](#adding-a-new-sub-agent)
+- [PangIA – GeoIA Agent 🌍](#pangia--geoia-agent-)
+  - [Table of Contents](#table-of-contents)
+  - [Multi-agent architecture](#multi-agent-architecture)
+    - [Agent enable / disable flags](#agent-enable--disable-flags)
+    - [Agent fault tolerance](#agent-fault-tolerance)
+    - [Agent ReAct loop iterations](#agent-react-loop-iterations)
+    - [Per-agent LLM configuration](#per-agent-llm-configuration)
+    - [SSE event types](#sse-event-types)
+    - [Human Output Agent](#human-output-agent)
+    - [Data Visualisation Agent](#data-visualisation-agent)
+    - [Map Agent](#map-agent)
+  - [Quick Start](#quick-start)
+    - [1. Configure environment](#1-configure-environment)
+    - [2. Start all services](#2-start-all-services)
+  - [Observability (Arize Phoenix)](#observability-arize-phoenix)
+    - [Configuration](#configuration)
+  - [Project structure](#project-structure)
+  - [Development (without Docker)](#development-without-docker)
+    - [Backend](#backend)
+    - [Frontend](#frontend)
+  - [Seed themes](#seed-themes)
+    - [Switching the theme](#switching-the-theme)
+    - [Adding a new theme](#adding-a-new-theme)
+  - [Adding a new sub-agent](#adding-a-new-sub-agent)
+  - [Geo Agent – Geospatial Analysis](#geo-agent--geospatial-analysis)
+    - [Sub-agent hierarchy](#sub-agent-hierarchy)
+    - [Configuration](#configuration-1)
+    - [Notes](#notes)
 
 ---
 
@@ -74,10 +81,12 @@ User query  +  selected_agents? (optional)
 │                                               │                  │
 │                                  post_process_router             │
 │                                  (synchronisation barrier)       │
+│                                               │                  │
+│                                    humanoutput_agent             │
+│                                  (decides map/dataviz/both)      │
 │                             ┌─────────┴──────────┐              │
-│                             │  Send fan-out       │              │
 │                    ┌────────▼────────┐  ┌─────────▼──────────┐  │
-│                    │   map_agent     │  │   dataviz_agent    │  │
+│                    │   mapviz_agent   │  │   dataviz_agent    │  │
 │                    │ (GeoJSON / map) │  │ (charts/KPI/tbl)   │  │
 │                    └────────┬────────┘  └─────────┬──────────┘  │
 │                             └─────────┬───────────┘              │
@@ -109,11 +118,13 @@ Within the eligible pool, the router LLM (structured output) picks the agents
 that best suit the query.  Each selected agent runs its own ReAct loop (LLM +
 tools) and writes its result into a shared `sub_results` dict.
 
-After all data-source agents complete, a **`post_process_router`** barrier fans
-out to `map_agent` and `dataviz_agent` **in parallel** (both read `sub_results`
-independently and write to separate state keys: `geojson` and `dataviz`).  The
-**merge** node then waits for both and synthesises all results into a final
-streamed answer.
+After all data-source agents complete, a **`post_process_router`** barrier routes
+to **`humanoutput_agent`**, which inspects `sub_results` and the user query to
+decide whether a map, charts/tables, both, or neither are appropriate.  It then
+fans out (via Send) only to the agents that are relevant — `mapviz_agent`,
+`dataviz_agent`, or both — and writes its decision to `state["output_decision"]`.
+The **merge** node then waits for all post-processors and synthesises the results
+into a final streamed answer.
 
 ### Agent enable / disable flags
 
@@ -124,8 +135,9 @@ streamed answer.
 | `VECTOR_AGENT_ENABLED` | `true` | Semantic search agent (ChromaDB) |
 | `POSTGIS_AGENT_ENABLED` | `true` | Spatial SQL agent (PostGIS) |
 | `DATA_GOUV_AGENT_ENABLED` | `true` | French open-data agent (data.gouv.fr via MCP) |
-| `MAP_AGENT_ENABLED` | `true` | Geographic visualisation agent (GeoJSON / Leaflet map) |
+| `MAPVIZ_AGENT_ENABLED` | `true` | Geographic visualisation agent (GeoJSON / Leaflet map) |
 | `DATAVIZ_AGENT_ENABLED` | `true` | Data visualisation agent (charts, KPIs, tables) |
+| `HUMANOUTPUT_AGENT_ENABLED` | `true` | Output decision agent (routes to map/dataviz selectively) |
 
 Set any flag to `false` in `.env` to exclude that agent from all routing decisions.
 The orchestrator always keeps at least one agent active as a fallback (defaults to `neo4j`).
@@ -156,7 +168,7 @@ The number of iterations is configurable at two levels:
 | `RDF_AGENT_MAX_ITERATIONS` | `0` | RDF/SPARQL agent override |
 | `VECTOR_AGENT_MAX_ITERATIONS` | `0` | Vector agent override |
 | `POSTGIS_AGENT_MAX_ITERATIONS` | `0` | PostGIS agent override |
-| `MAP_AGENT_MAX_ITERATIONS` | `0` | Map agent override |
+| `MAPVIZ_AGENT_MAX_ITERATIONS` | `0` | Map agent override |
 | `DATA_GOUV_AGENT_MAX_ITERATIONS` | `0` | data.gouv.fr agent override |
 | `DATAVIZ_AGENT_MAX_ITERATIONS` | `0` | DataViz agent override |
 
@@ -172,7 +184,7 @@ Every agent (including the router and the merge node) can use a **different LLM 
 | `<AGENT>_MODEL_PROVIDER` | `openai`, `anthropic`, `ollama` | Provider for this agent. Leave empty to use the global provider. |
 | `<AGENT>_MODEL_NAME` | `gpt-4o`, `claude-3-5-sonnet-latest`, `llama3` | Model name for this agent. Leave empty to fall back to `OPENAI_MODEL`. |
 
-Available `<AGENT>` prefixes: `ROUTER`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_AGENT`, `POSTGIS_AGENT`, `MAP_AGENT`, `DATA_GOUV_AGENT`, `DATAVIZ_AGENT`, `MERGE`.
+Available `<AGENT>` prefixes: `ROUTER`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_AGENT`, `POSTGIS_AGENT`, `MAPVIZ_AGENT`, `DATA_GOUV_AGENT`, `DATAVIZ_AGENT`, `MERGE`.
 
 Example `.env` — use a powerful model for the router and merge, a cheaper one for sub-agents:
 
@@ -209,6 +221,28 @@ Leave both variables empty (the default) to use the global `OPENAI_MODEL` for ev
 | `error` | An error occurred |
 | `done` | Stream complete |
 
+### Human Output Agent
+
+The **Human Output Agent** (`humanoutput_agent`) sits **between `post_process_router`
+and `mapviz_agent` / `dataviz_agent`** in the pipeline.  Its job is to analyse the
+data already gathered by the parallel sub-agents (plus the original user query)
+and decide which visualisation components — a map, charts/tables, both, or
+neither — are worth rendering.
+
+**Decision strategy:**
+1. **Fast-path** — if the combined content is empty, skip both visualisation agents.
+2. **Clear heuristics** — strong geo keywords (map, coordinates, GeoJSON…) or
+   dataviz keywords (chart, table, statistics…) resolve each side without an LLM call.
+3. **LLM classification** — when signals are ambiguous (e.g. decimal numbers that
+   could be coordinates *or* statistics), a lightweight LLM call with a structured
+   JSON-output prompt resolves the ambiguity.
+4. **Error fallback** — any exception defaults to `{needs_map: true, needs_dataviz: true}`
+   so downstream agents always have a chance to run.
+
+The agent can be disabled by setting `HUMANOUTPUT_AGENT_ENABLED=false`. When
+disabled the pipeline falls back to calling both `mapviz_agent` and `dataviz_agent`
+unconditionally (legacy behaviour).
+
 ### Data Visualisation Agent
 
 The **DataViz Agent** (`dataviz_agent`) runs **sequentially after the Map agent**, reading the accumulated
@@ -216,14 +250,14 @@ The **DataViz Agent** (`dataviz_agent`) runs **sequentially after the Map agent*
 
 ### Map Agent
 
-The **Map Agent** (`map_agent`) runs after the parallel data-source agents and extracts geographic
+The **Map Agent** (`mapviz_agent`) runs after the parallel data-source agents and extracts geographic
 coordinates from their `sub_results` to build a GeoJSON FeatureCollection rendered as an interactive
 Leaflet map in the UI.
 
 > **Note on iterations:** the Map Agent often requires **multiple ReAct loop iterations** to complete
 > its work — it typically needs one turn to call its coordinate-extraction tool, then one or more
 > additional turns to format the final GeoJSON output.  If the map is not appearing, the most common
-> cause is `MAP_AGENT_MAX_ITERATIONS` (or the global `AGENT_MAX_ITERATIONS`) being set too low.
+> cause is `MAPVIZ_AGENT_MAX_ITERATIONS` (or the global `AGENT_MAX_ITERATIONS`) being set too low.
 > The recommended minimum is **5**; the default is **10**.
 
 
@@ -327,10 +361,27 @@ pangia-poc/
 │       │   ├── rdf_agent.py     # RDF sub-agent (SPARQL / GraphDB)
 │       │   ├── vector_agent.py  # Vector sub-agent (ChromaDB)
 │       │   ├── postgis_agent.py # Spatial SQL sub-agent (PostGIS)
-│       │   ├── map_agent.py     # Map post-processor (GeoJSON)
+│       │   ├── mapviz_agent.py  # Map post-processor (GeoJSON)
 │       │   ├── dataviz_agent.py # DataViz post-processor (charts/KPIs/tables)
+│   ├── humanoutput_agent.py # Output decision agent (routes to map/dataviz)
 │       │   └── specialized/
-│       │       └── data_gouv_agent.py # French open-data sub-agent (data.gouv.fr MCP)
+│       │       ├── data_gouv_agent.py      # French open-data sub-agent (data.gouv.fr MCP)
+│       │       └── geo/
+│       │           ├── geo_master_agent.py         # Geospatial orchestrator (routes to geo sub-agents)
+│       │           ├── geo_address_agent.py         # L1: Geocoder – address ↔ coordinates
+│       │           ├── geo_spatial_parser_agent.py  # L1: SpatialParser – NL spatial understanding
+│       │           ├── geo_distance_agent.py        # L1: DistanceCalc – great-circle distances
+│       │           ├── geo_buffer_agent.py          # L1: BufferAnalyser – circular buffer zones
+│       │           ├── geo_isochrone_agent.py       # L1: Isochrone – accessibility zone estimation
+│       │           ├── geo_proximity_agent.py       # L2: Proximity – nearest-entity search
+│       │           ├── geo_intersection_agent.py    # L2: Intersection – spatial overlap analysis
+│       │           ├── geo_area_agent.py            # L2: AreaCalculator – polygon surface areas
+│       │           ├── geo_hotspot_agent.py         # L2: Hotspot – cluster detection & density
+│       │           ├── geo_shortest_path_agent.py   # L2: ShortestPath – route optimisation
+│       │           ├── geo_elevation_agent.py       # L3: Elevation – altitude retrieval (Open-Meteo)
+│       │           ├── geo_geometry_ops_agent.py    # L3: GeometryOps – GeoJSON transformations
+│       │           ├── geo_temporal_agent.py        # L3: TemporalAnalyst – spatio-temporal patterns
+│       │           └── geo_viewshed_agent.py        # L3: Viewshed – geometric visibility analysis
 │       └── db/
 │           ├── neo4j_client.py
 │           ├── graphdb_client.py
@@ -484,3 +535,63 @@ Sub-agents live in `backend/app/agent/`.  To add one:
 5. **Expose a `GET /api/suggestions`** update is automatic — suggestions are already
    served from the active theme's `suggestions` list.
 
+---
+
+## Geo Agent – Geospatial Analysis
+
+> ⚠️ **Not operational – needs rework before use.**
+> The Geo Agent is currently broken following the refactoring of utility functions into
+> `backend/libs/geo/`.  Imports and end-to-end pipeline consistency have not yet been fully
+> validated in real conditions.  Disable it via `GEO_AGENT_ENABLED=false` to avoid blocking
+> the backend startup in the meantime.
+
+The **Geo Agent** (`backend/app/agent/specialized/geo/geo_master_agent.py`) is a specialised
+orchestrator for advanced geospatial analysis tasks.  It is available as a parallel
+sub-agent in the master orchestrator (enabled by default via `GEO_AGENT_ENABLED=true`).
+
+When the master router selects `geo`, the Geo Agent uses its own internal LLM router
+to dispatch to the most appropriate geo sub-agents and merges their outputs.
+
+### Sub-agent hierarchy
+
+| Level | Key | Agent file | Capability |
+|-------|-----|-----------|------------|
+| 1 – MVP | `geo_address` | `geo_address_agent.py` | Geocoder – address ↔ coordinates (Nominatim) |
+| 1 – MVP | `geo_spatial_parser` | `geo_spatial_parser_agent.py` | SpatialParser – natural language spatial understanding |
+| 1 – MVP | `geo_distance` | `geo_distance_agent.py` | DistanceCalc – great-circle distance calculations |
+| 1 – MVP | `geo_buffer` | `geo_buffer_agent.py` | BufferAnalyser – circular and multi-ring buffer zones |
+| 1 – MVP | `geo_isochrone` | `geo_isochrone_agent.py` | Isochrone – travel-time accessibility zones |
+| 2 – Evolution | `geo_proximity` | `geo_proximity_agent.py` | Proximity – nearest-entity search and ranking |
+| 2 – Evolution | `geo_intersection` | `geo_intersection_agent.py` | Intersection – bounding-box overlap and containment |
+| 2 – Evolution | `geo_area` | `geo_area_agent.py` | AreaCalculator – polygon surface area computation |
+| 2 – Evolution | `geo_hotspot` | `geo_hotspot_agent.py` | Hotspot – point-cluster detection and density |
+| 2 – Evolution | `geo_shortest_path` | `geo_shortest_path_agent.py` | ShortestPath – waypoint route optimisation |
+| 3 – Specialised | `geo_elevation` | `geo_elevation_agent.py` | Elevation – altitude retrieval (Open-Meteo API) |
+| 3 – Specialised | `geo_geometry_ops` | `geo_geometry_ops_agent.py` | GeometryOps – GeoJSON transformations and validation |
+| 3 – Specialised | `geo_temporal` | `geo_temporal_agent.py` | TemporalAnalyst – spatio-temporal pattern detection |
+| 3 – Specialised | `geo_viewshed` | `geo_viewshed_agent.py` | Viewshed – geometric visibility analysis |
+
+### Configuration
+
+| Environment variable | Default | Description |
+|---|---|---|
+| `GEO_AGENT_ENABLED` | `true` | Enable/disable the entire Geo Agent |
+| `GEO_AGENT_MODEL_PROVIDER` | `` | LLM provider for the internal geo router and merge step |
+| `GEO_AGENT_MODEL_NAME` | `` | LLM model name (falls back to global `OPENAI_MODEL`) |
+| `GEO_AGENT_MAX_ITERATIONS` | `0` | Max ReAct loop iterations (0 = global default) |
+| `GEO_<SUBAGENT>_AGENT_MODEL_PROVIDER` | `` | Per-sub-agent model provider override |
+| `GEO_<SUBAGENT>_AGENT_MODEL_NAME` | `` | Per-sub-agent model name override |
+| `GEO_<SUBAGENT>_AGENT_MAX_ITERATIONS` | `0` | Per-sub-agent max iterations override |
+
+Replace `<SUBAGENT>` with `ADDRESS`, `SPATIAL_PARSER`, `DISTANCE`, `BUFFER`,
+`ISOCHRONE`, `PROXIMITY`, `INTERSECTION`, `AREA`, `HOTSPOT`, `SHORTEST_PATH`,
+`ELEVATION`, `GEOMETRY_OPS`, `TEMPORAL`, or `VIEWSHED`.
+
+### Notes
+
+- Isochrone, buffer, and viewshed computations are **geometric approximations**
+  based on straight-line (great-circle) distances and do not use road networks or DEMs.
+- Elevation data is retrieved from the [Open-Meteo elevation API](https://open-meteo.com/)
+  which is free and requires no API key.
+- For precise polygon operations (intersection, area, routing), the PostGIS agent
+  (`postgis_agent.py`) with PostGIS SQL remains the recommended approach.
