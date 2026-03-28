@@ -11,7 +11,7 @@ Exposed as a single async function `run` usable as a LangGraph node.
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-from app.agent.model_config import build_llm, get_agent_model_config
+from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
 from app.config import get_settings
 
@@ -36,13 +36,17 @@ You have access to tools provided by the data.gouv.fr MCP server that let you:
 - Answer in the same language as the user's question.
 """
 
-_MAX_ITERATIONS = 5
-
-
 # ─── Node function ─────────────────────────────────────────────────────────────
 
 async def run(state: AgentState) -> dict:
     """LangGraph node: run the data.gouv.fr MCP sub-agent ReAct loop."""
+    try:
+        return await _run(state)
+    except Exception as exc:  # noqa: BLE001
+        return {"sub_results": {"data_gouv": f"[data.gouv agent unavailable: {exc}]"}}
+
+
+async def _run(state: AgentState) -> dict:
     settings = get_settings()
 
     user_query = next(
@@ -68,7 +72,7 @@ async def run(state: AgentState) -> dict:
         HumanMessage(content=user_query),
     ]
 
-    for _ in range(_MAX_ITERATIONS):
+    for _ in range(get_agent_max_iterations("data_gouv_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
 

@@ -7,7 +7,7 @@ Exposed as a single async function `run` usable as a LangGraph node.
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 
-from app.agent.model_config import build_llm, get_agent_model_config
+from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
 from app.db.graphdb_client import (
     run_sparql_select as _db_sparql_select,
@@ -42,9 +42,6 @@ def _build_system_prompt() -> str:
         extra_guidelines=extra,
     )
 
-_MAX_ITERATIONS = 5
-
-
 # ─── Tools ────────────────────────────────────────────────────────────────────
 
 @tool
@@ -75,6 +72,13 @@ _TOOL_MAP = {t.name: t for t in RDF_TOOLS}
 
 async def run(state: AgentState) -> dict:
     """LangGraph node: run the RDF/SPARQL sub-agent ReAct loop."""
+    try:
+        return await _run(state)
+    except Exception as exc:  # noqa: BLE001
+        return {"sub_results": {"rdf": f"[RDF agent unavailable: {exc}]"}}
+
+
+async def _run(state: AgentState) -> dict:
     llm = build_llm(get_agent_model_config("rdf_agent"), streaming=True).bind_tools(RDF_TOOLS)
 
     user_query = next(
@@ -84,7 +88,7 @@ async def run(state: AgentState) -> dict:
 
     messages = [SystemMessage(content=_build_system_prompt()), HumanMessage(content=user_query)]
 
-    for _ in range(_MAX_ITERATIONS):
+    for _ in range(get_agent_max_iterations("rdf_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
 
