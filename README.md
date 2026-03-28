@@ -54,6 +54,9 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 
 ## Multi-agent architecture
 
+> 📊 **Interactive diagram:** [`backend/app/agent/GRAPH.md`](backend/app/agent/GRAPH.md)  
+> The Mermaid workflow graph is auto-generated at build time and kept in sync with the code.
+
 ```
 User query  +  selected_agents? (optional)
     │
