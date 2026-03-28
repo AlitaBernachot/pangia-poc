@@ -2,15 +2,18 @@ import json
 import uuid
 from typing import AsyncGenerator
 
-from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Header, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
 from pydantic import BaseModel
 
 from app.agent.master import agent_graph, get_active_agents
 from app.agent.state import AgentState
+from app.config import get_settings
 from app.db.redis_client import load_session, save_session
 from app.db.themes import get_active_theme
+from app.security.auth import check_auth
+from app.security.rate_limiter import check_rate_limit
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -76,8 +79,50 @@ async def suggestions() -> dict:
 # ─── SSE streaming endpoint ───────────────────────────────────────────────────
 
 @router.post("/chat")
-async def chat(body: ChatRequest) -> StreamingResponse:
+async def chat(
+    body: ChatRequest,
+    request: Request,
+    x_api_key: str | None = Header(default=None),
+) -> StreamingResponse:
+    settings = get_settings()
     session_id = body.session_id or str(uuid.uuid4())
+
+    # ── Authentication (HTTP layer) ────────────────────────────────────────────
+    if settings.guardrail_enabled and settings.guardrail_auth_enabled:
+        auth_result = check_auth(x_api_key, settings.guardrail_api_key)
+        if auth_result.blocked:
+            return JSONResponse(
+                status_code=401,
+                content={"detail": auth_result.reason},
+            )
+
+    # ── Rate limiting (HTTP layer) ─────────────────────────────────────────────
+    if settings.guardrail_enabled and settings.guardrail_rate_limit_enabled:
+        # Use session_id as the rate-limit key; fall back to client IP.
+        # Log a warning when neither is available so operators notice the gap.
+        if session_id:
+            rate_key = session_id
+        elif request.client and request.client.host:
+            rate_key = request.client.host
+        else:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "Rate limiter: no session_id or client IP available; "
+                "request will not be rate-limited."
+            )
+            rate_key = None
+
+        if rate_key:
+            rate_result = await check_rate_limit(
+                rate_key,
+                max_requests=settings.guardrail_rate_limit_max_requests,
+                window_seconds=settings.guardrail_rate_limit_window_seconds,
+            )
+            if rate_result.blocked:
+                return JSONResponse(
+                    status_code=429,
+                    content={"detail": rate_result.reason},
+                )
 
     # Restore history from Redis
     stored = await load_session(session_id)
@@ -99,6 +144,9 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         "sub_results": {},
         "geojson": None,
         "dataviz": None,
+        "output_decision": None,
+        "guardrail_blocked": False,
+        "guardrail_message": None,
     }
 
     async def event_stream() -> AsyncGenerator[str, None]:

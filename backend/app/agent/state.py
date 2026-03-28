@@ -38,3 +38,9 @@ class AgentState(TypedDict):
     # components to render.  Keys: "needs_map" (bool), "needs_dataviz" (bool).
     # None when the humanoutput_agent is disabled or has not run yet.
     output_decision: dict[str, Any] | None
+
+    # Input guardrail verdict.
+    # ``guardrail_blocked`` is True when a security check rejected the request.
+    # ``guardrail_message`` contains the human-readable rejection reason.
+    guardrail_blocked: bool
+    guardrail_message: str | None
