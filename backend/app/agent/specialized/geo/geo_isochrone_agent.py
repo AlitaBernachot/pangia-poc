@@ -24,69 +24,50 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
+from app.agent.specialized.geo.geo_address_agent import geocode_address
 from app.agent.state import AgentState
-
-_EARTH_RADIUS_M = 6_371_000.0
-
-# Average travel speeds in m/s (used for straight-line approximations)
-_SPEEDS_MS: dict[str, float] = {
-    "walking": 1.4,       # ~5 km/h
-    "cycling": 4.2,       # ~15 km/h
-    "driving": 13.9,      # ~50 km/h (urban)
-    "driving_highway": 27.8,  # ~100 km/h (highway)
-}
+from libs.geo.isochrone import SPEEDS_MS, isochrone_polygon
 
 _SYSTEM_PROMPT = """You are the Isochrone Agent of the PangIA GeoIA platform.
 Your role is to compute accessibility zones – areas reachable from a given point
 within a specified time or distance threshold.
 
+## Workflow
+1. **Geocode the origin first**: Call `geocode_address` with a precise query.
+   - Always include the exact city name and country in the query.
+   - For transport infrastructure use the local-language name:
+     `"gare SNCF Roanne, Loire, France"` not `"train station of Roanne"`.
+   - Always pass `countrycodes="fr"` (or the relevant ISO code) to prevent
+     false matches in other countries or nearby communes.
+   - Use the **first feature** returned (highest Nominatim relevance score).
+2. **Generate the isochrone**: Use `generate_isochrone` (single threshold) or
+   `generate_multi_isochrone` (multiple thresholds) with the coordinates from step 1.
+3. Optionally call `estimate_reachable_radius` to report the theoretical radius.
+
 ## Capabilities
-- `generate_isochrone`: Create an approximate isochrone polygon for a given travel mode and time.
-- `generate_multi_isochrone`: Create multiple nested isochrone rings (e.g. 5 min, 10 min, 15 min).
+- `geocode_address`: Convert a place name to precise coordinates (required first step).
+- `generate_isochrone`: Approximate isochrone polygon for a single travel time and mode.
+- `generate_multi_isochrone`: Multiple nested isochrone rings (e.g. 5 min, 10 min, 15 min).
 - `estimate_reachable_radius`: Compute the straight-line radius for a given travel time and mode.
 
 ## Important note
-These isochrones are geometric approximations based on average travel speeds and
+Isochrones are geometric approximations based on average travel speeds and
 straight-line distances.  They do not account for road networks, terrain, or traffic.
-For precise isochrones, a routing engine (OSRM, Valhalla, ORS) would be required.
 
 ## Guidelines
-- Always state the travel mode and time/distance threshold clearly.
-- Explain that results are approximations.
+- **Always geocode first** – accurate coordinates are essential for correct map placement.
 - Supported travel modes: walking, cycling, driving, driving_highway.
 - Answer in the same language as the user's question.
+- **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
+  rendering instructions in your answer – maps are rendered by the frontend.
 """
 
 
-# ─── Internal helpers ─────────────────────────────────────────────────────────
-
-def _destination_point(lat: float, lon: float, bearing_deg: float, dist_m: float) -> tuple[float, float]:
-    lat_r = math.radians(lat)
-    lon_r = math.radians(lon)
-    bearing_r = math.radians(bearing_deg)
-    angular = dist_m / _EARTH_RADIUS_M
-    dest_lat = math.asin(
-        math.sin(lat_r) * math.cos(angular)
-        + math.cos(lat_r) * math.sin(angular) * math.cos(bearing_r)
-    )
-    dest_lon = lon_r + math.atan2(
-        math.sin(bearing_r) * math.sin(angular) * math.cos(lat_r),
-        math.cos(angular) - math.sin(lat_r) * math.sin(dest_lat),
-    )
-    return math.degrees(dest_lat), math.degrees(dest_lon)
-
-
-def _isochrone_polygon(lat: float, lon: float, radius_m: float, n_vertices: int = 64) -> list[list[float]]:
-    coords = []
-    for i in range(n_vertices):
-        bearing = 360.0 * i / n_vertices
-        dlat, dlon = _destination_point(lat, lon, bearing, radius_m)
-        coords.append([round(dlon, 7), round(dlat, 7)])
-    coords.append(coords[0])
-    return coords
-
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
+
+# geocode_address is imported from geo_address_agent – no duplication.
+
 
 @tool
 def estimate_reachable_radius(
@@ -101,12 +82,12 @@ def estimate_reachable_radius(
     Returns a JSON object with the estimated radius and area.
     """
     mode = travel_mode.lower().strip()
-    speed = _SPEEDS_MS.get(mode)
+    speed = SPEEDS_MS.get(mode)
     if speed is None:
         return json.dumps(
             {
                 "error": f"Unknown travel mode: {travel_mode}.",
-                "supported_modes": list(_SPEEDS_MS.keys()),
+                "supported_modes": list(SPEEDS_MS.keys()),
             }
         )
 
@@ -146,12 +127,12 @@ def generate_isochrone(
     Returns a GeoJSON Feature with a Polygon geometry.
     """
     mode = travel_mode.lower().strip()
-    speed = _SPEEDS_MS.get(mode)
+    speed = SPEEDS_MS.get(mode)
     if speed is None:
         return json.dumps(
             {
                 "error": f"Unknown travel mode: {travel_mode}.",
-                "supported_modes": list(_SPEEDS_MS.keys()),
+                "supported_modes": list(SPEEDS_MS.keys()),
             }
         )
 
@@ -163,7 +144,7 @@ def generate_isochrone(
         return json.dumps({"error": "travel_time_minutes must be positive."})
 
     radius_m = speed * travel_time_minutes * 60
-    coords = _isochrone_polygon(latitude, longitude, radius_m)
+    coords = isochrone_polygon(latitude, longitude, radius_m)
     area_km2 = math.pi * (radius_m / 1000) ** 2
 
     feature: dict[str, Any] = {
@@ -201,12 +182,12 @@ def generate_multi_isochrone(
     Returns a GeoJSON FeatureCollection with one polygon per travel time.
     """
     mode = travel_mode.lower().strip()
-    speed = _SPEEDS_MS.get(mode)
+    speed = SPEEDS_MS.get(mode)
     if speed is None:
         return json.dumps(
             {
                 "error": f"Unknown travel mode: {travel_mode}.",
-                "supported_modes": list(_SPEEDS_MS.keys()),
+                "supported_modes": list(SPEEDS_MS.keys()),
             }
         )
 
@@ -221,7 +202,7 @@ def generate_multi_isochrone(
     features = []
     for t in sorted(times):
         radius_m = speed * t * 60
-        coords = _isochrone_polygon(latitude, longitude, radius_m)
+        coords = isochrone_polygon(latitude, longitude, radius_m)
         features.append(
             {
                 "type": "Feature",
@@ -250,7 +231,7 @@ def generate_multi_isochrone(
     )
 
 
-GEO_ISOCHRONE_TOOLS = [estimate_reachable_radius, generate_isochrone, generate_multi_isochrone]
+GEO_ISOCHRONE_TOOLS = [geocode_address, estimate_reachable_radius, generate_isochrone, generate_multi_isochrone]
 _TOOL_MAP = {t.name: t for t in GEO_ISOCHRONE_TOOLS}
 
 
@@ -276,6 +257,8 @@ async def _run(state: AgentState) -> dict:
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=user_query)]
 
+    collected_features: list[dict] = []
+
     for _ in range(get_agent_max_iterations("geo_isochrone_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
@@ -295,9 +278,48 @@ async def _run(state: AgentState) -> dict:
                     result = await tool_fn.ainvoke(tc["args"])
                 except Exception as exc:
                     result = f"Tool error: {exc}"
+
+            # Collect GeoJSON features to forward directly to the map agent.
+            if tc["name"] == "geocode_address":
+                # Origin point(s) – shown as marker(s) on the map
+                try:
+                    gj = json.loads(str(result))
+                    if isinstance(gj, dict):
+                        if gj.get("type") == "Feature":
+                            collected_features.append(gj)
+                        elif gj.get("type") == "FeatureCollection":
+                            # Take only the best match (first result)
+                            feats = gj.get("features", [])
+                            if feats:
+                                collected_features.append(feats[0])
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+            elif tc["name"] in ("generate_isochrone", "generate_multi_isochrone"):
+                # Isochrone polygon(s) – polygon features placed before point markers
+                try:
+                    gj = json.loads(str(result))
+                    if isinstance(gj, dict):
+                        if gj.get("type") == "Feature":
+                            collected_features.insert(0, gj)
+                        elif gj.get("type") == "FeatureCollection":
+                            for feat in gj.get("features", []):
+                                collected_features.insert(0, feat)
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+
             messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
 
-    result_content = (
+    result_text = (
         messages[-1].content if messages else "geo_isochrone agent returned no result."
     )
-    return {"sub_results": {"geo_isochrone": str(result_content)}}
+
+    # Return a structured payload so upstream agents and the map agent can
+    # pass the GeoJSON polygon through without losing it in text summaries.
+    if collected_features:
+        payload: dict = {
+            "text": str(result_text),
+            "geojson": {"type": "FeatureCollection", "features": collected_features},
+        }
+        return {"sub_results": {"geo_isochrone": json.dumps(payload)}}
+
+    return {"sub_results": {"geo_isochrone": str(result_text)}}

@@ -21,27 +21,33 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 
 ## Table of Contents
 
-- [Multi-agent architecture](#multi-agent-architecture)
-  - [Agent enable / disable flags](#agent-enable--disable-flags)
-  - [Agent fault tolerance](#agent-fault-tolerance)
-  - [Agent ReAct loop iterations](#agent-react-loop-iterations)
-  - [Per-agent LLM configuration](#per-agent-llm-configuration)
-  - [SSE event types](#sse-event-types)
-  - [Data Visualisation Agent](#data-visualisation-agent)
-  - [Map Agent](#map-agent)
-- [Quick Start](#quick-start)
-  - [1. Configure environment](#1-configure-environment)
-  - [2. Start all services](#2-start-all-services)
-- [Observability (Arize Phoenix)](#observability-arize-phoenix)
-  - [Configuration](#configuration)
-- [Project structure](#project-structure)
-- [Development (without Docker)](#development-without-docker)
-  - [Backend](#backend)
-  - [Frontend](#frontend)
-- [Seed themes](#seed-themes)
-  - [Switching the theme](#switching-the-theme)
-  - [Adding a new theme](#adding-a-new-theme)
-- [Adding a new sub-agent](#adding-a-new-sub-agent)
+- [PangIA – GeoIA Agent 🌍](#pangia--geoia-agent-)
+  - [Table of Contents](#table-of-contents)
+  - [Multi-agent architecture](#multi-agent-architecture)
+    - [Agent enable / disable flags](#agent-enable--disable-flags)
+    - [Agent fault tolerance](#agent-fault-tolerance)
+    - [Agent ReAct loop iterations](#agent-react-loop-iterations)
+    - [Per-agent LLM configuration](#per-agent-llm-configuration)
+    - [SSE event types](#sse-event-types)
+    - [Data Visualisation Agent](#data-visualisation-agent)
+    - [Map Agent](#map-agent)
+  - [Quick Start](#quick-start)
+    - [1. Configure environment](#1-configure-environment)
+    - [2. Start all services](#2-start-all-services)
+  - [Observability (Arize Phoenix)](#observability-arize-phoenix)
+    - [Configuration](#configuration)
+  - [Project structure](#project-structure)
+  - [Development (without Docker)](#development-without-docker)
+    - [Backend](#backend)
+    - [Frontend](#frontend)
+  - [Seed themes](#seed-themes)
+    - [Switching the theme](#switching-the-theme)
+    - [Adding a new theme](#adding-a-new-theme)
+  - [Adding a new sub-agent](#adding-a-new-sub-agent)
+  - [Geo Agent – Geospatial Analysis](#geo-agent--geospatial-analysis)
+    - [Sub-agent hierarchy](#sub-agent-hierarchy)
+    - [Configuration](#configuration-1)
+    - [Notes](#notes)
 
 ---
 
@@ -487,6 +493,12 @@ Sub-agents live in `backend/app/agent/`.  To add one:
 ---
 
 ## Geo Agent – Geospatial Analysis
+
+> ⚠️ **Not operational – needs rework before use.**
+> The Geo Agent is currently broken following the refactoring of utility functions into
+> `backend/libs/geo/`.  Imports and end-to-end pipeline consistency have not yet been fully
+> validated in real conditions.  Disable it via `GEO_AGENT_ENABLED=false` to avoid blocking
+> the backend startup in the meantime.
 
 The **Geo Agent** (`backend/app/agent/specialized/geo/geo_master_agent.py`) is a specialised
 orchestrator for advanced geospatial analysis tasks.  It is available as a parallel

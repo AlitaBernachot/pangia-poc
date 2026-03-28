@@ -17,7 +17,6 @@ directly by the geo_agent orchestrator.
 from __future__ import annotations
 
 import json
-import math
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -25,6 +24,7 @@ from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
+from libs.geo.intersection import bbox_area_deg2, parse_bbox
 
 _SYSTEM_PROMPT = """You are the Spatial Intersection Agent of the PangIA GeoIA platform.
 Your role is to determine whether and how geographic features spatially overlap.
@@ -41,26 +41,9 @@ Your role is to determine whether and how geographic features spatially overlap.
 - Clearly distinguish between bounding-box approximations and exact polygon results.
 - For exact polygon intersection, recommend using the PostGIS agent.
 - Answer in the same language as the user's question.
+- **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
+  rendering instructions in your answer – maps are rendered by the frontend.
 """
-
-
-# ─── Internal helpers ─────────────────────────────────────────────────────────
-
-def _parse_bbox(bbox_json: str) -> tuple[float, float, float, float] | None:
-    """Parse a bbox from JSON array [min_lon, min_lat, max_lon, max_lat]."""
-    try:
-        b = json.loads(bbox_json)
-        if isinstance(b, dict):
-            return (float(b["west"]), float(b["south"]), float(b["east"]), float(b["north"]))
-        if isinstance(b, list) and len(b) == 4:
-            return (float(b[0]), float(b[1]), float(b[2]), float(b[3]))
-    except (json.JSONDecodeError, KeyError, ValueError, TypeError):
-        pass
-    return None
-
-
-def _bbox_area_deg2(w: float, s: float, e: float, n: float) -> float:
-    return max(0.0, e - w) * max(0.0, n - s)
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -74,8 +57,8 @@ def check_bbox_intersection(bbox_a_json: str, bbox_b_json: str) -> str:
         bbox_b_json: JSON array [min_lon, min_lat, max_lon, max_lat] for bbox B.
     Returns a JSON object with the intersection result.
     """
-    a = _parse_bbox(bbox_a_json)
-    b = _parse_bbox(bbox_b_json)
+    a = parse_bbox(bbox_a_json)
+    b = parse_bbox(bbox_b_json)
     if a is None:
         return json.dumps({"error": "Invalid bbox_a. Provide [min_lon, min_lat, max_lon, max_lat]."})
     if b is None:
@@ -103,8 +86,8 @@ def compute_bbox_overlap(bbox_a_json: str, bbox_b_json: str) -> str:
         bbox_b_json: JSON array [min_lon, min_lat, max_lon, max_lat] for bbox B.
     Returns a JSON object describing the overlap extent and ratio.
     """
-    a = _parse_bbox(bbox_a_json)
-    b = _parse_bbox(bbox_b_json)
+    a = parse_bbox(bbox_a_json)
+    b = parse_bbox(bbox_b_json)
     if a is None:
         return json.dumps({"error": "Invalid bbox_a. Provide [min_lon, min_lat, max_lon, max_lat]."})
     if b is None:
@@ -128,9 +111,9 @@ def compute_bbox_overlap(bbox_a_json: str, bbox_b_json: str) -> str:
             }
         )
 
-    overlap_area = _bbox_area_deg2(ow, os, oe, on)
-    area_a = _bbox_area_deg2(aw, as_, ae, an)
-    area_b = _bbox_area_deg2(bw, bs, be, bn)
+    overlap_area = bbox_area_deg2(ow, os, oe, on)
+    area_a = bbox_area_deg2(aw, as_, ae, an)
+    area_b = bbox_area_deg2(bw, bs, be, bn)
     ratio_a = overlap_area / area_a if area_a > 0 else 0.0
     ratio_b = overlap_area / area_b if area_b > 0 else 0.0
 
@@ -159,7 +142,7 @@ def point_in_bbox(latitude: float, longitude: float, bbox_json: str) -> str:
         bbox_json: JSON array [min_lon, min_lat, max_lon, max_lat].
     Returns a JSON object indicating containment.
     """
-    bbox = _parse_bbox(bbox_json)
+    bbox = parse_bbox(bbox_json)
     if bbox is None:
         return json.dumps({"error": "Invalid bbox. Provide [min_lon, min_lat, max_lon, max_lat]."})
 
@@ -186,8 +169,8 @@ def classify_spatial_relationship(bbox_a_json: str, bbox_b_json: str) -> str:
         bbox_b_json: JSON array [min_lon, min_lat, max_lon, max_lat] for bbox B.
     Returns a JSON object with the DE-9IM-inspired classification.
     """
-    a = _parse_bbox(bbox_a_json)
-    b = _parse_bbox(bbox_b_json)
+    a = parse_bbox(bbox_a_json)
+    b = parse_bbox(bbox_b_json)
     if a is None:
         return json.dumps({"error": "Invalid bbox_a."})
     if b is None:

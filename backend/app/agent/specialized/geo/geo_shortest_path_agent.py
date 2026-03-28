@@ -16,7 +16,6 @@ directly by the geo_agent orchestrator.
 from __future__ import annotations
 
 import json
-import math
 from itertools import permutations
 from typing import Any
 
@@ -25,14 +24,8 @@ from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
-
-_EARTH_RADIUS_M = 6_371_000.0
-
-_SPEEDS_MS: dict[str, float] = {
-    "walking": 1.4,
-    "cycling": 4.2,
-    "driving": 13.9,
-}
+from libs.geo.geodesy import haversine
+from libs.geo.shortest_path import TRAVEL_SPEEDS_MS, route_distance
 
 _SYSTEM_PROMPT = """You are the Shortest Path Agent of the PangIA GeoIA platform.
 Your role is to compute routes and itineraries between geographic waypoints.
@@ -52,27 +45,9 @@ routing engine (OSRM, Valhalla, ORS) would be required.
 - Report total distance and estimated travel time.
 - Clearly state that results are straight-line approximations.
 - Answer in the same language as the user's question.
+- **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
+  rendering instructions in your answer – maps are rendered by the frontend.
 """
-
-
-# ─── Internal helpers ─────────────────────────────────────────────────────────
-
-def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    return 2 * _EARTH_RADIUS_M * math.asin(math.sqrt(a))
-
-
-def _route_distance(waypoints: list[dict[str, Any]]) -> float:
-    total = 0.0
-    for i in range(len(waypoints) - 1):
-        total += _haversine(
-            float(waypoints[i]["latitude"]), float(waypoints[i]["longitude"]),
-            float(waypoints[i + 1]["latitude"]), float(waypoints[i + 1]["longitude"]),
-        )
-    return total
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -106,7 +81,7 @@ def compute_route(waypoints_json: str) -> str:
         except (KeyError, ValueError, TypeError) as exc:
             return json.dumps({"error": f"Invalid waypoint at index {i}: {exc}"})
 
-        dist_m = _haversine(lat1, lon1, lat2, lon2)
+        dist_m = haversine(lat1, lon1, lat2, lon2)
         cumulative_m += dist_m
         segments.append(
             {
@@ -154,7 +129,7 @@ def optimise_tour(waypoints_json: str) -> str:
     try:
         dist = [
             [
-                _haversine(
+                haversine(
                     float(waypoints[i]["latitude"]), float(waypoints[i]["longitude"]),
                     float(waypoints[j]["latitude"]), float(waypoints[j]["longitude"]),
                 )
@@ -215,12 +190,12 @@ def estimate_travel_time(
     Returns estimated travel time in hours and minutes.
     """
     mode = travel_mode.lower().strip()
-    speed = _SPEEDS_MS.get(mode)
+    speed = TRAVEL_SPEEDS_MS.get(mode)
     if speed is None:
         return json.dumps(
             {
                 "error": f"Unknown travel mode: {travel_mode}.",
-                "supported_modes": list(_SPEEDS_MS.keys()),
+                "supported_modes": list(TRAVEL_SPEEDS_MS.keys()),
             }
         )
 

@@ -26,10 +26,8 @@ from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
-
-_EARTH_RADIUS_M = 6_371_000.0
-# Standard atmospheric refraction coefficient (reduces effective Earth radius)
-_REFRACTION_COEFF = 0.13
+from libs.geo.geodesy import destination_point, haversine
+from libs.geo.viewshed import REFRACTION_COEFF, effective_earth_radius, horizon_distance_m
 _SYSTEM_PROMPT = """You are the Viewshed Analysis Agent of the PangIA GeoIA platform.
 Your role is to analyse geographic visibility from observer points.
 
@@ -50,48 +48,9 @@ and ray-casting algorithm would be required.
 - Express distances in kilometres and heights in metres.
 - GeoJSON coordinates are [longitude, latitude].
 - Answer in the same language as the user's question.
+- **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
+  rendering instructions in your answer – maps are rendered by the frontend.
 """
-
-
-# ─── Internal helpers ─────────────────────────────────────────────────────────
-
-def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Return the Haversine great-circle distance in metres."""
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    return 2 * _EARTH_RADIUS_M * math.asin(math.sqrt(a))
-
-
-def _destination_point(lat: float, lon: float, bearing_deg: float, dist_m: float) -> tuple[float, float]:
-    lat_r = math.radians(lat)
-    lon_r = math.radians(lon)
-    bearing_r = math.radians(bearing_deg)
-    angular = dist_m / _EARTH_RADIUS_M
-    dest_lat = math.asin(
-        math.sin(lat_r) * math.cos(angular)
-        + math.cos(lat_r) * math.sin(angular) * math.cos(bearing_r)
-    )
-    dest_lon = lon_r + math.atan2(
-        math.sin(bearing_r) * math.sin(angular) * math.cos(lat_r),
-        math.cos(angular) - math.sin(lat_r) * math.sin(dest_lat),
-    )
-    return math.degrees(dest_lat), math.degrees(dest_lon)
-
-
-def _effective_radius() -> float:
-    """Earth radius corrected for atmospheric refraction."""
-    return _EARTH_RADIUS_M / (1 - _REFRACTION_COEFF)
-
-
-def _horizon_distance_m(observer_height_m: float, target_height_m: float = 0.0) -> float:
-    """Geometric horizon distance accounting for atmospheric refraction.
-
-    d = sqrt(2 * R_eff * h_obs) + sqrt(2 * R_eff * h_target)
-    """
-    r = _effective_radius()
-    return math.sqrt(2 * r * observer_height_m) + math.sqrt(2 * r * target_height_m)
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -113,15 +72,15 @@ def compute_horizon_distance(
     if target_height_metres < 0:
         return json.dumps({"error": "target_height_metres must be non-negative."})
 
-    dist_m = _horizon_distance_m(observer_height_metres, target_height_metres)
-    r_eff = _effective_radius()
+    dist_m = horizon_distance_m(observer_height_metres, target_height_metres)
+    r_eff = effective_earth_radius()
 
     return json.dumps(
         {
             "observer_height_m": observer_height_metres,
             "target_height_m": target_height_metres,
             "effective_earth_radius_km": round(r_eff / 1000, 1),
-            "refraction_coefficient": _REFRACTION_COEFF,
+            "refraction_coefficient": REFRACTION_COEFF,
             "horizon_distance": {
                 "metres": round(dist_m, 1),
                 "kilometres": round(dist_m / 1000, 3),
@@ -148,7 +107,7 @@ def estimate_viewshed_radius(
         return json.dumps({"error": "observer_height_metres must be non-negative."})
 
     total_height = observer_height_metres + elevation_asl_metres
-    radius_m = _horizon_distance_m(total_height)
+    radius_m = horizon_distance_m(total_height)
     area_km2 = math.pi * (radius_m / 1000) ** 2
 
     return json.dumps(
@@ -192,12 +151,12 @@ def generate_viewshed_zone(
         return json.dumps({"error": f"Invalid longitude: {longitude}."})
 
     total_height = max(0.0, observer_height_metres + elevation_asl_metres)
-    radius_m = _horizon_distance_m(total_height)
+    radius_m = horizon_distance_m(total_height)
 
     coords = []
     for i in range(n_vertices):
         bearing = 360.0 * i / n_vertices
-        dlat, dlon = _destination_point(latitude, longitude, bearing, radius_m)
+        dlat, dlon = destination_point(latitude, longitude, bearing, radius_m)
         coords.append([round(dlon, 7), round(dlat, 7)])
     coords.append(coords[0])
 
@@ -241,8 +200,8 @@ def check_line_of_sight(
         target_height_m: Target height above the surface in metres (default 0).
     Returns a JSON object with line-of-sight assessment.
     """
-    dist_m = _haversine(obs_lat, obs_lon, target_lat, target_lon)
-    max_dist_m = _horizon_distance_m(obs_height_m, target_height_m)
+    dist_m = haversine(obs_lat, obs_lon, target_lat, target_lon)
+    max_dist_m = horizon_distance_m(obs_height_m, target_height_m)
     visible = dist_m <= max_dist_m
 
     return json.dumps(
@@ -288,6 +247,8 @@ async def _run(state: AgentState) -> dict:
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=user_query)]
 
+    collected_features: list[dict] = []
+
     for _ in range(get_agent_max_iterations("geo_viewshed_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
@@ -307,9 +268,29 @@ async def _run(state: AgentState) -> dict:
                     result = await tool_fn.ainvoke(tc["args"])
                 except Exception as exc:
                     result = f"Tool error: {exc}"
+
+            if tc["name"] == "generate_viewshed_zone":
+                try:
+                    gj = json.loads(str(result))
+                    if isinstance(gj, dict):
+                        if gj.get("type") == "Feature":
+                            collected_features.append(gj)
+                        elif gj.get("type") == "FeatureCollection":
+                            collected_features.extend(gj.get("features", []))
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+
             messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
 
-    result_content = (
+    result_text = (
         messages[-1].content if messages else "geo_viewshed agent returned no result."
     )
-    return {"sub_results": {"geo_viewshed": str(result_content)}}
+
+    if collected_features:
+        payload = {
+            "text": str(result_text),
+            "geojson": {"type": "FeatureCollection", "features": collected_features},
+        }
+        return {"sub_results": {"geo_viewshed": json.dumps(payload)}}
+
+    return {"sub_results": {"geo_viewshed": str(result_text)}}

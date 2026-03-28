@@ -25,8 +25,8 @@ from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
-
-_EARTH_RADIUS_M = 6_371_000.0
+from libs.geo.geodesy import haversine
+from libs.geo.hotspot import centroid as geogeo_centroid
 
 _SYSTEM_PROMPT = """You are the Hotspot Detection Agent of the PangIA GeoIA platform.
 Your role is to identify geographic clusters and density hotspots in point datasets.
@@ -34,7 +34,7 @@ Your role is to identify geographic clusters and density hotspots in point datas
 ## Capabilities
 - `detect_clusters`: Group points into spatial clusters using a distance threshold.
 - `compute_spatial_density`: Compute the density of points within a grid.
-- `find_cluster_centroid`: Compute the geographic centroid of a cluster.
+- `find_clustergeo_centroid`: Compute the geographic centroid of a cluster.
 
 ## Guidelines
 - Clearly state the clustering parameters (distance threshold, minimum cluster size).
@@ -42,24 +42,9 @@ Your role is to identify geographic clusters and density hotspots in point datas
 - For each cluster, provide the centroid coordinates and approximate radius.
 - Outliers (points not belonging to any cluster) should be reported separately.
 - Answer in the same language as the user's question.
+- **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
+  rendering instructions in your answer – maps are rendered by the frontend.
 """
-
-
-# ─── Internal helpers ─────────────────────────────────────────────────────────
-
-def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    return 2 * _EARTH_RADIUS_M * math.asin(math.sqrt(a))
-
-
-def _centroid(points: list[dict[str, Any]]) -> tuple[float, float]:
-    """Compute the arithmetic mean centroid of a list of points."""
-    lats = [float(p["latitude"]) for p in points]
-    lons = [float(p["longitude"]) for p in points]
-    return sum(lats) / len(lats), sum(lons) / len(lons)
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -116,7 +101,7 @@ def detect_clusters(
                     lon2 = float(points[j]["longitude"])
                 except (KeyError, ValueError, TypeError):
                     continue
-                if _haversine(lat1, lon1, lat2, lon2) <= eps_metres:
+                if haversine(lat1, lon1, lat2, lon2) <= eps_metres:
                     labels[j] = cluster_id
                     cluster.append(j)
                     queue.append(j)
@@ -135,9 +120,9 @@ def detect_clusters(
         if len(members) < min_cluster_size:
             outliers.extend(members)
             continue
-        clat, clon = _centroid(members)
+        clat, clon = geo_centroid(members)
         max_radius = max(
-            _haversine(clat, clon, float(m["latitude"]), float(m["longitude"]))
+            haversine(clat, clon, float(m["latitude"]), float(m["longitude"]))
             for m in members
         )
         clusters.append(
@@ -223,7 +208,7 @@ def compute_spatial_density(
 
 
 @tool
-def find_cluster_centroid(points_json: str) -> str:
+def find_clustergeo_centroid(points_json: str) -> str:
     """Compute the geographic centroid of a set of points.
 
     Args:
@@ -250,8 +235,8 @@ def find_cluster_centroid(points_json: str) -> str:
     if not valid:
         return json.dumps({"error": "No valid (latitude, longitude) pairs found."})
 
-    clat, clon = _centroid(valid)
-    max_r = max(_haversine(clat, clon, p["latitude"], p["longitude"]) for p in valid)
+    clat, clon = geo_centroid(valid)
+    max_r = max(haversine(clat, clon, p["latitude"], p["longitude"]) for p in valid)
 
     return json.dumps(
         {
@@ -263,7 +248,7 @@ def find_cluster_centroid(points_json: str) -> str:
     )
 
 
-GEO_HOTSPOT_TOOLS = [detect_clusters, compute_spatial_density, find_cluster_centroid]
+GEO_HOTSPOT_TOOLS = [detect_clusters, compute_spatial_density, find_clustergeo_centroid]
 _TOOL_MAP = {t.name: t for t in GEO_HOTSPOT_TOOLS}
 
 

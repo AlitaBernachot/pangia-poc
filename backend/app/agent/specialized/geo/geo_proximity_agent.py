@@ -13,7 +13,6 @@ directly by the geo_agent orchestrator.
 from __future__ import annotations
 
 import json
-import math
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -21,8 +20,7 @@ from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
-
-_EARTH_RADIUS_M = 6_371_000.0
+from libs.geo.geodesy import haversine
 
 _SYSTEM_PROMPT = """You are the Proximity Analysis Agent of the PangIA GeoIA platform.
 Your role is to find and rank geographic features by their distance from a reference point.
@@ -37,17 +35,9 @@ Your role is to find and rank geographic features by their distance from a refer
 - Specify whether the result is within or outside a threshold if given.
 - GeoJSON coordinates are [longitude, latitude].
 - Answer in the same language as the user's question.
+- **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
+  rendering instructions in your answer – maps are rendered by the frontend.
 """
-
-
-# ─── Internal helpers ─────────────────────────────────────────────────────────
-
-def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    return 2 * _EARTH_RADIUS_M * math.asin(math.sqrt(a))
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -82,7 +72,7 @@ def find_nearest(
             lat, lon = float(ft["latitude"]), float(ft["longitude"])
         except (KeyError, ValueError, TypeError) as exc:
             return json.dumps({"error": f"Feature at index {i} has invalid coordinates: {exc}"})
-        dist_m = _haversine(ref_lat, ref_lon, lat, lon)
+        dist_m = haversine(ref_lat, ref_lon, lat, lon)
         ranked.append({**ft, "_distance_m": dist_m, "_distance_km": round(dist_m / 1000, 4)})
 
     ranked.sort(key=lambda x: x["_distance_m"])
@@ -135,7 +125,7 @@ def filter_within_radius(
             lat, lon = float(ft["latitude"]), float(ft["longitude"])
         except (KeyError, ValueError, TypeError) as exc:
             return json.dumps({"error": f"Feature at index {i} has invalid coordinates: {exc}"})
-        dist_m = _haversine(ref_lat, ref_lon, lat, lon)
+        dist_m = haversine(ref_lat, ref_lon, lat, lon)
         entry = {
             "name": ft.get("name", f"feature_{i}"),
             "latitude": ft.get("latitude"),
@@ -186,7 +176,7 @@ def rank_by_proximity(
             lat, lon = float(ft["latitude"]), float(ft["longitude"])
         except (KeyError, ValueError, TypeError) as exc:
             return json.dumps({"error": f"Feature at index {i} has invalid coordinates: {exc}"})
-        dist_m = _haversine(ref_lat, ref_lon, lat, lon)
+        dist_m = haversine(ref_lat, ref_lon, lat, lon)
         ranked.append(
             {
                 "name": ft.get("name", f"feature_{i}"),

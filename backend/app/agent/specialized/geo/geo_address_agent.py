@@ -14,15 +14,16 @@ from __future__ import annotations
 
 import json
 
-import httpx
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
-
-_NOMINATIM_BASE = "https://nominatim.openstreetmap.org"
-_HEADERS = {"User-Agent": "PangIA-GeoIA/0.1 (contact@pangia.io)"}
+from libs.geo.nominatim import (
+    nominatim_batch_search,
+    nominatim_reverse,
+    nominatim_search,
+)
 
 _SYSTEM_PROMPT = """You are the Geocoding Agent of the PangIA GeoIA platform.
 Your role is to resolve geographic references (addresses, place names, regions) to
@@ -39,24 +40,25 @@ coordinates and vice-versa.
 - Clearly state when a location cannot be found.
 - GeoJSON coordinates are [longitude, latitude] (not lat, lon).
 - Answer in the same language as the user's question.
+- **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
+  rendering instructions in your answer – maps are rendered by the frontend.
 """
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
 
 @tool
-async def geocode_address(address: str) -> str:
+async def geocode_address(address: str, countrycodes: str = "") -> str:
     """Convert a place name or address to geographic coordinates using OpenStreetMap Nominatim.
 
-    Returns a GeoJSON Feature with coordinates and metadata.
+    Args:
+        address: Place name or address string to geocode.
+        countrycodes: Optional comma-separated ISO 3166-1 alpha-2 country codes to restrict
+            results (e.g. 'fr', 'fr,be').  Leave empty to search worldwide.
+    Returns a GeoJSON FeatureCollection with up to 3 ranked candidate features.
     """
-    url = f"{_NOMINATIM_BASE}/search"
-    params = {"q": address, "format": "json", "limit": 3, "addressdetails": 1}
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url, params=params, headers=_HEADERS)
-            resp.raise_for_status()
-            results = resp.json()
+        results = await nominatim_search(address, countrycodes=countrycodes)
         if not results:
             return json.dumps({"error": f"No results found for: {address}"})
         features = []
@@ -97,13 +99,8 @@ async def reverse_geocode(latitude: float, longitude: float) -> str:
     if not (-180 <= longitude <= 180):
         return json.dumps({"error": f"Invalid longitude: {longitude}. Must be between -180 and 180."})
 
-    url = f"{_NOMINATIM_BASE}/reverse"
-    params = {"lat": latitude, "lon": longitude, "format": "json", "addressdetails": 1}
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url, params=params, headers=_HEADERS)
-            resp.raise_for_status()
-            result = resp.json()
+        result = await nominatim_reverse(latitude, longitude)
         if "error" in result:
             return json.dumps({"error": result["error"]})
         return json.dumps(
@@ -135,34 +132,19 @@ async def batch_geocode(addresses_json: str) -> str:
     if not isinstance(addresses, list):
         return json.dumps({"error": "Input must be a JSON array of address strings."})
 
-    results = []
-    for address in addresses:
+    str_addresses = []
+    non_string_errors = []
+    for i, address in enumerate(addresses):
         if not isinstance(address, str):
-            results.append({"address": str(address), "error": "Address must be a string."})
-            continue
-        url = f"{_NOMINATIM_BASE}/search"
-        params = {"q": address, "format": "json", "limit": 1}
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(url, params=params, headers=_HEADERS)
-                resp.raise_for_status()
-                hits = resp.json()
-            if not hits:
-                results.append({"address": address, "found": False})
-            else:
-                r = hits[0]
-                results.append(
-                    {
-                        "address": address,
-                        "found": True,
-                        "latitude": float(r["lat"]),
-                        "longitude": float(r["lon"]),
-                        "display_name": r.get("display_name", address),
-                        "place_type": r.get("type", ""),
-                    }
-                )
-        except Exception as exc:
-            results.append({"address": address, "error": str(exc)})
+            non_string_errors.append({"address": str(address), "error": "Address must be a string.", "_idx": i})
+        else:
+            str_addresses.append(address)
+
+    results = await nominatim_batch_search(str_addresses)
+
+    # Re-insert non-string error entries at their original positions
+    for entry in non_string_errors:
+        results.insert(entry["_idx"], {"address": entry["address"], "error": entry["error"]})
 
     return json.dumps(results)
 
@@ -193,6 +175,8 @@ async def _run(state: AgentState) -> dict:
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=user_query)]
 
+    collected_features: list[dict] = []
+
     for _ in range(get_agent_max_iterations("geo_address_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
@@ -212,9 +196,29 @@ async def _run(state: AgentState) -> dict:
                     result = await tool_fn.ainvoke(tc["args"])
                 except Exception as exc:
                     result = f"Tool error: {exc}"
+
+            if tc["name"] == "geocode_address":
+                try:
+                    gj = json.loads(str(result))
+                    if isinstance(gj, dict):
+                        if gj.get("type") == "Feature":
+                            collected_features.append(gj)
+                        elif gj.get("type") == "FeatureCollection":
+                            collected_features.extend(gj.get("features", []))
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+
             messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
 
-    result_content = (
+    result_text = (
         messages[-1].content if messages else "geo_address agent returned no result."
     )
-    return {"sub_results": {"geo_address": str(result_content)}}
+
+    if collected_features:
+        payload = {
+            "text": str(result_text),
+            "geojson": {"type": "FeatureCollection", "features": collected_features},
+        }
+        return {"sub_results": {"geo_address": json.dumps(payload)}}
+
+    return {"sub_results": {"geo_address": str(result_text)}}

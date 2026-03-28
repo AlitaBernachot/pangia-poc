@@ -14,7 +14,6 @@ directly by the geo_agent orchestrator.
 from __future__ import annotations
 
 import json
-import math
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -22,6 +21,7 @@ from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
+from libs.geo.geometry_ops import collect_coords, rdp
 
 _SYSTEM_PROMPT = """You are the Geometry Operations Agent of the PangIA GeoIA platform.
 Your role is to perform geometric transformations and analyses on GeoJSON features.
@@ -38,54 +38,9 @@ Your role is to perform geometric transformations and analyses on GeoJSON featur
 - Bounding boxes are expressed as [min_lon, min_lat, max_lon, max_lat].
 - GeoJSON coordinates are [longitude, latitude] (not lat, lon).
 - Answer in the same language as the user's question.
+- **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
+  rendering instructions in your answer – maps are rendered by the frontend.
 """
-
-
-# ─── Internal helpers ─────────────────────────────────────────────────────────
-
-def _collect_coords(geometry: dict[str, Any]) -> list[list[float]]:
-    """Recursively collect all [lon, lat] coordinate pairs from a geometry."""
-    gtype = geometry.get("type", "")
-    raw = geometry.get("coordinates", [])
-    if gtype == "Point":
-        return [raw] if raw else []
-    if gtype in ("MultiPoint", "LineString"):
-        return list(raw)
-    if gtype in ("MultiLineString", "Polygon"):
-        return [c for ring in raw for c in ring]
-    if gtype == "MultiPolygon":
-        return [c for poly in raw for ring in poly for c in ring]
-    if gtype == "GeometryCollection":
-        return [c for g in geometry.get("geometries", []) for c in _collect_coords(g)]
-    return []
-
-
-def _perpendicular_distance(point: list[float], line_start: list[float], line_end: list[float]) -> float:
-    """Compute the perpendicular distance from a point to a line segment (in coordinate units)."""
-    if line_start == line_end:
-        return math.hypot(point[0] - line_start[0], point[1] - line_start[1])
-    dx = line_end[0] - line_start[0]
-    dy = line_end[1] - line_start[1]
-    d = abs(dy * point[0] - dx * point[1] + line_end[0] * line_start[1] - line_end[1] * line_start[0])
-    return d / math.hypot(dx, dy)
-
-
-def _rdp(coords: list[list[float]], epsilon: float) -> list[list[float]]:
-    """Ramer-Douglas-Peucker simplification."""
-    if len(coords) < 3:
-        return coords
-    max_dist = 0.0
-    max_idx = 0
-    for i in range(1, len(coords) - 1):
-        d = _perpendicular_distance(coords[i], coords[0], coords[-1])
-        if d > max_dist:
-            max_dist = d
-            max_idx = i
-    if max_dist > epsilon:
-        left = _rdp(coords[:max_idx + 1], epsilon)
-        right = _rdp(coords[max_idx:], epsilon)
-        return left[:-1] + right
-    return [coords[0], coords[-1]]
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -107,12 +62,12 @@ def compute_bbox(geojson_str: str) -> str:
     if data.get("type") == "FeatureCollection":
         for f in data.get("features", []):
             if f.get("geometry"):
-                coords.extend(_collect_coords(f["geometry"]))
+                coords.extend(collect_coords(f["geometry"]))
     elif data.get("type") == "Feature":
         if data.get("geometry"):
-            coords.extend(_collect_coords(data["geometry"]))
+            coords.extend(collect_coords(data["geometry"]))
     else:
-        coords.extend(_collect_coords(data))
+        coords.extend(collect_coords(data))
 
     if not coords:
         return json.dumps({"error": "No coordinates found in the GeoJSON input."})
@@ -149,12 +104,12 @@ def compute_centroid(geojson_str: str) -> str:
     if data.get("type") == "FeatureCollection":
         for f in data.get("features", []):
             if f.get("geometry"):
-                coords.extend(_collect_coords(f["geometry"]))
+                coords.extend(collect_coords(f["geometry"]))
     elif data.get("type") == "Feature":
         if data.get("geometry"):
-            coords.extend(_collect_coords(data["geometry"]))
+            coords.extend(collect_coords(data["geometry"]))
     else:
-        coords.extend(_collect_coords(data))
+        coords.extend(collect_coords(data))
 
     if not coords:
         return json.dumps({"error": "No coordinates found."})
@@ -207,7 +162,7 @@ def simplify_linestring(coordinates_json: str, tolerance: float = 0.0001) -> str
     if len(coords) < 2:
         return json.dumps({"error": "LineString needs at least 2 coordinate pairs."})
 
-    simplified = _rdp(coords, tolerance)
+    simplified = rdp(coords, tolerance)
     reduction_pct = round((1 - len(simplified) / len(coords)) * 100, 1)
 
     return json.dumps(
@@ -269,12 +224,12 @@ def validate_geojson(geojson_str: str) -> str:
     if gtype == "FeatureCollection":
         for f in data.get("features", []):
             if f.get("geometry"):
-                all_coords.extend(_collect_coords(f["geometry"]))
+                all_coords.extend(collect_coords(f["geometry"]))
     elif gtype == "Feature":
         if data.get("geometry"):
-            all_coords.extend(_collect_coords(data["geometry"]))
+            all_coords.extend(collect_coords(data["geometry"]))
     else:
-        all_coords.extend(_collect_coords(data))
+        all_coords.extend(collect_coords(data))
 
     for c in all_coords:
         if len(c) < 2:
@@ -361,6 +316,8 @@ async def _run(state: AgentState) -> dict:
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=user_query)]
 
+    collected_features: list[dict] = []
+
     for _ in range(get_agent_max_iterations("geo_geometry_ops_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
@@ -380,9 +337,29 @@ async def _run(state: AgentState) -> dict:
                     result = await tool_fn.ainvoke(tc["args"])
                 except Exception as exc:
                     result = f"Tool error: {exc}"
+
+            if tc["name"] in ("compute_centroid", "merge_feature_collections"):
+                try:
+                    gj = json.loads(str(result))
+                    if isinstance(gj, dict):
+                        if gj.get("type") == "Feature":
+                            collected_features.append(gj)
+                        elif gj.get("type") == "FeatureCollection":
+                            collected_features.extend(gj.get("features", []))
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+
             messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
 
-    result_content = (
+    result_text = (
         messages[-1].content if messages else "geo_geometry_ops agent returned no result."
     )
-    return {"sub_results": {"geo_geometry_ops": str(result_content)}}
+
+    if collected_features:
+        payload = {
+            "text": str(result_text),
+            "geojson": {"type": "FeatureCollection", "features": collected_features},
+        }
+        return {"sub_results": {"geo_geometry_ops": json.dumps(payload)}}
+
+    return {"sub_results": {"geo_geometry_ops": str(result_text)}}

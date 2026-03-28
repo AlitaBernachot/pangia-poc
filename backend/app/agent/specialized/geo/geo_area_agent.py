@@ -21,22 +21,7 @@ from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
-
-_EARTH_RADIUS_M = 6_371_000.0
-
-# Reference areas in km² for comparison
-_REFERENCE_AREAS_KM2: dict[str, float] = {
-    "France": 551_695,
-    "Germany": 357_114,
-    "Spain": 505_990,
-    "UK": 243_610,
-    "Italy": 301_340,
-    "Belgium": 30_528,
-    "Switzerland": 41_285,
-    "Paris (city)": 105.4,
-    "London (Greater)": 1_572,
-    "Central Park NYC": 3.41,
-}
+from libs.geo.area import REFERENCE_AREAS_KM2, format_area, spherical_polygon_area
 
 _SYSTEM_PROMPT = """You are the Area Calculation Agent of the PangIA GeoIA platform.
 Your role is to compute and compare surface areas of geographic features.
@@ -52,39 +37,9 @@ Your role is to compute and compare surface areas of geographic features.
 - Always report areas in multiple units for clarity (m², km², hectares).
 - Use reference comparisons to make large areas intuitive.
 - Answer in the same language as the user's question.
+- **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
+  rendering instructions in your answer – maps are rendered by the frontend.
 """
-
-
-# ─── Internal helpers ─────────────────────────────────────────────────────────
-
-def _spherical_polygon_area(coords: list[tuple[float, float]]) -> float:
-    """Compute the area of a spherical polygon in m² using the spherical excess formula.
-
-    coords: list of (lat, lon) pairs in decimal degrees.
-    """
-    n = len(coords)
-    if n < 3:
-        return 0.0
-
-    total = 0.0
-    for i in range(n):
-        j = (i + 1) % n
-        lat1, lon1 = math.radians(coords[i][0]), math.radians(coords[i][1])
-        lat2, lon2 = math.radians(coords[j][0]), math.radians(coords[j][1])
-        total += (lon2 - lon1) * (2 + math.sin(lat1) + math.sin(lat2))
-
-    return abs(total) * _EARTH_RADIUS_M ** 2 / 2
-
-
-def _format_area(m2: float) -> dict[str, float]:
-    return {
-        "m2": round(m2, 2),
-        "km2": round(m2 / 1_000_000, 6),
-        "hectares": round(m2 / 10_000, 4),
-        "acres": round(m2 / 4046.856, 4),
-        "sq_miles": round(m2 / 2_589_988.11, 6),
-    }
-
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
 
@@ -131,11 +86,11 @@ def calculate_polygon_area(coordinates_json: str) -> str:
     if len(coords) < 3:
         return json.dumps({"error": "A polygon needs at least 3 coordinates."})
 
-    area_m2 = _spherical_polygon_area(coords)
+    area_m2 = spherical_polygon_area(coords)
     return json.dumps(
         {
             "vertex_count": len(coords),
-            "area": _format_area(area_m2),
+            "area": format_area(area_m2),
             "method": "spherical excess (WGS-84 sphere)",
         }
     )
@@ -193,7 +148,7 @@ def compare_to_reference(area_km2: float) -> str:
         return json.dumps({"error": "area_km2 must be positive."})
 
     comparisons = []
-    for name, ref_km2 in _REFERENCE_AREAS_KM2.items():
+    for name, ref_km2 in REFERENCE_AREAS_KM2.items():
         ratio = area_km2 / ref_km2
         comparisons.append(
             {

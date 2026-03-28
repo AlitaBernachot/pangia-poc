@@ -13,7 +13,6 @@ directly by the geo_agent orchestrator.
 from __future__ import annotations
 
 import json
-import math
 from datetime import datetime, timezone
 from typing import Any
 
@@ -22,16 +21,8 @@ from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
-
-_EARTH_RADIUS_M = 6_371_000.0
-
-# Supported ISO 8601 timestamp formats for _parse_ts
-_TIMESTAMP_FORMATS = (
-    "%Y-%m-%dT%H:%M:%SZ",
-    "%Y-%m-%dT%H:%M:%S",
-    "%Y-%m-%d %H:%M:%S",
-    "%Y-%m-%d",
-)
+from libs.geo.geodesy import bearing, haversine
+from libs.geo.temporal import parse_ts
 
 _SYSTEM_PROMPT = """You are the Temporal Analysis Agent of the PangIA GeoIA platform.
 Your role is to analyse how geographic phenomena evolve over time.
@@ -48,37 +39,9 @@ Your role is to analyse how geographic phenomena evolve over time.
 - Identify periods of acceleration, deceleration, or stasis.
 - Detect seasonal or periodic patterns when temporal data spans multiple periods.
 - Answer in the same language as the user's question.
+- **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
+  rendering instructions in your answer – maps are rendered by the frontend.
 """
-
-
-# ─── Internal helpers ─────────────────────────────────────────────────────────
-
-def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    return 2 * _EARTH_RADIUS_M * math.asin(math.sqrt(a))
-
-
-def _bearing(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Compute the initial bearing from point 1 to point 2 in degrees (0–360)."""
-    lat1_r, lat2_r = math.radians(lat1), math.radians(lat2)
-    dlon = math.radians(lon2 - lon1)
-    x = math.sin(dlon) * math.cos(lat2_r)
-    y = math.cos(lat1_r) * math.sin(lat2_r) - math.sin(lat1_r) * math.cos(lat2_r) * math.cos(dlon)
-    return (math.degrees(math.atan2(x, y)) + 360) % 360
-
-
-def _parse_ts(ts_str: str) -> float | None:
-    """Try to parse an ISO 8601 timestamp; return POSIX seconds or None."""
-    for fmt in _TIMESTAMP_FORMATS:
-        try:
-            dt = datetime.strptime(ts_str, fmt).replace(tzinfo=timezone.utc)
-            return dt.timestamp()
-        except ValueError:
-            continue
-    return None
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -104,7 +67,7 @@ def analyse_movement(positions_json: str) -> str:
     parsed = []
     for i, p in enumerate(positions):
         try:
-            ts = _parse_ts(str(p.get("timestamp", "")))
+            ts = parse_ts(str(p.get("timestamp", "")))
             if ts is None:
                 return json.dumps({"error": f"Cannot parse timestamp at index {i}: {p.get('timestamp')!r}"})
             parsed.append({
@@ -127,10 +90,10 @@ def analyse_movement(positions_json: str) -> str:
         dt_s = b["ts"] - a["ts"]
         if dt_s <= 0:
             continue
-        dist_m = _haversine(a["lat"], a["lon"], b["lat"], b["lon"])
+        dist_m = haversine(a["lat"], a["lon"], b["lat"], b["lon"])
         speed_ms = dist_m / dt_s
         speed_kmh = speed_ms * 3.6
-        bear = _bearing(a["lat"], a["lon"], b["lat"], b["lon"])
+        bear = bearing(a["lat"], a["lon"], b["lat"], b["lon"])
         total_dist += dist_m
         speeds.append(speed_kmh)
         segments.append({
@@ -181,7 +144,7 @@ def compute_displacement(positions_json: str) -> str:
     parsed = []
     for i, p in enumerate(positions):
         try:
-            ts = _parse_ts(str(p.get("timestamp", "")))
+            ts = parse_ts(str(p.get("timestamp", "")))
             parsed.append({
                 "ts": ts or 0.0,
                 "lat": float(p["latitude"]),
@@ -196,8 +159,8 @@ def compute_displacement(positions_json: str) -> str:
         parsed.sort(key=lambda x: x["ts"])
 
     first, last = parsed[0], parsed[-1]
-    dist_m = _haversine(first["lat"], first["lon"], last["lat"], last["lon"])
-    bear = _bearing(first["lat"], first["lon"], last["lat"], last["lon"])
+    dist_m = haversine(first["lat"], first["lon"], last["lat"], last["lon"])
+    bear = bearing(first["lat"], first["lon"], last["lat"], last["lon"])
 
     compass = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
     compass_dir = compass[round(bear / 45) % 8]
@@ -234,7 +197,7 @@ def detect_temporal_pattern(values_json: str) -> str:
     parsed = []
     for i, item in enumerate(data):
         try:
-            ts = _parse_ts(str(item.get("timestamp", "")))
+            ts = parse_ts(str(item.get("timestamp", "")))
             if ts is None:
                 return json.dumps({"error": f"Cannot parse timestamp at index {i}: {item.get('timestamp')!r}"})
             parsed.append({"ts": ts, "value": float(item["value"]), "timestamp": item["timestamp"]})
@@ -303,7 +266,7 @@ def summarise_time_series(events_json: str) -> str:
 
     timestamps = []
     for i, ev in enumerate(events):
-        ts = _parse_ts(str(ev.get("timestamp", "")))
+        ts = parse_ts(str(ev.get("timestamp", "")))
         if ts is not None:
             timestamps.append(ts)
 

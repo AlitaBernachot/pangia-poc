@@ -311,16 +311,45 @@ async def _run(state: AgentState) -> dict:
         "",
     )
 
+    # ── Extract pre-built GeoJSON features from structured sub-result payloads ─
+    # Some sub-agents (e.g. geo_isochrone) embed GeoJSON directly in their
+    # sub_results value as {"text": "...", "geojson": {...}} to prevent polygon
+    # coordinates from being lost when going through LLM text summaries.
+    direct_features: list[dict[str, Any]] = []
+
+    def _unwrap_sub_result(val: str) -> str:
+        """Return the human-readable text from a sub_result, extracting any embedded GeoJSON."""
+        try:
+            parsed = json.loads(val)
+            if isinstance(parsed, dict):
+                gj = parsed.get("geojson")
+                if isinstance(gj, dict):
+                    if gj.get("type") == "FeatureCollection":
+                        direct_features.extend(gj.get("features", []))
+                    elif gj.get("type") == "Feature":
+                        direct_features.append(gj)
+                if "text" in parsed:
+                    return str(parsed["text"])
+        except (json.JSONDecodeError, AttributeError):
+            pass
+        return val
+
     # Build enriched context from all sub-agent results
     sub_text = "\n\n".join(
-        f"[{agent.upper()} RESULTS]:\n{result}"
+        f"[{agent.upper()} RESULTS]:\n{_unwrap_sub_result(result)}"
         for agent, result in sub_results.items()
         if result and result.strip()
     )
 
-    # Quick heuristic: skip entirely if there is no geographic signal
+    # Quick heuristic: skip entirely if there is no geographic signal.
+    # Exception: if sub-agents already provided direct GeoJSON features, keep them.
     combined_check = f"{sub_text} {user_query}"
     if not _COORD_HINT_RE.search(combined_check):
+        if direct_features:
+            return {
+                "sub_results": {"map": ""},
+                "geojson": {"type": "FeatureCollection", "features": direct_features},
+            }
         return {"sub_results": {"map": ""}, "geojson": None}
 
     llm = build_llm(get_agent_model_config("map_agent"), streaming=True).bind_tools(MAP_TOOLS)
@@ -376,6 +405,15 @@ async def _run(state: AgentState) -> dict:
                         summary = parsed.get("summary", summary)
                 except (json.JSONDecodeError, ValueError):
                     pass
+
+    # Merge pre-built GeoJSON features (e.g. isochrone polygons) into the result.
+    # These are placed first so polygons render beneath the point markers.
+    if direct_features:
+        existing_features = (geojson_data or {}).get("features", []) if geojson_data else []
+        geojson_data = {
+            "type": "FeatureCollection",
+            "features": direct_features + existing_features,
+        }
 
     return {
         "sub_results": {"map": summary},

@@ -13,7 +13,6 @@ directly by the geo_agent orchestrator.
 from __future__ import annotations
 
 import json
-import math
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -21,8 +20,8 @@ from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
+from libs.geo.geodesy import format_distance, haversine
 
-_EARTH_RADIUS_M = 6_371_000.0  # Mean Earth radius in metres
 
 _SYSTEM_PROMPT = """You are the Distance Calculation Agent of the PangIA GeoIA platform.
 Your role is to compute geographic distances between locations.
@@ -38,27 +37,9 @@ Your role is to compute geographic distances between locations.
 - Always state the unit of the result clearly.
 - For large datasets, summarise with min/max/mean distances.
 - Answer in the same language as the user's question.
+- **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
+  rendering instructions in your answer – maps are rendered by the frontend.
 """
-
-
-# ─── Internal helpers ─────────────────────────────────────────────────────────
-
-def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Return the Haversine great-circle distance in metres."""
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    return 2 * _EARTH_RADIUS_M * math.asin(math.sqrt(a))
-
-
-def _format_distance(metres: float) -> dict[str, float]:
-    return {
-        "metres": round(metres, 2),
-        "kilometres": round(metres / 1000, 4),
-        "miles": round(metres / 1609.344, 4),
-        "nautical_miles": round(metres / 1852, 4),
-    }
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -86,12 +67,12 @@ def haversine_distance(
         if not (lo <= val <= hi):
             return json.dumps({"error": f"Invalid {name}: {val}. Must be between {lo} and {hi}."})
 
-    dist_m = _haversine(lat1, lon1, lat2, lon2)
+    dist_m = haversine(lat1, lon1, lat2, lon2)
     return json.dumps(
         {
             "point_a": {"latitude": lat1, "longitude": lon1},
             "point_b": {"latitude": lat2, "longitude": lon2},
-            "distance": _format_distance(dist_m),
+            "distance": format_distance(dist_m),
         }
     )
 
@@ -126,13 +107,13 @@ def distance_matrix(points_json: str) -> str:
             except (KeyError, ValueError, TypeError) as exc:
                 return json.dumps({"error": f"Invalid point format: {exc}. Each point needs 'latitude' and 'longitude'."})
 
-            dist_m = _haversine(lat1, lon1, lat2, lon2)
+            dist_m = haversine(lat1, lon1, lat2, lon2)
             all_distances.append(dist_m)
             matrix.append(
                 {
                     "from": p1.get("name", f"point_{i}"),
                     "to": p2.get("name", f"point_{j}"),
-                    "distance": _format_distance(dist_m),
+                    "distance": format_distance(dist_m),
                 }
             )
 
@@ -175,16 +156,16 @@ def find_closest_point(
             lat, lon = float(pt["latitude"]), float(pt["longitude"])
         except (KeyError, ValueError, TypeError) as exc:
             return json.dumps({"error": f"Invalid candidate at index {i}: {exc}."})
-        dist = _haversine(ref_lat, ref_lon, lat, lon)
-        if dist < best_dist:
-            best_dist = dist
+        dist_m = haversine(ref_lat, ref_lon, lat, lon)
+        if dist_m < best_dist:
+            best_dist = dist_m
             best = pt
 
     return json.dumps(
         {
             "reference": {"latitude": ref_lat, "longitude": ref_lon},
             "closest_point": best,
-            "distance": _format_distance(best_dist),
+            "distance": format_distance(best_dist),
         }
     )
 

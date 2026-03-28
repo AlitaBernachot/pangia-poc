@@ -16,17 +16,15 @@ directly by the geo_agent orchestrator.
 from __future__ import annotations
 
 import json
-import math
 from typing import Any
 
-import httpx
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
-
-_EARTH_RADIUS_M = 6_371_000.0
+from libs.geo.elevation import fetch_open_meteo_elevation
+from libs.geo.geodesy import haversine
 
 _SYSTEM_PROMPT = """You are the Elevation Agent of the PangIA GeoIA platform.
 Your role is to retrieve and analyse terrain elevation data for geographic locations.
@@ -41,34 +39,9 @@ Your role is to retrieve and analyse terrain elevation data for geographic locat
 - Always cite the data source for elevation values.
 - Clearly state when elevation data is unavailable for a location.
 - Answer in the same language as the user's question.
+- **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
+  rendering instructions in your answer – maps are rendered by the frontend.
 """
-
-
-# ─── Internal helpers ─────────────────────────────────────────────────────────
-
-def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    return 2 * _EARTH_RADIUS_M * math.asin(math.sqrt(a))
-
-
-async def _fetch_open_meteo_elevation(locations: list[dict[str, float]]) -> list[float | None]:
-    """Fetch elevation from the Open-Meteo elevation API (free, no key required)."""
-    lats = ",".join(str(loc["latitude"]) for loc in locations)
-    lons = ",".join(str(loc["longitude"]) for loc in locations)
-    url = "https://api.open-meteo.com/v1/elevation"
-    params = {"latitude": lats, "longitude": lons}
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(url, params=params)
-            resp.raise_for_status()
-            data = resp.json()
-        elevations = data.get("elevation", [])
-        return [float(e) if e is not None else None for e in elevations]
-    except Exception:
-        return [None] * len(locations)
 
 
 # ─── Tools ────────────────────────────────────────────────────────────────────
@@ -105,7 +78,7 @@ async def get_elevation(locations_json: str) -> str:
         except (KeyError, ValueError, TypeError) as exc:
             return json.dumps({"error": f"Invalid location at index {i}: {exc}"})
 
-    elevations = await _fetch_open_meteo_elevation(locations)
+    elevations = await fetch_open_meteo_elevation(locations)
 
     results = []
     for loc, elev in zip(locations, elevations):
@@ -152,7 +125,7 @@ async def compute_elevation_profile(waypoints_json: str) -> str:
         except (KeyError, ValueError, TypeError) as exc:
             return json.dumps({"error": f"Invalid waypoint at index {i}: {exc}"})
 
-    elevations = await _fetch_open_meteo_elevation(locations)
+    elevations = await fetch_open_meteo_elevation(locations)
 
     profile = []
     cumulative_m = 0.0
@@ -160,7 +133,7 @@ async def compute_elevation_profile(waypoints_json: str) -> str:
         seg_km = 0.0
         if i > 0:
             prev = locations[i - 1]
-            seg_m = _haversine(
+            seg_m = haversine(
                 prev["latitude"], prev["longitude"],
                 loc["latitude"], loc["longitude"],
             )

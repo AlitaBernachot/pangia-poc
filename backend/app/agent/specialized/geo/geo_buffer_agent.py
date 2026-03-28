@@ -21,8 +21,8 @@ from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.state import AgentState
+from libs.geo.buffer import circular_buffer_coords
 
-_EARTH_RADIUS_M = 6_371_000.0
 
 _SYSTEM_PROMPT = """You are the Buffer Analysis Agent of the PangIA GeoIA platform.
 Your role is to create and analyse spatial buffer zones around geographic features.
@@ -38,42 +38,9 @@ Your role is to create and analyse spatial buffer zones around geographic featur
 - Use appropriate units (metres for small buffers, km for large ones).
 - GeoJSON coordinates are [longitude, latitude].
 - Answer in the same language as the user's question.
+- **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
+  rendering instructions in your answer – maps are rendered by the frontend.
 """
-
-
-# ─── Internal helpers ─────────────────────────────────────────────────────────
-
-def _destination_point(lat: float, lon: float, bearing_deg: float, dist_m: float) -> tuple[float, float]:
-    """Compute the destination point given a start, bearing, and distance on a sphere."""
-    lat_r = math.radians(lat)
-    lon_r = math.radians(lon)
-    bearing_r = math.radians(bearing_deg)
-    angular = dist_m / _EARTH_RADIUS_M
-
-    dest_lat = math.asin(
-        math.sin(lat_r) * math.cos(angular)
-        + math.cos(lat_r) * math.sin(angular) * math.cos(bearing_r)
-    )
-    dest_lon = lon_r + math.atan2(
-        math.sin(bearing_r) * math.sin(angular) * math.cos(lat_r),
-        math.cos(angular) - math.sin(lat_r) * math.sin(dest_lat),
-    )
-    return math.degrees(dest_lat), math.degrees(dest_lon)
-
-
-def _circular_buffer_coords(lat: float, lon: float, radius_m: float, n_vertices: int = 64) -> list[list[float]]:
-    """Return a list of [lon, lat] pairs forming a circular buffer polygon."""
-    coords = []
-    for i in range(n_vertices):
-        bearing = 360.0 * i / n_vertices
-        dlat, dlon = _destination_point(lat, lon, bearing, radius_m)
-        coords.append([round(dlon, 7), round(dlat, 7)])
-    # Close the ring
-    coords.append(coords[0])
-    return coords
-
-
-# ─── Tools ────────────────────────────────────────────────────────────────────
 
 @tool
 def create_circular_buffer(
@@ -98,7 +65,7 @@ def create_circular_buffer(
     if radius_metres <= 0:
         return json.dumps({"error": "radius_metres must be positive."})
 
-    coords = _circular_buffer_coords(latitude, longitude, radius_metres)
+    coords = circular_buffer_coords(latitude, longitude, radius_metres)
     area_m2 = math.pi * radius_metres ** 2
 
     feature: dict[str, Any] = {
@@ -144,7 +111,7 @@ def create_multi_ring_buffer(
     radii_sorted = sorted(radii)
     features = []
     for r in radii_sorted:
-        coords = _circular_buffer_coords(latitude, longitude, r)
+        coords = circular_buffer_coords(latitude, longitude, r)
         area_m2 = math.pi * r ** 2
         features.append(
             {
@@ -235,6 +202,8 @@ async def _run(state: AgentState) -> dict:
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=user_query)]
 
+    collected_features: list[dict] = []
+
     for _ in range(get_agent_max_iterations("geo_buffer_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
@@ -254,9 +223,29 @@ async def _run(state: AgentState) -> dict:
                     result = await tool_fn.ainvoke(tc["args"])
                 except Exception as exc:
                     result = f"Tool error: {exc}"
+
+            if tc["name"] in ("create_circular_buffer", "create_multi_ring_buffer"):
+                try:
+                    gj = json.loads(str(result))
+                    if isinstance(gj, dict):
+                        if gj.get("type") == "Feature":
+                            collected_features.append(gj)
+                        elif gj.get("type") == "FeatureCollection":
+                            collected_features.extend(gj.get("features", []))
+                except (json.JSONDecodeError, AttributeError):
+                    pass
+
             messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
 
-    result_content = (
+    result_text = (
         messages[-1].content if messages else "geo_buffer agent returned no result."
     )
-    return {"sub_results": {"geo_buffer": str(result_content)}}
+
+    if collected_features:
+        payload = {
+            "text": str(result_text),
+            "geojson": {"type": "FeatureCollection", "features": collected_features},
+        }
+        return {"sub_results": {"geo_buffer": json.dumps(payload)}}
+
+    return {"sub_results": {"geo_buffer": str(result_text)}}

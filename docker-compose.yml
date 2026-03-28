@@ -56,6 +56,7 @@ services:
       - PHOENIX_PROJECT_NAME=${PHOENIX_PROJECT_NAME:-pangia-geoia}
     volumes:
       - ./backend/app:/backend/app
+      - ./backend/libs:/backend/libs
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/health || exit 1"]

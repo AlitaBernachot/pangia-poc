@@ -35,6 +35,7 @@ Exposed as a single async function `run` usable as a LangGraph node.
 """
 from __future__ import annotations
 
+import json
 from typing import Literal
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -149,6 +150,8 @@ _ROUTER_SYSTEM = (
     "  - For accessibility/isochrone questions, use geo_isochrone.\n"
     "  - For natural-language spatial parsing, use geo_spatial_parser.\n"
     "  - Always include at least one sub-agent.\n"
+    "  - Never include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or "
+    "rendering instructions – maps are rendered by the frontend.\n"
 )
 
 _GEO_SUB_AGENT_LITERALS = Literal[
@@ -224,23 +227,54 @@ async def _run(state: AgentState) -> dict:
     if not non_empty:
         return {"sub_results": {"geo": "Geospatial sub-agents returned no results."}}
 
-    if len(non_empty) == 1:
-        geo_answer = next(iter(non_empty.values()))
+    # ── Collect any structured GeoJSON features from sub-agent results ─────────
+    # Sub-agents like geo_isochrone return {"text": "...", "geojson": {...}} to
+    # prevent polygon coordinates from being lost during LLM text merging.
+    direct_geo_features: list[dict] = []
+    text_results: dict[str, str] = {}
+    for key, val in non_empty.items():
+        try:
+            parsed = json.loads(val)
+            if isinstance(parsed, dict) and "geojson" in parsed:
+                gj = parsed.get("geojson") or {}
+                if isinstance(gj, dict):
+                    if gj.get("type") == "FeatureCollection":
+                        direct_geo_features.extend(gj.get("features", []))
+                    elif gj.get("type") == "Feature":
+                        direct_geo_features.append(gj)
+                text_results[key] = str(parsed.get("text", val))
+            else:
+                text_results[key] = val
+        except (json.JSONDecodeError, AttributeError):
+            text_results[key] = val
+
+    if len(text_results) == 1:
+        geo_answer = next(iter(text_results.values()))
     else:
         merge_llm = build_llm(get_agent_model_config("geo_agent"), streaming=True)
         context = "\n\n".join(
             f"### {key.replace('_', ' ').title()} Result\n{val}"
-            for key, val in non_empty.items()
+            for key, val in text_results.items()
         )
         merge_prompt = (
             f"User question: {user_query}\n\n"
             f"Geospatial sub-agent results:\n\n{context}\n\n"
             "Synthesise the above results into a single, clear, and well-structured answer. "
-            "Preserve all numeric values, coordinates, and units exactly as provided."
+            "Preserve all numeric values, coordinates, and units exactly as provided. "
+            "Never include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or "
+            "rendering instructions – maps are rendered by the frontend."
         )
         merge_response: AIMessage = await merge_llm.ainvoke(
             [HumanMessage(content=merge_prompt)]
         )
         geo_answer = merge_response.content
+
+    # Re-attach structured GeoJSON so the map agent can retrieve it
+    if direct_geo_features:
+        payload = {
+            "text": str(geo_answer),
+            "geojson": {"type": "FeatureCollection", "features": direct_geo_features},
+        }
+        return {"sub_results": {"geo": json.dumps(payload)}}
 
     return {"sub_results": {"geo": str(geo_answer)}}
