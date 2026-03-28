@@ -3,27 +3,30 @@ Master orchestrator agent (PangIA GeoIA).
 
 Topology
 --------
-        ┌─────────────────────────────────────────────────────────────┐
-        │                    master graph                             │
-        │                                                             │
-  entry ─► router ──[Send fan-out]──► neo4j_agent ───┐               │
-        │          │                                   │               │
-        │          ├──────────────► rdf_agent ─────────┤               │
-        │          │                                   │               │
-        │          ├──────────────► vector_agent ───────┤               │
-        │          │                                   ▼               │
-        │          └──────────────► postgis_agent ──► map_agent        │
-        │                                              │               │
-        │                                       dataviz_agent ──► merge ──► END
-        └─────────────────────────────────────────────────────────────┘
+        ┌──────────────────────────────────────────────────────────────────┐
+        │                        master graph                              │
+        │                                                                  │
+  entry ─► router ──[Send fan-out]──► neo4j_agent ───┐                    │
+        │          │                                   │                    │
+        │          ├──────────────► rdf_agent ─────────┤                    │
+        │          │                                   │                    │
+        │          ├──────────────► vector_agent ───────┤                    │
+        │          │                                   ▼                    │
+        │          └──────────────► postgis_agent ──► post_process_router   │
+        │                                           [Send fan-out]          │
+        │                                        ┌────┴─────┐               │
+        │                                    map_agent  dataviz_agent        │
+        │                                        └────┬─────┘               │
+        │                                           merge ──► END            │
+        └──────────────────────────────────────────────────────────────────┘
 
 The *router* decides which parallel sub-agents (neo4j, rdf, vector, postgis)
 are relevant.  They run concurrently via LangGraph's Send API and each writes
 results into `state["sub_results"]`.  After all parallel agents complete,
-*map_agent* runs sequentially to extract GeoJSON from the accumulated
-sub_results.  Then *dataviz_agent* runs to detect and format any numerical /
-statistical data for visualisation.  Finally *merge* synthesises all results
-into a final answer.
+*post_process_router* acts as a barrier then fans out to *map_agent* **and**
+*dataviz_agent* in parallel (both read `sub_results` independently and write
+to distinct state keys: `geojson` and `dataviz`).  Finally *merge* synthesises
+all results into a final answer once both post-processors have completed.
 
 Only agents that are **enabled** in the application configuration are added to
 the graph.  The user may narrow the parallel agents via `state["selected_agents"]`.
@@ -276,19 +279,43 @@ async def merge_node(state: AgentState) -> dict:
     return {"messages": [response]}
 
 
-# ─── Routing edge ─────────────────────────────────────────────────────────────
+# ─── Routing edges ────────────────────────────────────────────────────────────
 
 def dispatch_agents(state: AgentState):
     """Fan out to selected parallel sub-agents using LangGraph's Send API."""
     agents = state.get("agents_to_call", [])
     if not agents:
-        # No parallel agents – go straight to the first post-processing step
-        if is_map_enabled():
-            return "map_agent"
-        if is_dataviz_enabled():
-            return "dataviz_agent"
+        # No parallel agents – jump straight to post-processing (or merge)
+        if is_map_enabled() or is_dataviz_enabled():
+            return "post_process_router"
         return "merge"
     return [Send(f"{a}_agent", state) for a in agents]
+
+
+def post_process_router_node(state: AgentState) -> dict:
+    """Barrier node that collects all parallel sub-agent results.
+
+    Returns an empty dict (no state mutation); LangGraph uses this node as a
+    synchronisation point before fanning out to map_agent and dataviz_agent
+    in parallel.
+    """
+    return {}
+
+
+def post_process_dispatch(state: AgentState):
+    """Fan out to map_agent and dataviz_agent in parallel via Send.
+
+    Both agents read `sub_results` independently so they can safely run
+    concurrently.  Each writes to a distinct state key (`geojson` / `dataviz`).
+    """
+    sends = []
+    if is_map_enabled():
+        sends.append(Send("map_agent", state))
+    if is_dataviz_enabled():
+        sends.append(Send("dataviz_agent", state))
+    if sends:
+        return sends
+    return "merge"
 
 
 # ─── Graph construction ───────────────────────────────────────────────────────
@@ -297,15 +324,15 @@ def build_graph():
     """Build and compile the master LangGraph workflow.
 
     Parallel sub-agents (neo4j, rdf, vector, postgis) fan out from the router.
-    After ALL parallel agents complete (LangGraph barrier), the map_agent node
-    runs sequentially to extract GeoJSON from their sub_results.  Then the
-    dataviz_agent runs to detect and format numerical data for visualisation.
-    Finally, the merge node synthesises a conversational answer.
+    After ALL parallel agents complete (LangGraph barrier at post_process_router),
+    map_agent and dataviz_agent run **in parallel** – both read sub_results
+    independently and write to distinct state keys (geojson / dataviz).
+    Finally, the merge node synthesises a conversational answer once both
+    post-processors have completed.
 
-    If MAP_AGENT_ENABLED is False, parallel agents route directly to dataviz
-    (or merge if dataviz is also disabled).
-    If DATAVIZ_AGENT_ENABLED is False, the pipeline proceeds directly to merge
-    after the map step (or the parallel agents if map is also disabled).
+    If MAP_AGENT_ENABLED is False, only dataviz_agent runs after the barrier.
+    If DATAVIZ_AGENT_ENABLED is False, only map_agent runs after the barrier.
+    If both are disabled, the pipeline proceeds directly to merge.
     """
     active = get_active_agents()
     map_enabled = is_map_enabled()
@@ -317,22 +344,26 @@ def build_graph():
     workflow.add_node("router", router_node)
     workflow.add_node("merge", merge_node)
 
-    # Determine the sequential post-processing pipeline after parallel agents
-    # Order: parallel → [map_agent] → [dataviz_agent] → merge
-    if map_enabled and dataviz_enabled:
-        convergence_node = "map_agent"
-        workflow.add_node("map_agent", map_run)
-        workflow.add_node("dataviz_agent", dataviz_run)
-        workflow.add_edge("map_agent", "dataviz_agent")
-        workflow.add_edge("dataviz_agent", "merge")
-    elif map_enabled:
-        convergence_node = "map_agent"
-        workflow.add_node("map_agent", map_run)
-        workflow.add_edge("map_agent", "merge")
-    elif dataviz_enabled:
-        convergence_node = "dataviz_agent"
-        workflow.add_node("dataviz_agent", dataviz_run)
-        workflow.add_edge("dataviz_agent", "merge")
+    # Post-processing: map_agent and dataviz_agent run in parallel after sub-agents
+    if map_enabled or dataviz_enabled:
+        convergence_node = "post_process_router"
+        workflow.add_node("post_process_router", post_process_router_node)
+
+        post_process_targets: list[str] = []
+        if map_enabled:
+            workflow.add_node("map_agent", map_run)
+            workflow.add_edge("map_agent", "merge")
+            post_process_targets.append("map_agent")
+        if dataviz_enabled:
+            workflow.add_node("dataviz_agent", dataviz_run)
+            workflow.add_edge("dataviz_agent", "merge")
+            post_process_targets.append("dataviz_agent")
+
+        workflow.add_conditional_edges(
+            "post_process_router",
+            post_process_dispatch,
+            post_process_targets + ["merge"],
+        )
     else:
         convergence_node = "merge"
 
@@ -349,7 +380,7 @@ def build_graph():
     workflow.add_conditional_edges(
         "router",
         dispatch_agents,
-        active_node_names + [convergence_node],
+        active_node_names + [convergence_node, "merge"],
     )
     workflow.add_edge("merge", END)
 

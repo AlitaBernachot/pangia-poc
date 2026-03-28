@@ -44,16 +44,19 @@ User query  +  selected_agents? (optional)
 │                                       └──────────────────────┘   │
 │                          (barrier: wait for all parallel agents)  │
 │                                               │                  │
-│                                       ┌───────▼──────────┐       │
-│                                       │   map_agent      │       │
-│                                       │ (GeoJSON / map)  │       │
-│                                       └───────┬──────────┘       │
-│                                               │                  │
-│                                       ┌───────▼──────────┐       │
-│                                       │  dataviz_agent   │       │
-│                                       │ (charts/KPI/tbl) │       │
-│                                       └───────┬──────────┘       │
-│                                               │                  │
+│                                  post_process_router             │
+│                                  (synchronisation barrier)       │
+│                             ┌─────────┴──────────┐              │
+│                             │  Send fan-out       │              │
+│                    ┌────────▼────────┐  ┌─────────▼──────────┐  │
+│                    │   map_agent     │  │   dataviz_agent    │  │
+│                    │ (GeoJSON / map) │  │ (charts/KPI/tbl)   │  │
+│                    └────────┬────────┘  └─────────┬──────────┘  │
+│                             └─────────┬───────────┘              │
+│                                       │                          │
+│                                       │                          │
+│                                       │ (barrier: wait for both) │
+│                                       │                          │
 │                                       ┌───────▼──────────┐       │
 │                                       │   merge node     │       │
 │                                       │  (synthesise)    │       │
@@ -76,8 +79,13 @@ pool* constrained by two layers:
 
 Within the eligible pool, the router LLM (structured output) picks the agents
 that best suit the query.  Each selected agent runs its own ReAct loop (LLM +
-tools) and writes its result into a shared `sub_results` dict.  The **merge**
-node then synthesises all results into a final streamed answer.
+tools) and writes its result into a shared `sub_results` dict.
+
+After all data-source agents complete, a **`post_process_router`** barrier fans
+out to `map_agent` and `dataviz_agent` **in parallel** (both read `sub_results`
+independently and write to separate state keys: `geojson` and `dataviz`).  The
+**merge** node then waits for both and synthesises all results into a final
+streamed answer.
 
 ### Agent enable / disable flags
 
