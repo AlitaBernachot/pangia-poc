@@ -33,3 +33,8 @@ class AgentState(TypedDict):
     # Structured visualisation data produced by the dataviz agent (None if not invoked).
     # Contains charts, KPI cards, and/or tables ready for the frontend to render.
     dataviz: dict[str, Any] | None
+
+    # Decision produced by the humanoutput_agent about which visualisation
+    # components to render.  Keys: "needs_map" (bool), "needs_dataviz" (bool).
+    # None when the humanoutput_agent is disabled or has not run yet.
+    output_decision: dict[str, Any] | None

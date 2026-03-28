@@ -29,6 +29,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
     - [Agent ReAct loop iterations](#agent-react-loop-iterations)
     - [Per-agent LLM configuration](#per-agent-llm-configuration)
     - [SSE event types](#sse-event-types)
+    - [Human Output Agent](#human-output-agent)
     - [Data Visualisation Agent](#data-visualisation-agent)
     - [Map Agent](#map-agent)
   - [Quick Start](#quick-start)
@@ -80,8 +81,10 @@ User query  +  selected_agents? (optional)
 │                                               │                  │
 │                                  post_process_router             │
 │                                  (synchronisation barrier)       │
+│                                               │                  │
+│                                    humanoutput_agent             │
+│                                  (decides map/dataviz/both)      │
 │                             ┌─────────┴──────────┐              │
-│                             │  Send fan-out       │              │
 │                    ┌────────▼────────┐  ┌─────────▼──────────┐  │
 │                    │   map_agent     │  │   dataviz_agent    │  │
 │                    │ (GeoJSON / map) │  │ (charts/KPI/tbl)   │  │
@@ -115,11 +118,13 @@ Within the eligible pool, the router LLM (structured output) picks the agents
 that best suit the query.  Each selected agent runs its own ReAct loop (LLM +
 tools) and writes its result into a shared `sub_results` dict.
 
-After all data-source agents complete, a **`post_process_router`** barrier fans
-out to `map_agent` and `dataviz_agent` **in parallel** (both read `sub_results`
-independently and write to separate state keys: `geojson` and `dataviz`).  The
-**merge** node then waits for both and synthesises all results into a final
-streamed answer.
+After all data-source agents complete, a **`post_process_router`** barrier routes
+to **`humanoutput_agent`**, which inspects `sub_results` and the user query to
+decide whether a map, charts/tables, both, or neither are appropriate.  It then
+fans out (via Send) only to the agents that are relevant — `map_agent`,
+`dataviz_agent`, or both — and writes its decision to `state["output_decision"]`.
+The **merge** node then waits for all post-processors and synthesises the results
+into a final streamed answer.
 
 ### Agent enable / disable flags
 
@@ -132,6 +137,7 @@ streamed answer.
 | `DATA_GOUV_AGENT_ENABLED` | `true` | French open-data agent (data.gouv.fr via MCP) |
 | `MAP_AGENT_ENABLED` | `true` | Geographic visualisation agent (GeoJSON / Leaflet map) |
 | `DATAVIZ_AGENT_ENABLED` | `true` | Data visualisation agent (charts, KPIs, tables) |
+| `HUMANOUTPUT_AGENT_ENABLED` | `true` | Output decision agent (routes to map/dataviz selectively) |
 
 Set any flag to `false` in `.env` to exclude that agent from all routing decisions.
 The orchestrator always keeps at least one agent active as a fallback (defaults to `neo4j`).
@@ -214,6 +220,28 @@ Leave both variables empty (the default) to use the global `OPENAI_MODEL` for ev
 | `dataviz` | Visualisation payload from the DataViz agent (charts, KPI cards, tables) |
 | `error` | An error occurred |
 | `done` | Stream complete |
+
+### Human Output Agent
+
+The **Human Output Agent** (`humanoutput_agent`) sits **between `post_process_router`
+and `map_agent` / `dataviz_agent`** in the pipeline.  Its job is to analyse the
+data already gathered by the parallel sub-agents (plus the original user query)
+and decide which visualisation components — a map, charts/tables, both, or
+neither — are worth rendering.
+
+**Decision strategy:**
+1. **Fast-path** — if the combined content is empty, skip both visualisation agents.
+2. **Clear heuristics** — strong geo keywords (map, coordinates, GeoJSON…) or
+   dataviz keywords (chart, table, statistics…) resolve each side without an LLM call.
+3. **LLM classification** — when signals are ambiguous (e.g. decimal numbers that
+   could be coordinates *or* statistics), a lightweight LLM call with a structured
+   JSON-output prompt resolves the ambiguity.
+4. **Error fallback** — any exception defaults to `{needs_map: true, needs_dataviz: true}`
+   so downstream agents always have a chance to run.
+
+The agent can be disabled by setting `HUMANOUTPUT_AGENT_ENABLED=false`. When
+disabled the pipeline falls back to calling both `map_agent` and `dataviz_agent`
+unconditionally (legacy behaviour).
 
 ### Data Visualisation Agent
 
@@ -335,6 +363,7 @@ pangia-poc/
 │       │   ├── postgis_agent.py # Spatial SQL sub-agent (PostGIS)
 │       │   ├── map_agent.py     # Map post-processor (GeoJSON)
 │       │   ├── dataviz_agent.py # DataViz post-processor (charts/KPIs/tables)
+│   ├── humanoutput_agent.py # Output decision agent (routes to map/dataviz)
 │       │   └── specialized/
 │       │       ├── data_gouv_agent.py      # French open-data sub-agent (data.gouv.fr MCP)
 │       │       └── geo/

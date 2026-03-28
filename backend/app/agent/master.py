@@ -13,7 +13,9 @@ Topology
         │          ├──────────────► vector_agent ───────┤                    │
         │          │                                   ▼                    │
         │          └──────────────► postgis_agent ──► post_process_router   │
-        │                                           [Send fan-out]          │
+        │                                                │                  │
+        │                                         humanoutput_agent         │
+        │                                        [decides map/dataviz]      │
         │                                        ┌────┴─────┐               │
         │                                    map_agent  dataviz_agent        │
         │                                        └────┬─────┘               │
@@ -23,10 +25,9 @@ Topology
 The *router* decides which parallel sub-agents (neo4j, rdf, vector, postgis)
 are relevant.  They run concurrently via LangGraph's Send API and each writes
 results into `state["sub_results"]`.  After all parallel agents complete,
-*post_process_router* acts as a barrier then fans out to *map_agent* **and**
-*dataviz_agent* in parallel (both read `sub_results` independently and write
-to distinct state keys: `geojson` and `dataviz`).  Finally *merge* synthesises
-all results into a final answer once both post-processors have completed.
+*post_process_router* acts as a barrier then routes to *humanoutput_agent*
+which inspects the data and decides whether to call *map_agent*, *dataviz_agent*,
+both, or neither.  Finally *merge* synthesises all results into a final answer.
 
 Only agents that are **enabled** in the application configuration are added to
 the graph.  The user may narrow the parallel agents via `state["selected_agents"]`.
@@ -39,6 +40,7 @@ from langgraph.types import Send
 from pydantic import BaseModel
 
 from app.agent.dataviz_agent import run as dataviz_run
+from app.agent.humanoutput_agent import run as humanoutput_run
 from app.agent.map_agent import run as map_run
 from app.agent.model_config import build_llm, get_agent_model_config
 from app.agent.neo4j_agent import run as neo4j_run
@@ -183,6 +185,10 @@ def is_dataviz_enabled() -> bool:
     return get_settings().dataviz_agent_enabled
 
 
+def is_humanoutput_enabled() -> bool:
+    return get_settings().humanoutput_agent_enabled
+
+
 def _build_router_system(available_agents: list[str]) -> str:
     """Build the router system prompt restricted to *available_agents*."""
     agent_list = "\n".join(_AGENT_DESCRIPTIONS[a] for a in available_agents)
@@ -262,6 +268,7 @@ def router_node(state: AgentState) -> dict:
         "sub_results": {},
         "geojson": None,
         "dataviz": None,
+        "output_decision": None,
     }
 
 
@@ -321,13 +328,36 @@ def post_process_router_node(state: AgentState) -> dict:
 def post_process_dispatch(state: AgentState):
     """Fan out to map_agent and dataviz_agent in parallel via Send.
 
-    Both agents read `sub_results` independently so they can safely run
-    concurrently.  Each writes to a distinct state key (`geojson` / `dataviz`).
+    Used only when humanoutput_agent is **disabled**.  Both agents read
+    `sub_results` independently so they can safely run concurrently.  Each
+    writes to a distinct state key (`geojson` / `dataviz`).
     """
     sends = []
     if is_map_enabled():
         sends.append(Send("map_agent", state))
     if is_dataviz_enabled():
+        sends.append(Send("dataviz_agent", state))
+    if sends:
+        return sends
+    return "merge"
+
+
+def humanoutput_dispatch(state: AgentState):
+    """Fan out to map_agent / dataviz_agent based on humanoutput_agent decision.
+
+    Reads ``state["output_decision"]`` written by :func:`humanoutput_run` and
+    dispatches via Send only to the agents that are both **enabled** and
+    **requested** by the decision.  Falls back to dispatching both if the
+    decision key is missing.
+    """
+    decision: dict = state.get("output_decision") or {}
+    needs_map = decision.get("needs_map", True)
+    needs_dataviz = decision.get("needs_dataviz", True)
+
+    sends = []
+    if is_map_enabled() and needs_map:
+        sends.append(Send("map_agent", state))
+    if is_dataviz_enabled() and needs_dataviz:
         sends.append(Send("dataviz_agent", state))
     if sends:
         return sends
@@ -341,18 +371,23 @@ def build_graph():
 
     Parallel sub-agents (neo4j, rdf, vector, postgis) fan out from the router.
     After ALL parallel agents complete (LangGraph barrier at post_process_router),
-    map_agent and dataviz_agent run **in parallel** – both read sub_results
-    independently and write to distinct state keys (geojson / dataviz).
-    Finally, the merge node synthesises a conversational answer once both
+    the optional *humanoutput_agent* analyses the results and decides which
+    visualisation agents to invoke.  When enabled it routes selectively to
+    *map_agent*, *dataviz_agent*, both, or neither.  When disabled the pipeline
+    falls back to calling both unconditionally (legacy behaviour).
+
+    Finally, the merge node synthesises a conversational answer once all
     post-processors have completed.
 
-    If MAP_AGENT_ENABLED is False, only dataviz_agent runs after the barrier.
-    If DATAVIZ_AGENT_ENABLED is False, only map_agent runs after the barrier.
-    If both are disabled, the pipeline proceeds directly to merge.
+    If MAP_AGENT_ENABLED is False, map_agent is never added to the graph.
+    If DATAVIZ_AGENT_ENABLED is False, dataviz_agent is never added.
+    If HUMANOUTPUT_AGENT_ENABLED is False, the decision step is skipped.
+    If both map and dataviz are disabled, the pipeline proceeds directly to merge.
     """
     active = get_active_agents()
     map_enabled = is_map_enabled()
     dataviz_enabled = is_dataviz_enabled()
+    humanoutput_enabled = is_humanoutput_enabled()
 
     workflow = StateGraph(AgentState)
 
@@ -360,7 +395,8 @@ def build_graph():
     workflow.add_node("router", router_node)
     workflow.add_node("merge", merge_node)
 
-    # Post-processing: map_agent and dataviz_agent run in parallel after sub-agents
+    # Post-processing: map_agent and dataviz_agent run in parallel after sub-agents,
+    # optionally gated by humanoutput_agent which decides which ones to invoke.
     if map_enabled or dataviz_enabled:
         convergence_node = "post_process_router"
         workflow.add_node("post_process_router", post_process_router_node)
@@ -375,11 +411,23 @@ def build_graph():
             workflow.add_edge("dataviz_agent", "merge")
             post_process_targets.append("dataviz_agent")
 
-        workflow.add_conditional_edges(
-            "post_process_router",
-            post_process_dispatch,
-            post_process_targets + ["merge"],
-        )
+        if humanoutput_enabled:
+            # humanoutput_agent sits between post_process_router and map/dataviz.
+            # It decides which visualisation agents to call based on data content.
+            workflow.add_node("humanoutput_agent", humanoutput_run)
+            workflow.add_edge("post_process_router", "humanoutput_agent")
+            workflow.add_conditional_edges(
+                "humanoutput_agent",
+                humanoutput_dispatch,
+                post_process_targets + ["merge"],
+            )
+        else:
+            # Legacy behaviour: always call both if enabled
+            workflow.add_conditional_edges(
+                "post_process_router",
+                post_process_dispatch,
+                post_process_targets + ["merge"],
+            )
     else:
         convergence_node = "merge"
 

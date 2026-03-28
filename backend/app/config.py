@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     data_gouv_agent_enabled: bool = True
     dataviz_agent_enabled: bool = True
     geo_agent_enabled: bool = True
+    humanoutput_agent_enabled: bool = True
 
     # Maximum number of LLM+tool iterations (ReAct loop) per agent.
     # Each iteration = one LLM call + zero or more tool calls.
@@ -71,6 +72,7 @@ class Settings(BaseSettings):
     data_gouv_agent_max_iterations: int = 0
     dataviz_agent_max_iterations: int = 0
     geo_agent_max_iterations: int = 0
+    humanoutput_agent_max_iterations: int = 0
     geo_address_agent_max_iterations: int = 0
     geo_spatial_parser_agent_max_iterations: int = 0
     geo_distance_agent_max_iterations: int = 0
@@ -107,6 +109,8 @@ class Settings(BaseSettings):
     data_gouv_agent_model_name: str = ""
     dataviz_agent_model_provider: str = ""
     dataviz_agent_model_name: str = ""
+    humanoutput_agent_model_provider: str = ""
+    humanoutput_agent_model_name: str = ""
     geo_agent_model_provider: str = ""
     geo_agent_model_name: str = ""
     geo_address_agent_model_provider: str = ""
