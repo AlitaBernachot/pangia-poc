@@ -1,0 +1,45 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	router(router)
+	merge(merge)
+	post_process_router(post_process_router)
+	mapviz_agent(mapviz_agent)
+	dataviz_agent(dataviz_agent)
+	humanoutput_agent(humanoutput_agent)
+	neo4j_agent(neo4j_agent)
+	rdf_agent(rdf_agent)
+	vector_agent(vector_agent)
+	postgis_agent(postgis_agent)
+	data_gouv_agent(data_gouv_agent)
+	geo_agent(geo_agent)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> router;
+	data_gouv_agent --> post_process_router;
+	dataviz_agent --> merge;
+	geo_agent --> post_process_router;
+	humanoutput_agent -.-> dataviz_agent;
+	humanoutput_agent -.-> mapviz_agent;
+	humanoutput_agent -.-> merge;
+	mapviz_agent --> merge;
+	neo4j_agent --> post_process_router;
+	post_process_router --> humanoutput_agent;
+	postgis_agent --> post_process_router;
+	rdf_agent --> post_process_router;
+	router -.-> data_gouv_agent;
+	router -.-> geo_agent;
+	router -.-> merge;
+	router -.-> neo4j_agent;
+	router -.-> post_process_router;
+	router -.-> postgis_agent;
+	router -.-> rdf_agent;
+	router -.-> vector_agent;
+	vector_agent --> post_process_router;
+	merge --> __end__;
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc
