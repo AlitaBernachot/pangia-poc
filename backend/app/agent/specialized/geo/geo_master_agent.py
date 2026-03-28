@@ -41,20 +41,20 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from pydantic import BaseModel
 
 from app.agent.model_config import build_llm, get_agent_model_config
-from app.agent.specialized.geo_address_agent import run as geo_address_run
-from app.agent.specialized.geo_area_agent import run as geo_area_run
-from app.agent.specialized.geo_buffer_agent import run as geo_buffer_run
-from app.agent.specialized.geo_distance_agent import run as geo_distance_run
-from app.agent.specialized.geo_elevation_agent import run as geo_elevation_run
-from app.agent.specialized.geo_geometry_ops_agent import run as geo_geometry_ops_run
-from app.agent.specialized.geo_hotspot_agent import run as geo_hotspot_run
-from app.agent.specialized.geo_intersection_agent import run as geo_intersection_run
-from app.agent.specialized.geo_isochrone_agent import run as geo_isochrone_run
-from app.agent.specialized.geo_proximity_agent import run as geo_proximity_run
-from app.agent.specialized.geo_shortest_path_agent import run as geo_shortest_path_run
-from app.agent.specialized.geo_spatial_parser_agent import run as geo_spatial_parser_run
-from app.agent.specialized.geo_temporal_agent import run as geo_temporal_run
-from app.agent.specialized.geo_viewshed_agent import run as geo_viewshed_run
+from app.agent.specialized.geo.geo_address_agent import run as geo_address_run
+from app.agent.specialized.geo.geo_area_agent import run as geo_area_run
+from app.agent.specialized.geo.geo_buffer_agent import run as geo_buffer_run
+from app.agent.specialized.geo.geo_distance_agent import run as geo_distance_run
+from app.agent.specialized.geo.geo_elevation_agent import run as geo_elevation_run
+from app.agent.specialized.geo.geo_geometry_ops_agent import run as geo_geometry_ops_run
+from app.agent.specialized.geo.geo_hotspot_agent import run as geo_hotspot_run
+from app.agent.specialized.geo.geo_intersection_agent import run as geo_intersection_run
+from app.agent.specialized.geo.geo_isochrone_agent import run as geo_isochrone_run
+from app.agent.specialized.geo.geo_proximity_agent import run as geo_proximity_run
+from app.agent.specialized.geo.geo_shortest_path_agent import run as geo_shortest_path_run
+from app.agent.specialized.geo.geo_spatial_parser_agent import run as geo_spatial_parser_run
+from app.agent.specialized.geo.geo_temporal_agent import run as geo_temporal_run
+from app.agent.specialized.geo.geo_viewshed_agent import run as geo_viewshed_run
 from app.agent.state import AgentState
 
 # ─── Sub-agent registry ───────────────────────────────────────────────────────

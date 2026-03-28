@@ -331,21 +331,22 @@ pangia-poc/
 │       │   ├── dataviz_agent.py # DataViz post-processor (charts/KPIs/tables)
 │       │   └── specialized/
 │       │       ├── data_gouv_agent.py      # French open-data sub-agent (data.gouv.fr MCP)
-│       │       ├── geo_agent.py            # Geospatial orchestrator (routes to geo sub-agents)
-│       │       ├── geo_address_agent.py    # L1: Geocoder – address ↔ coordinates
-│       │       ├── geo_spatial_parser_agent.py # L1: SpatialParser – NL spatial understanding
-│       │       ├── geo_distance_agent.py   # L1: DistanceCalc – great-circle distances
-│       │       ├── geo_buffer_agent.py     # L1: BufferAnalyser – circular buffer zones
-│       │       ├── geo_isochrone_agent.py  # L1: Isochrone – accessibility zone estimation
-│       │       ├── geo_proximity_agent.py  # L2: Proximity – nearest-entity search
-│       │       ├── geo_intersection_agent.py # L2: Intersection – spatial overlap analysis
-│       │       ├── geo_area_agent.py       # L2: AreaCalculator – polygon surface areas
-│       │       ├── geo_hotspot_agent.py    # L2: Hotspot – cluster detection & density
-│       │       ├── geo_shortest_path_agent.py # L2: ShortestPath – route optimisation
-│       │       ├── geo_elevation_agent.py  # L3: Elevation – altitude retrieval (Open-Meteo)
-│       │       ├── geo_geometry_ops_agent.py # L3: GeometryOps – GeoJSON transformations
-│       │       ├── geo_temporal_agent.py   # L3: TemporalAnalyst – spatio-temporal patterns
-│       │       └── geo_viewshed_agent.py   # L3: Viewshed – geometric visibility analysis
+│       │       └── geo/
+│       │           ├── geo_master_agent.py         # Geospatial orchestrator (routes to geo sub-agents)
+│       │           ├── geo_address_agent.py         # L1: Geocoder – address ↔ coordinates
+│       │           ├── geo_spatial_parser_agent.py  # L1: SpatialParser – NL spatial understanding
+│       │           ├── geo_distance_agent.py        # L1: DistanceCalc – great-circle distances
+│       │           ├── geo_buffer_agent.py          # L1: BufferAnalyser – circular buffer zones
+│       │           ├── geo_isochrone_agent.py       # L1: Isochrone – accessibility zone estimation
+│       │           ├── geo_proximity_agent.py       # L2: Proximity – nearest-entity search
+│       │           ├── geo_intersection_agent.py    # L2: Intersection – spatial overlap analysis
+│       │           ├── geo_area_agent.py            # L2: AreaCalculator – polygon surface areas
+│       │           ├── geo_hotspot_agent.py         # L2: Hotspot – cluster detection & density
+│       │           ├── geo_shortest_path_agent.py   # L2: ShortestPath – route optimisation
+│       │           ├── geo_elevation_agent.py       # L3: Elevation – altitude retrieval (Open-Meteo)
+│       │           ├── geo_geometry_ops_agent.py    # L3: GeometryOps – GeoJSON transformations
+│       │           ├── geo_temporal_agent.py        # L3: TemporalAnalyst – spatio-temporal patterns
+│       │           └── geo_viewshed_agent.py        # L3: Viewshed – geometric visibility analysis
 │       └── db/
 │           ├── neo4j_client.py
 │           ├── graphdb_client.py
@@ -487,7 +488,7 @@ Sub-agents live in `backend/app/agent/`.  To add one:
 
 ## Geo Agent – Geospatial Analysis
 
-The **Geo Agent** (`backend/app/agent/specialized/geo_agent.py`) is a specialised
+The **Geo Agent** (`backend/app/agent/specialized/geo/geo_master_agent.py`) is a specialised
 orchestrator for advanced geospatial analysis tasks.  It is available as a parallel
 sub-agent in the master orchestrator (enabled by default via `GEO_AGENT_ENABLED=true`).
 

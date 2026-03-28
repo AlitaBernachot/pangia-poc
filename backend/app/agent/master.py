@@ -45,7 +45,7 @@ from app.agent.neo4j_agent import run as neo4j_run
 from app.agent.postgis_agent import run as postgis_run
 from app.agent.rdf_agent import run as rdf_run
 from app.agent.specialized.data_gouv_agent import run as data_gouv_run
-from app.agent.specialized.geo_agent import run as geo_run
+from app.agent.specialized.geo.geo_master_agent import run as geo_run
 from app.agent.state import AgentState
 from app.agent.vector_agent import run as vector_run
 from app.config import get_settings
