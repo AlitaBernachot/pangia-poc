@@ -42,7 +42,7 @@ services:
       - CHROMA_CLIENT_AUTH_PROVIDER=
       - ANONYMIZED_TELEMETRY=False
       # PostGIS
-      - POSTGIS_DSN=postgresql://${POSTGIS_USER:-pangia}:${POSTGIS_PASSWORD:-pangia-password}@postgis:5434/${POSTGIS_DB:-pangia}
+      - POSTGIS_DSN=postgresql://${POSTGIS_USER:-pangia}:${POSTGIS_PASSWORD:-pangia-password}@postgis:5432/${POSTGIS_DB:-pangia}
       # Redis
       - REDIS_URL=redis://redis:6379
       # Seeding – enabled by default so dev/demo stacks get sample data;
@@ -137,7 +137,7 @@ services:
   postgis:
     image: postgis/postgis:16-3.4-alpine
     ports:
-      - "5434:5434"
+      - "5434:5432"
     environment:
       - POSTGRES_USER=${POSTGIS_USER:-pangia}
       - POSTGRES_PASSWORD=${POSTGIS_PASSWORD:-pangia-password}

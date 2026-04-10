@@ -8,7 +8,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 |---|---|
 | **Frontend** | Vue 3 + ai-elements-vue, Vite, TypeScript |
 | **Backend** | FastAPI, Server-Sent Events (SSE) |
-| **Orchestration** | LangChain + LangGraph (master agent + 4 sub-agents) |
+| **Orchestration** | LangChain + LangGraph (orchestrator agent + 4 sub-agents) |
 | **Knowledge Graph** | Neo4j (Cypher) |
 | **RDF / Linked Data** | Ontotext GraphDB (SPARQL) |
 | **Vector Search** | ChromaDB (embeddings) |
@@ -55,7 +55,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 
 ## Multi-agent architecture
 
-> 📊 **Mermaid graph:** [`backend/app/agent/mermaid_graph/master_graph.mmd`](backend/app/agent/mermaid_graph/master_graph.mmd)  
+> 📊 **Mermaid graph:** [`backend/app/agent/mermaid_graph/orchestrator_graph.mmd`](backend/app/agent/mermaid_graph/orchestrator_graph.mmd)  
 > The Mermaid workflow graph is auto-generated at startup and kept in sync with the code.
 
 ```
@@ -63,7 +63,7 @@ User query  +  selected_agents? (optional)
     │
     ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                         Master Agent                             │
+│                         Orchestrator Agent                             │
 │                                                                  │
 │  config flags (enabled/disabled)                                 │
 │       ∩  user selection (selected_agents)                        │
@@ -360,7 +360,7 @@ pangia-poc/
 │       │   └── routes.py        # POST /api/chat (SSE), GET /api/suggestions
 │       ├── agent/
 │       │   ├── state.py         # AgentState (messages, agents_to_call, sub_results)
-│       │   ├── master.py        # Master orchestrator (router → fan-out → merge)
+│       │   ├── orchestrator.py  # Orchestrator (router → fan-out → merge)
 │       │   ├── neo4j_agent.py   # Knowledge Graph sub-agent (Cypher)
 │       │   ├── rdf_agent.py     # RDF sub-agent (SPARQL / GraphDB)
 │       │   ├── vector_agent.py  # Vector sub-agent (ChromaDB)
@@ -371,7 +371,7 @@ pangia-poc/
 │       │   └── specialized/
 │       │       ├── data_gouv_agent.py      # French open-data sub-agent (data.gouv.fr MCP)
 │       │       └── geo/
-│       │           ├── geo_master_agent.py         # Geospatial orchestrator (routes to geo sub-agents)
+│       │           ├── geo_orchestrator_agent.py    # Geospatial orchestrator (routes to geo sub-agents)
 │       │           ├── geo_address_agent.py         # L1: Geocoder – address ↔ coordinates
 │       │           ├── geo_spatial_parser_agent.py  # L1: SpatialParser – NL spatial understanding
 │       │           ├── geo_distance_agent.py        # L1: DistanceCalc – great-circle distances
@@ -497,7 +497,7 @@ SEED_THEME=my_theme docker compose up --build
    | `suggestions` | Example prompts shown in the chat UI |
 
 3. **Review the router's agent descriptions and routing rules** in
-   `backend/app/agent/master.py`:
+   `backend/app/agent/orchestrator.py`:
    - `_AGENT_DESCRIPTIONS` — the short capability blurb shown to the router LLM
      for each agent.  If your theme stores data in a way that differs from the
      generic description (e.g. PostGIS holds domain-specific tables with
@@ -521,7 +521,7 @@ Sub-agents live in `backend/app/agent/`.  To add one:
 1. **Create `backend/app/agent/<name>_agent.py`** with an `async def run(state: AgentState) -> dict` function.
    Follow the existing agents as a template (ReAct loop: LLM + tools, write result to `sub_results`).
 
-2. **Connect it to the master orchestrator** in `backend/app/agent/master.py`:
+2. **Connect it to the orchestrator** in `backend/app/agent/orchestrator.py`:
    - Declare it as a valid literal in `RoutingDecision.agents`.
    - Add an import and a `Send` mapping in `fan_out_node`.
    - Register it in `AGENT_LABELS`.
@@ -549,11 +549,11 @@ Sub-agents live in `backend/app/agent/`.  To add one:
 > validated in real conditions.  Disable it via `GEO_AGENT_ENABLED=false` to avoid blocking
 > the backend startup in the meantime.
 
-The **Geo Agent** (`backend/app/agent/specialized/geo/geo_master_agent.py`) is a specialised
+The **Geo Agent** (`backend/app/agent/specialized/geo/geo_orchestrator_agent.py`) is a specialised
 orchestrator for advanced geospatial analysis tasks.  It is available as a parallel
-sub-agent in the master orchestrator (enabled by default via `GEO_AGENT_ENABLED=true`).
+sub-agent in the orchestrator orchestrator (enabled by default via `GEO_AGENT_ENABLED=true`).
 
-When the master router selects `geo`, the Geo Agent uses its own internal LLM router
+When the orchestrator router selects `geo`, the Geo Agent uses its own internal LLM router
 to dispatch to the most appropriate geo sub-agents and merges their outputs.
 
 ### Sub-agent hierarchy
