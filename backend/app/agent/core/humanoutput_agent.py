@@ -36,7 +36,7 @@ import re
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agent.model_config import build_llm, get_agent_model_config
-from app.agent.state import AgentState
+from app.agent.core.state import AgentState
 
 logger = logging.getLogger(__name__)
 

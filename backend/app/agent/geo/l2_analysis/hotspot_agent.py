@@ -24,7 +24,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
-from app.agent.state import AgentState
+from app.agent.core.state import AgentState
 from libs.geo.geodesy import haversine
 from libs.geo.hotspot import centroid as geogeo_centroid
 

@@ -12,7 +12,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
-from app.agent.state import AgentState
+from app.agent.core.state import AgentState
 from app.config import get_settings
 
 _SYSTEM_PROMPT = """You are the data.gouv.fr Open-Data Agent of the PangIA GeoIA platform.

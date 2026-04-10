@@ -20,7 +20,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
-from app.agent.state import AgentState
+from app.agent.core.state import AgentState
 from libs.geo.area import REFERENCE_AREAS_KM2, format_area, spherical_polygon_area
 
 _SYSTEM_PROMPT = """You are the Area Calculation Agent of the PangIA GeoIA platform.
