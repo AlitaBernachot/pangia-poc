@@ -8,7 +8,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 |---|---|
 | **Frontend** | Vue 3 + ai-elements-vue, Vite, TypeScript |
 | **Backend** | FastAPI, Server-Sent Events (SSE) |
-| **Orchestration** | LangChain + LangGraph (orchestrator agent + 4 sub-agents) |
+| **Orchestration** | LangChain + LangGraph (2-stage routing: Intent Parser + Smart Dispatcher + parallel sub-agents) |
 | **Knowledge Graph** | Neo4j (Cypher) |
 | **RDF / Linked Data** | Ontotext GraphDB (SPARQL) |
 | **Vector Search** | ChromaDB (embeddings) |
@@ -29,6 +29,9 @@ A minimal AI agent chat application with a **multi-agent architecture**:
     - [Agent ReAct loop iterations](#agent-react-loop-iterations)
     - [Per-agent LLM configuration](#per-agent-llm-configuration)
     - [SSE event types](#sse-event-types)
+    - [Intent Parser](#intent-parser)
+    - [Smart Dispatcher](#smart-dispatcher)
+    - [Source Registry](#source-registry)
     - [Human Output Agent](#human-output-agent)
     - [Data Visualisation Agent](#data-visualisation-agent)
     - [Map Agent](#map-agent)
@@ -63,64 +66,75 @@ User query  +  selected_agents? (optional)
     │
     ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                         Orchestrator Agent                             │
+│                       Orchestrator Agent                         │
 │                                                                  │
-│  config flags (enabled/disabled)                                 │
-│       ∩  user selection (selected_agents)                        │
-│       = eligible pool                                            │
-│               │                                                  │
-│          ┌────▼────┐   Send fan-out   ┌──────────────────────┐   │
-│          │ router  │─────────────────►│ neo4j_agent          │─┐ │
-│          │ (LLM +  │                  │ (Cypher / Neo4j)     │ │ │
-│          │ struct) │─────────────────►│ rdf_agent            │─┤ │
-│          └─────────┘                  │ (SPARQL / GraphDB)   │ │ │
-│                                       │ vector_agent         │─┤ │
-│                                       │ (Chroma embeddings)  │ │ │
-│                                       │ postgis_agent        │─┤ │
-│                                       │ (PostGIS SQL)        │ │ │
-│                                       │ data_gouv_agent      │─┘ │
-│                                       │ (data.gouv.fr MCP)   │   │
-│                                       └──────────────────────┘   │
-│                          (barrier: wait for all parallel agents)  │
-│                                               │                  │
-│                                  post_process_router             │
-│                                  (synchronisation barrier)       │
-│                                               │                  │
-│                                    humanoutput_agent             │
-│                                  (decides map/dataviz/both)      │
-│                             ┌─────────┴──────────┐              │
-│                    ┌────────▼────────┐  ┌─────────▼──────────┐  │
-│                    │   mapviz_agent   │  │   dataviz_agent    │  │
-│                    │ (GeoJSON / map) │  │ (charts/KPI/tbl)   │  │
-│                    └────────┬────────┘  └─────────┬──────────┘  │
-│                             └─────────┬───────────┘              │
-│                                       │                          │
-│                                       │                          │
-│                                       │ (barrier: wait for both) │
-│                                       │                          │
-│                                       ┌───────▼──────────┐       │
-│                                       │   merge node     │       │
-│                                       │  (synthesise)    │       │
-│                                       └───────┬──────────┘       │
-└───────────────────────────────────────────────┼──────────────────┘
-                                                ▼
-                                         Streamed answer (SSE)
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  intent_parser  (heuristics + LLM structured output)     │   │
+│  │  → ParsedIntent (intent_type, entities, geo_zone …)      │   │
+│  └─────────────────────────┬────────────────────────────────┘   │
+│           [INTENT_PARSER_ENABLED – default: on]                  │
+│  ┌─────────────────────────▼────────────────────────────────┐   │
+│  │  smart_dispatcher  (metadata scoring vs Source Registry)  │   │
+│  │  → agents_to_call  (deterministic, no LLM required)      │   │
+│  └─────────────────────────┬────────────────────────────────┘   │
+│        [SMART_DISPATCHER_ENABLED – default: on]                  │
+│        (when off, the LLM router selects agents instead)         │
+│                            │ Send fan-out                        │
+│          ┌─────────────────┼──────────────────┐                 │
+│  ┌───────▼──────┐  ┌───────▼────────┐  ┌──────▼───────┐        │
+│  │ neo4j_agent  │  │   rdf_agent    │  │ postgis / …  │        │
+│  │(Cypher/Neo4j)│  │(SPARQL/GraphDB)│  │ vector / geo │        │
+│  └───────┬──────┘  └───────┬────────┘  └──────┬───────┘        │
+│          └─────────────────┼──────────────────┘                 │
+│                   (barrier: wait for all parallel agents)        │
+│                            │                                     │
+│                   post_process_router                            │
+│                            │                                     │
+│                   humanoutput_agent                              │
+│                   (decides map / dataviz / both)                 │
+│            ┌───────────────┴──────────────┐                     │
+│   ┌────────▼────────┐        ┌────────────▼──────────┐          │
+│   │  mapviz_agent   │        │    dataviz_agent       │          │
+│   │ (GeoJSON / map) │        │ (charts / KPI / tbl)   │          │
+│   └────────┬────────┘        └────────────┬──────────┘          │
+│            └───────────────┬──────────────┘                     │
+│                         ┌──▼──────────┐                         │
+│                         │  merge node │                         │
+│                         │ (synthesise)│                         │
+│                         └──┬──────────┘                         │
+└────────────────────────────┼─────────────────────────────────────┘
+                             ▼
+                      Streamed answer (SSE)
 ```
 
-The **router** selects the minimum set of relevant sub-agents from an *eligible
-pool* constrained by two layers:
+The query passes through up to two **preparatory stages** before being fanned
+out to the data-source connectors:
 
-1. **Server-side config** — each sub-agent can be individually enabled or
-   disabled via environment variables (all default to `true`).  Disabled agents
-   are excluded from the graph entirely.
+1. **Intent Parser** (`intent_parser`) — extracts a structured `ParsedIntent`
+   (intent type, named entities, geographic zone, temporal range, natural language
+   intention, detected language, confidence) using fast heuristics followed by an
+   LLM structured-output call when needed.  Enabled by `INTENT_PARSER_ENABLED`
+   (default `true`).
+
+2. **Smart Dispatcher** (`smart_dispatcher`) — uses the `ParsedIntent` to score
+   every registered source against the **Source Registry** metadata (capability
+   match, topic/entity overlap, geographic scope, semantic similarity via ChromaDB).
+   Returns a ranked `agents_to_call` list **without any LLM call**.  When disabled,
+   the legacy **LLM router** (structured output) selects agents instead.  Enabled
+   by `SMART_DISPATCHER_ENABLED` (default `true`).
+
+Both stages respect two cross-cutting constraints:
+
+1. **Server-side config** — each agent can be individually enabled or disabled via
+   environment variables (all default to `true`).  Disabled agents are excluded
+   from the eligible pool entirely.
 2. **User selection** — a caller can pass `"selected_agents": ["neo4j", "vector"]`
    in the `POST /api/chat` request body to restrict routing to a specific subset.
-   An empty list (or omitting the field) means *"no preference"* — the router
-   considers all active agents.
+   An empty list (or omitting the field) means *"no preference"* — all active
+   agents are considered.
 
-Within the eligible pool, the router LLM (structured output) picks the agents
-that best suit the query.  Each selected agent runs its own ReAct loop (LLM +
-tools) and writes its result into a shared `sub_results` dict.
+Each selected connector runs its own ReAct loop (LLM + tools) and writes its
+result into a shared `sub_results` dict.
 
 After all data-source agents complete, a **`post_process_router`** barrier routes
 to **`humanoutput_agent`**, which inspects `sub_results` and the user query to
@@ -134,14 +148,17 @@ into a final streamed answer.
 
 | Variable | Default | Description |
 |---|---|---|
-| `NEO4J_AGENT_ENABLED` | `true` | Knowledge Graph agent (Cypher / Neo4j) |
-| `RDF_AGENT_ENABLED` | `true` | RDF/Linked Data agent (SPARQL / GraphDB) |
-| `VECTOR_AGENT_ENABLED` | `true` | Semantic search agent (ChromaDB) |
-| `POSTGIS_AGENT_ENABLED` | `true` | Spatial SQL agent (PostGIS) |
-| `DATA_GOUV_AGENT_ENABLED` | `true` | French open-data agent (data.gouv.fr via MCP) |
+| `INTENT_PARSER_ENABLED` | `true` | Stage 1 – query analyser (produces ParsedIntent) |
+| `SMART_DISPATCHER_ENABLED` | `true` | Stage 2 – metadata-based router (replaces LLM router when on) |
+| `NEO4J_AGENT_ENABLED` | `true` | Knowledge Graph connector (Cypher / Neo4j) |
+| `RDF_AGENT_ENABLED` | `true` | RDF/Linked Data connector (SPARQL / GraphDB) |
+| `VECTOR_AGENT_ENABLED` | `true` | Semantic search connector (ChromaDB) |
+| `POSTGIS_AGENT_ENABLED` | `true` | Spatial SQL connector (PostGIS) |
+| `DATA_GOUV_AGENT_ENABLED` | `true` | French open-data connector (data.gouv.fr via MCP) |
+| `GEO_AGENT_ENABLED` | `true` | Geospatial analysis orchestrator (geo sub-agents) |
+| `HUMANOUTPUT_AGENT_ENABLED` | `true` | Output decision agent (routes to map/dataviz selectively) |
 | `MAPVIZ_AGENT_ENABLED` | `true` | Geographic visualisation agent (GeoJSON / Leaflet map) |
 | `DATAVIZ_AGENT_ENABLED` | `true` | Data visualisation agent (charts, KPIs, tables) |
-| `HUMANOUTPUT_AGENT_ENABLED` | `true` | Output decision agent (routes to map/dataviz selectively) |
 
 Set any flag to `false` in `.env` to exclude that agent from all routing decisions.
 The orchestrator always keeps at least one agent active as a fallback (defaults to `neo4j`).
@@ -168,6 +185,7 @@ The number of iterations is configurable at two levels:
 | Variable | Default | Description |
 |---|---|---|
 | `AGENT_MAX_ITERATIONS` | `10` | Global fallback used by all agents |
+| `INTENT_PARSER_AGENT_MAX_ITERATIONS` | `0` | Intent Parser override (0 = use global) |
 | `NEO4J_AGENT_MAX_ITERATIONS` | `0` | Neo4j agent override (0 = use global) |
 | `RDF_AGENT_MAX_ITERATIONS` | `0` | RDF/SPARQL agent override |
 | `VECTOR_AGENT_MAX_ITERATIONS` | `0` | Vector agent override |
@@ -188,7 +206,7 @@ Every agent (including the router and the merge node) can use a **different LLM 
 | `<AGENT>_MODEL_PROVIDER` | `openai`, `anthropic`, `ollama` | Provider for this agent. Leave empty to use the global provider. |
 | `<AGENT>_MODEL_NAME` | `gpt-4o`, `claude-3-5-sonnet-latest`, `llama3` | Model name for this agent. Leave empty to fall back to `OPENAI_MODEL`. |
 
-Available `<AGENT>` prefixes: `ROUTER`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_AGENT`, `POSTGIS_AGENT`, `MAPVIZ_AGENT`, `DATA_GOUV_AGENT`, `DATAVIZ_AGENT`, `MERGE`.
+Available `<AGENT>` prefixes: `ROUTER`, `INTENT_PARSER_AGENT`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_AGENT`, `POSTGIS_AGENT`, `MAPVIZ_AGENT`, `DATA_GOUV_AGENT`, `DATAVIZ_AGENT`, `MERGE`.
 
 Example `.env` — use a powerful model for the router and merge, a cheaper one for sub-agents:
 
@@ -224,6 +242,94 @@ Leave both variables empty (the default) to use the global `OPENAI_MODEL` for ev
 | `dataviz` | Visualisation payload from the DataViz agent (charts, KPI cards, tables) |
 | `error` | An error occurred |
 | `done` | Stream complete |
+
+### Intent Parser
+
+The **Intent Parser** (`intent_parser`) is the **first preparatory stage** of the
+pipeline.  It analyses the raw user query and produces a structured `ParsedIntent`
+before any routing or connector call takes place.
+
+**`ParsedIntent` fields:**
+
+| Field | Type | Description |
+|---|---|---|
+| `intent_type` | string | One of: `geo_search`, `geo_analysis`, `data_retrieval`, `data_analysis`, `comparison`, `temporal`, `description`, `combined`, `unknown` |
+| `entities` | list[str] | Named entities extracted from the query (places, datasets, species, events …) |
+| `geo_zone` | object \| null | Geographic scope — `name` (raw text), `type` (`city` / `region` / `country` / `coordinates` / `generic`), optional `bbox` |
+| `temporal_range` | object \| null | Time scope — `start_date`, `end_date`, `description` (e.g. "2020–2023") |
+| `intention` | string | One-sentence normalised restatement of the query |
+| `language` | string | ISO 639-1 detected language code (`fr`, `en` …) |
+| `confidence` | float | Confidence in [0, 1] |
+
+**Decision strategy:**
+1. **Fast-path** — empty or very short queries skip the LLM entirely and return a
+   low-confidence `unknown` intent.
+2. **Heuristic pre-filter** — four lightweight regex rules detect geo, temporal, stats,
+   and comparison signals to populate the intent type cheaply.
+3. **LLM structured output** — when heuristics are inconclusive a model call with
+   `with_structured_output(ParsedIntent)` resolves the ambiguity.
+4. **Error fallback** — any exception returns a safe default with `confidence: 0.0`
+   so the pipeline never stalls.
+
+The agent can be disabled by setting `INTENT_PARSER_ENABLED=false`.  When disabled,
+`parsed_intent` remains `null` in the state and downstream stages fall back to their
+own logic (Smart Dispatcher uses hard rules only; the LLM router uses its own prompt).
+
+### Smart Dispatcher
+
+The **Smart Dispatcher** (`smart_dispatcher`) is the **second preparatory stage**
+of the pipeline.  It uses the `ParsedIntent` produced by the Intent Parser plus the
+**Source Registry** metadata to deterministically select which connector agents to
+invoke — **without any LLM call**.
+
+**Scoring algorithm** (applied to every registered source):
+
+| Signal | Score |
+|---|---|
+| Agent `capabilities` include a tag matching the detected `intent_type` | +3 |
+| Agent `topics` overlap with extracted `entities` | +2 |
+| Agent `geo_scope` covers the detected geographic zone | +2 |
+| Semantic similarity to the query (ChromaDB) ≥ 0.6 | +1 |
+
+Agents with a total score ≥ 3 are selected.  If no agent reaches the threshold, the
+highest-scoring one is kept as a fallback so the pipeline always has at least one
+connector to call.
+
+The Smart Dispatcher can be disabled by setting `SMART_DISPATCHER_ENABLED=false`,
+in which case the legacy **LLM router** (structured output) takes over agent selection.
+
+### Source Registry
+
+The **Source Registry** (`backend/app/agent/core/source_registry.py`) is the metadata
+catalogue consumed by the Smart Dispatcher.  Every data-source connector declares a
+`SourceEntry` with the following fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | Agent key used in `agents_to_call` (e.g. `neo4j`, `postgis`) |
+| `name` | string | Human-readable label |
+| `capabilities` | list[str] | Capability tags matched against `intent_type` |
+| `topics` | list[str] | Domain keywords for entity-overlap scoring |
+| `geo_scope` | string | `global`, `france`, `local`, or `none` |
+| `description` | string | Free-text description embedded into ChromaDB for semantic search |
+
+**Capability vocabulary:** `graph_query`, `sparql_query`, `semantic_search`,
+`spatial_query`, `open_data`, `geo_analysis`, `geocoding`, `routing`,
+`buffering`, `elevation`, `viewshed`, `temporal_analysis`, `statistics`,
+`data_retrieval`, `data_analysis`, `geo_search`, `comparison`.
+
+**Bootstrap:** at startup (`main.py` lifespan), `bootstrap_registry_embeddings()`
+upserts all registry descriptions into the ChromaDB collection
+`pangia_source_registry`.  If ChromaDB is unavailable, scoring continues using
+only the deterministic rules (the semantic similarity bonus is simply skipped).
+
+**Adding a new source to the registry:**
+
+1. Add a new `SourceEntry` to `SOURCE_REGISTRY` in `source_registry.py`.
+2. Choose `capabilities` that match the intent types your agent handles
+   (see `_INTENT_CAPABILITIES` in `smart_dispatcher.py`).
+3. Restart the backend — `bootstrap_registry_embeddings()` will upsert the new entry
+   automatically on startup.
 
 ### Human Output Agent
 
@@ -362,10 +468,13 @@ pangia-poc/
 │       │   ├── model_config.py      # LLM provider abstraction (per-agent config)
 │       │   ├── graph.py             # Backward-compat shim → core/orchestrator.py
 │       │   ├── core/                # System brains
-│       │   │   ├── state.py         # AgentState (messages, agents_to_call, sub_results)
-│       │   │   ├── orchestrator.py  # Main orchestrator (router → fan-out → merge)
+│       │   │   ├── state.py             # AgentState + ParsedIntent / GeoZone / TemporalRange models
+│       │   │   ├── orchestrator.py      # Main orchestrator (4 pipeline topologies)
 │       │   │   ├── geo_orchestrator.py  # Geospatial sub-orchestrator
-│       │   │   └── humanoutput_agent.py # Output decision (map / dataviz routing)
+│       │   │   ├── humanoutput_agent.py # Output decision (map / dataviz routing)
+│       │   │   ├── intent_parser.py     # Stage 1 – query analysis → ParsedIntent
+│       │   │   ├── smart_dispatcher.py  # Stage 2 – metadata scoring → agents_to_call
+│       │   │   └── source_registry.py   # Source Registry (SourceEntry catalogue + ChromaDB bootstrap)
 │       │   ├── connectors/          # Data-source agents (read-only)
 │       │   │   ├── neo4j_agent.py   # Knowledge Graph sub-agent (Cypher)
 │       │   │   ├── rdf_agent.py     # RDF sub-agent (SPARQL / GraphDB)
@@ -538,7 +647,11 @@ Sub-agents live in `backend/app/agent/`.  To add one:
    - Declare it as a valid literal in `RoutingDecision.agents`.
    - Add an import and a `Send` mapping in `fan_out_node`.
    - Register it in `backend/app/agent/output/synthesis_agent.py → AGENT_LABELS`.
-   - Update `ROUTER_SYSTEM` to include its description and routing rules.
+   - Update `ROUTER_SYSTEM` to include its description and routing rules (used as
+     legacy fallback when `SMART_DISPATCHER_ENABLED=false`).
+   - **Add a `SourceEntry`** to `SOURCE_REGISTRY` in
+     `backend/app/agent/core/source_registry.py` with appropriate `capabilities`,
+     `topics`, and `geo_scope` so the Smart Dispatcher can route to it.
 
 3. **Write a clear `_BASE_SYSTEM_PROMPT`** for the agent. Keep generic query mechanics
    (tool selection, output format, error handling) in the base prompt in the agent file.

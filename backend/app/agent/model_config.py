@@ -113,6 +113,8 @@ def build_llm(config: ModelConfig, *, streaming: bool = False) -> BaseChatModel:
 # Canonical agent names used as prefixes in Settings fields.
 AGENT_NAMES = [
     "router",
+    "intent_parser_agent",
+    "smart_dispatcher_agent",
     "neo4j_agent",
     "rdf_agent",
     "vector_agent",

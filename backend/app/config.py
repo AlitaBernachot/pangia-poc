@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     dataviz_agent_enabled: bool = True
     geo_agent_enabled: bool = True
     humanoutput_agent_enabled: bool = True
+    intent_parser_enabled: bool = True
+    smart_dispatcher_enabled: bool = True
 
     # Maximum number of LLM+tool iterations (ReAct loop) per agent.
     # Each iteration = one LLM call + zero or more tool calls.
@@ -73,6 +75,8 @@ class Settings(BaseSettings):
     dataviz_agent_max_iterations: int = 0
     geo_agent_max_iterations: int = 0
     humanoutput_agent_max_iterations: int = 0
+    intent_parser_agent_max_iterations: int = 0
+    smart_dispatcher_agent_max_iterations: int = 0
     geo_address_agent_max_iterations: int = 0
     geo_spatial_parser_agent_max_iterations: int = 0
     geo_distance_agent_max_iterations: int = 0
@@ -111,6 +115,10 @@ class Settings(BaseSettings):
     dataviz_agent_model_name: str = ""
     humanoutput_agent_model_provider: str = ""
     humanoutput_agent_model_name: str = ""
+    intent_parser_agent_model_provider: str = ""
+    intent_parser_agent_model_name: str = ""
+    smart_dispatcher_agent_model_provider: str = ""
+    smart_dispatcher_agent_model_name: str = ""
     geo_agent_model_provider: str = ""
     geo_agent_model_name: str = ""
     geo_address_agent_model_provider: str = ""

@@ -50,6 +50,8 @@ from app.agent.connectors.postgis_agent import run as postgis_run
 from app.agent.connectors.rdf_agent import run as rdf_run
 from app.agent.connectors.data_gouv_agent import run as data_gouv_run
 from app.agent.core.geo_orchestrator import run as geo_run
+from app.agent.core.intent_parser import run as intent_parser_run
+from app.agent.core.smart_dispatcher import run as smart_dispatcher_run
 from app.agent.core.state import AgentState
 from app.agent.connectors.vector_agent import run as vector_run
 from app.agent.output.synthesis_agent import AGENT_LABELS, merge_node, _last_human_message
@@ -164,6 +166,14 @@ def is_dataviz_enabled() -> bool:
 
 def is_humanoutput_enabled() -> bool:
     return get_settings().humanoutput_agent_enabled
+
+
+def is_intent_parser_enabled() -> bool:
+    return get_settings().intent_parser_enabled
+
+
+def is_smart_dispatcher_enabled() -> bool:
+    return get_settings().smart_dispatcher_enabled
 
 
 def _build_router_system(available_agents: list[str]) -> str:
@@ -309,17 +319,19 @@ def humanoutput_dispatch(state: AgentState):
 def build_graph():
     """Build and compile the orchestrator LangGraph workflow.
 
-    Parallel sub-agents (neo4j, rdf, vector, postgis) fan out from the router.
-    After ALL parallel agents complete (LangGraph barrier at post_process_router),
-    the optional *humanoutput_agent* analyses the results and decides which
-    visualisation agents to invoke.  When enabled it routes selectively to
-    *mapviz_agent*, *dataviz_agent*, both, or neither.  When disabled the pipeline
-    falls back to calling both unconditionally (legacy behaviour).
+    Entry path (evaluated at startup based on config flags):
 
-    Finally, the merge node synthesises a conversational answer once all
-    post-processors have completed.
+    ┌─ INTENT_PARSER_ENABLED + SMART_DISPATCHER_ENABLED (default) ─────────┐
+    │  intent_parser → smart_dispatcher → [fan-out] → … → merge → END      │
+    ├─ INTENT_PARSER_ENABLED only ─────────────────────────────────────────┤
+    │  intent_parser → router → [fan-out] → … → merge → END                │
+    └─ legacy (both disabled) ─────────────────────────────────────────────┘
+       router → [fan-out] → … → merge → END
 
-    If MAPVIZ_AGENT_ENABLED is False, mapviz_agent is never added to the graph.
+    Post-processing (after fan-out barrier):
+      post_process_router → [humanoutput_agent?] → mapviz / dataviz → merge
+
+    If MAPVIZ_AGENT_ENABLED is False, mapviz_agent is never added.
     If DATAVIZ_AGENT_ENABLED is False, dataviz_agent is never added.
     If HUMANOUTPUT_AGENT_ENABLED is False, the decision step is skipped.
     If both map and dataviz are disabled, the pipeline proceeds directly to merge.
@@ -328,15 +340,15 @@ def build_graph():
     map_enabled = is_map_enabled()
     dataviz_enabled = is_dataviz_enabled()
     humanoutput_enabled = is_humanoutput_enabled()
+    intent_parser_enabled = is_intent_parser_enabled()
+    smart_dispatcher_enabled = is_smart_dispatcher_enabled()
 
     workflow = StateGraph(AgentState)
 
-    # Core nodes (always present)
-    workflow.add_node("router", router_node)
+    # ── merge is always present ───────────────────────────────────────────
     workflow.add_node("merge", merge_node)
 
-    # Post-processing: mapviz_agent and dataviz_agent run in parallel after sub-agents,
-    # optionally gated by humanoutput_agent which decides which ones to invoke.
+    # ── Post-processing layer ─────────────────────────────────────────────
     if map_enabled or dataviz_enabled:
         convergence_node = "post_process_router"
         workflow.add_node("post_process_router", post_process_router_node)
@@ -352,8 +364,6 @@ def build_graph():
             post_process_targets.append("dataviz_agent")
 
         if humanoutput_enabled:
-            # humanoutput_agent sits between post_process_router and map/dataviz.
-            # It decides which visualisation agents to call based on data content.
             workflow.add_node("humanoutput_agent", humanoutput_run)
             workflow.add_edge("post_process_router", "humanoutput_agent")
             workflow.add_conditional_edges(
@@ -362,7 +372,6 @@ def build_graph():
                 post_process_targets + ["merge"],
             )
         else:
-            # Legacy behaviour: always call both if enabled
             workflow.add_conditional_edges(
                 "post_process_router",
                 post_process_dispatch,
@@ -371,7 +380,7 @@ def build_graph():
     else:
         convergence_node = "merge"
 
-    # Parallel sub-agent nodes – only for enabled agents
+    # ── Parallel data-source sub-agents ───────────────────────────────────
     active_node_names: list[str] = []
     for agent_key in active:
         node_name, run_fn = _AGENT_NODES[agent_key]
@@ -379,13 +388,34 @@ def build_graph():
         workflow.add_edge(node_name, convergence_node)
         active_node_names.append(node_name)
 
-    # Router → fan-out edge
-    workflow.set_entry_point("router")
-    workflow.add_conditional_edges(
-        "router",
-        dispatch_agents,
-        active_node_names + [convergence_node, "merge"],
-    )
+    fan_out_targets = active_node_names + [convergence_node, "merge"]
+
+    # ── Entry path: intent_parser + smart_dispatcher / router ─────────────
+    if smart_dispatcher_enabled:
+        # smart_dispatcher produces agents_to_call and replaces router
+        workflow.add_node("smart_dispatcher", smart_dispatcher_run)
+        workflow.add_conditional_edges("smart_dispatcher", dispatch_agents, fan_out_targets)
+
+        if intent_parser_enabled:
+            workflow.add_node("intent_parser", intent_parser_run)
+            workflow.add_edge("intent_parser", "smart_dispatcher")
+            workflow.set_entry_point("intent_parser")
+        else:
+            workflow.set_entry_point("smart_dispatcher")
+
+    else:
+        # Legacy LLM-based router
+        workflow.add_node("router", router_node)
+        workflow.add_conditional_edges("router", dispatch_agents, fan_out_targets)
+
+        if intent_parser_enabled:
+            # intent_parser enriches state; router still makes the routing call
+            workflow.add_node("intent_parser", intent_parser_run)
+            workflow.add_edge("intent_parser", "router")
+            workflow.set_entry_point("intent_parser")
+        else:
+            workflow.set_entry_point("router")
+
     workflow.add_edge("merge", END)
 
     return workflow.compile()
