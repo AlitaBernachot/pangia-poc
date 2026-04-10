@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     chroma_port: int = 8001
 
     # PostGIS (Spatial SQL agent)
-    postgis_dsn: str = "postgresql://pangia:pangia-password@localhost:5432/pangia"
+    postgis_dsn: str = "postgresql://pangia:pangia-password@localhost:5434/pangia"
 
     # Redis (sessions)
     redis_url: str = "redis://localhost:6379"

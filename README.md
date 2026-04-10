@@ -314,7 +314,7 @@ docker compose up --build
 | Neo4j Browser | http://localhost:7474 | Knowledge graph |
 | GraphDB Workbench | http://localhost:7200 | RDF triplestore |
 | ChromaDB | http://localhost:8001 | Vector store |
-| PostGIS | localhost:5432 | Spatial database |
+| PostGIS | localhost:5434 | Spatial database |
 | Phoenix UI | http://localhost:6006 | Agent observability (traces & spans) |
 
 ---
