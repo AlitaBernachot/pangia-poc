@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useTranslation, Trans } from 'react-i18next'
 import { ChevronDown, ChevronUp, Globe, Database, Zap, Shield, HelpCircle } from 'lucide-react'
 
 const AGENTS_INFO = [
@@ -62,36 +62,26 @@ export function FaqPage() {
         <div className="bg-white/3 border border-white/8 rounded-xl px-5 py-4 text-sm text-white/70 leading-relaxed space-y-3">
           <p>{t('faq.aboutP1')}</p>
           <p>
-            {t('faq.aboutP2', {
-              defaultValue: '',
-              interpolation: { escapeValue: false },
-            }).split(/<b>|<\/b>/).map((part, i) =>
-              i % 2 === 1 ? <strong key={i} className="text-white/80">{part}</strong> : part
-            )}
+            <Trans
+              i18nKey="faq.aboutP2"
+              components={{ b: <strong className="text-white/80" /> }}
+            />
           </p>
           <p>
-            {t('faq.aboutP3', {
-              defaultValue: '',
-              interpolation: { escapeValue: false },
-            }).split(/<b>|<\/b>|<link>|<\/link>/).map((part, i) => {
-              if (i % 4 === 1 || i % 4 === 3) {
-                if (i % 4 === 3) {
-                  return (
-                    <a
-                      key={i}
-                      href="https://elements.ai-sdk.dev/components/attachments"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-blue-400 underline"
-                    >
-                      {part}
-                    </a>
-                  )
-                }
-                return <strong key={i} className="text-white/80">{part}</strong>
-              }
-              return part
-            })}
+            <Trans
+              i18nKey="faq.aboutP3"
+              components={{
+                b: <strong className="text-white/80" />,
+                link: (
+                  <a
+                    href="https://elements.ai-sdk.dev/components/attachments"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-400 underline"
+                  />
+                ),
+              }}
+            />
           </p>
         </div>
 
@@ -116,31 +106,34 @@ export function FaqPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-white">{t('faq.faqTitle')}</h2>
         <div className="space-y-2">
-          {FAQ_KEYS.map((key, i) => (
-            <div
-              key={key}
-              className="border border-white/8 rounded-xl overflow-hidden bg-white/2"
-            >
-              <button
-                type="button"
-                onClick={() => toggle(i)}
-                className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left text-sm font-medium text-white/80 hover:text-white hover:bg-white/3 transition-colors"
+          {FAQ_KEYS.map((key, i) => {
+            const answerKey = key.replace('q', 'a') as `a${number}`
+            return (
+              <div
+                key={key}
+                className="border border-white/8 rounded-xl overflow-hidden bg-white/2"
               >
-                <span>{t(`faq.questions.${key}`)}</span>
-                {openIndex === i ? (
-                  <ChevronUp size={16} className="text-white/40 shrink-0" />
-                ) : (
-                  <ChevronDown size={16} className="text-white/40 shrink-0" />
-                )}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => toggle(i)}
+                  className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left text-sm font-medium text-white/80 hover:text-white hover:bg-white/3 transition-colors"
+                >
+                  <span>{t(`faq.questions.${key}`)}</span>
+                  {openIndex === i ? (
+                    <ChevronUp size={16} className="text-white/40 shrink-0" />
+                  ) : (
+                    <ChevronDown size={16} className="text-white/40 shrink-0" />
+                  )}
+                </button>
 
-              {openIndex === i && (
-                <div className="px-5 pb-4 text-sm text-white/55 leading-relaxed border-t border-white/6 pt-3">
-                  {t(`faq.answers.a${i}`)}
-                </div>
-              )}
-            </div>
-          ))}
+                {openIndex === i && (
+                  <div className="px-5 pb-4 text-sm text-white/55 leading-relaxed border-t border-white/6 pt-3">
+                    {t(`faq.answers.${answerKey}`)}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       </section>
 
