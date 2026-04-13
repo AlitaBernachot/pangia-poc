@@ -8,6 +8,7 @@ from phoenix.otel import register
 
 from app.api.routes import router
 from app.config import get_settings
+from app.agent.source.source_registry import bootstrap_registry_embeddings
 from app.db.chroma_client import close_client as close_chroma
 from app.db.neo4j_client import close_driver
 from app.db.postgis_client import close_pool
@@ -37,6 +38,9 @@ async def lifespan(app: FastAPI):
             await seed_all()
         except Exception:
             logger.exception("Database seeding failed – continuing startup anyway.")
+    if settings.smart_dispatcher_enabled:
+        logger.info("Bootstrapping source registry embeddings …")
+        await bootstrap_registry_embeddings()
     yield
     # shutdown – close all data-store connections
     await close_driver()

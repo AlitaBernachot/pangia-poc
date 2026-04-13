@@ -48,6 +48,11 @@ async def _get_client():
     return _client
 
 
+async def get_chroma_client():
+    """Return the shared async ChromaDB client (public accessor)."""
+    return await _get_client()
+
+
 async def _get_collection():
     client = await _get_client()
     return await client.get_or_create_collection(

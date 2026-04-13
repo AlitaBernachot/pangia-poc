@@ -1,0 +1,44 @@
+# Agent descriptions used by the legacy LLM router prompt.
+#
+# Each key must match the agent connector key declared in source_registry.yml
+# and orchestrator.py (_AGENT_NODES).
+#
+# Values are free-text descriptions shown to the LLM when it decides which
+# agents to route to. Keep them concise and factual.
+#
+# MCP connectors declared in source_registry.yml do NOT need an entry here —
+# the orchestrator falls back to SourceEntry.description from the registry.
+
+neo4j: >-
+  Knowledge Graph (Cypher queries against Neo4j).
+  Best for: entity relationships, graph traversals, structured facts,
+  discovering entities and their associated locations or sites,
+  relationship chains, co-occurrence, migrations, hierarchies.
+
+rdf: >-
+  RDF/SPARQL (SPARQL queries against GraphDB).
+  Best for: ontologies, linked data, semantic relationships, GeoSPARQL.
+
+vector: >-
+  Semantic search (embedding similarity via ChromaDB).
+  Best for: free-text similarity, document retrieval, concept proximity,
+  general descriptive questions ("tell me about X").
+
+postgis: >-
+  Spatial SQL (PostGIS queries against PostgreSQL).
+  Best for: geometric computations, spatial intersections, distances,
+  area calculations, coordinate transformations, and retrieving entities
+  with their geographic coordinates when precise location data is needed for mapping.
+
+data_gouv: >-
+  French government open-data (data.gouv.fr via MCP).
+  Best for: searching French official datasets, government statistics,
+  public-sector open data, administrative boundaries, environmental records,
+  and any question whose answer is likely in French open data.
+
+geo: >-
+  Advanced geospatial analysis (multi-sub-agent orchestrator).
+  Best for: geocoding addresses, computing distances, buffer zones,
+  isochrones (accessibility zones), proximity searches, spatial intersections,
+  area calculations, hotspot detection, route optimisation, elevation profiles,
+  geometry operations, spatio-temporal analysis, and viewshed estimation.

@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     chroma_port: int = 8001
 
     # PostGIS (Spatial SQL agent)
-    postgis_dsn: str = "postgresql://pangia:pangia-password@localhost:5432/pangia"
+    postgis_dsn: str = "postgresql://pangia:pangia-password@localhost:5434/pangia"
 
     # Redis (sessions)
     redis_url: str = "redis://localhost:6379"
@@ -44,7 +44,10 @@ class Settings(BaseSettings):
     # data.gouv.fr MCP agent
     data_gouv_mcp_url: str = "https://mcp.data.gouv.fr/mcp"
 
-    # Agent enable / disable flags  (master orchestrator is always active)
+    # GeoNetwork MCP agent — URL is declared per-instance in the Source Registry
+    # (see backend/app/agent/core/source_registry.py).
+
+    # Agent enable / disable flags  (orchestrator is always active)
     # Set any of these to false via environment variable to disable that agent.
     neo4j_agent_enabled: bool = True
     rdf_agent_enabled: bool = True
@@ -52,9 +55,12 @@ class Settings(BaseSettings):
     postgis_agent_enabled: bool = True
     mapviz_agent_enabled: bool = True
     data_gouv_agent_enabled: bool = True
+    geonetworkmcp_agent_enabled: bool = True
     dataviz_agent_enabled: bool = True
     geo_agent_enabled: bool = True
     humanoutput_agent_enabled: bool = True
+    intent_parser_enabled: bool = True
+    smart_dispatcher_enabled: bool = True
 
     # Maximum number of LLM+tool iterations (ReAct loop) per agent.
     # Each iteration = one LLM call + zero or more tool calls.
@@ -70,9 +76,12 @@ class Settings(BaseSettings):
     postgis_agent_max_iterations: int = 0
     mapviz_agent_max_iterations: int = 0
     data_gouv_agent_max_iterations: int = 0
+    geonetwork_mcp_agent_max_iterations: int = 0
     dataviz_agent_max_iterations: int = 0
     geo_agent_max_iterations: int = 0
     humanoutput_agent_max_iterations: int = 0
+    intent_parser_agent_max_iterations: int = 0
+    smart_dispatcher_agent_max_iterations: int = 0
     geo_address_agent_max_iterations: int = 0
     geo_spatial_parser_agent_max_iterations: int = 0
     geo_distance_agent_max_iterations: int = 0
@@ -107,10 +116,16 @@ class Settings(BaseSettings):
     mapviz_agent_model_name: str = ""
     data_gouv_agent_model_provider: str = ""
     data_gouv_agent_model_name: str = ""
+    geonetwork_mcp_agent_model_provider: str = ""
+    geonetwork_mcp_agent_model_name: str = ""
     dataviz_agent_model_provider: str = ""
     dataviz_agent_model_name: str = ""
     humanoutput_agent_model_provider: str = ""
     humanoutput_agent_model_name: str = ""
+    intent_parser_agent_model_provider: str = ""
+    intent_parser_agent_model_name: str = ""
+    smart_dispatcher_agent_model_provider: str = ""
+    smart_dispatcher_agent_model_name: str = ""
     geo_agent_model_provider: str = ""
     geo_agent_model_name: str = ""
     geo_address_agent_model_provider: str = ""

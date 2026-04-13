@@ -3,7 +3,7 @@
 # on:
 #   push:
 #     paths:
-#       - "backend/app/agent/master.py"
+#       - "backend/app/agent/orchestrator.py"
 #       - "backend/app/agent/generate_graph.py"
 #       - ".github/workflows/generate-agent-graph.yml"
 

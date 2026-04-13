@@ -7,8 +7,8 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
 from pydantic import BaseModel
 
-from app.agent.master import agent_graph, get_active_agents
-from app.agent.state import AgentState
+from app.agent.core.orchestrator import agent_graph, get_active_agents
+from app.agent.core.state import AgentState
 from app.db.redis_client import load_session, save_session
 from app.db.themes import get_active_theme
 
