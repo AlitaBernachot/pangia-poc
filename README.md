@@ -1,6 +1,6 @@
-![PangIA Banner](docs/banner.png)
+![PangIA Banner](docs/pangIA_logo.png)
 
-# PangIA – GeoIA Agent 🌍
+# PangIA – Multi-agent system 🌍
 
 A minimal AI agent chat application with a **multi-agent architecture**:
 
@@ -21,7 +21,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 
 ## Table of Contents
 
-- [PangIA – GeoIA Agent 🌍](#pangia--geoia-agent-)
+- [PangIA – Multi-agent system 🌍](#pangia--multi-agent-system-)
   - [Table of Contents](#table-of-contents)
   - [Multi-agent architecture](#multi-agent-architecture)
     - [Agent enable / disable flags](#agent-enable--disable-flags)
@@ -457,7 +457,7 @@ pangia-poc/
 ├── docker-compose.yml
 ├── .env.example
 ├── docs/
-│   └── banner.png
+│   └── pangIA_logo.png
 ├── backend/
 │   ├── Dockerfile
 │   ├── requirements.txt
