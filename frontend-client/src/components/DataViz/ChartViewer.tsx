@@ -3,8 +3,14 @@ import * as d3 from 'd3'
 import type { DataVizChart } from '../../types'
 
 const PALETTE = [
-  '#e879f9', '#818cf8', '#38bdf8', '#4ade80',
-  '#fbbf24', '#fb923c', '#f43f5e', '#a78bfa',
+  '#38bdf8', // sky-400  — bleu ciel vif
+  '#1e3a5f', // bleu marine foncé
+  '#22d3ee', // cyan-400 — turquoise
+  '#0f4c81', // bleu roi profond
+  '#7dd3fc', // sky-300  — bleu pâle
+  '#0e7490', // cyan-700 — cyan foncé
+  '#bae6fd', // sky-200  — bleu très clair
+  '#155e75', // cyan-800 — profond
 ]
 
 interface Props {

@@ -15,7 +15,7 @@ export function Sidebar() {
       {/* User avatar */}
       <div
         title="User"
-        className="size-9 rounded-full bg-yellow-500/20 border border-yellow-500/30 flex items-center justify-center text-sm font-semibold text-yellow-300 select-none"
+        className="size-9 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-sm font-semibold text-cyan-300 select-none"
       >
         U
       </div>

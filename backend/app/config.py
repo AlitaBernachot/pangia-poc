@@ -10,9 +10,14 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173"]
 
-    # LLM
+    # LLM — global defaults
+    # MODEL_PROVIDER / MODEL_NAME are the global fallbacks for every agent.
+    # Per-agent overrides (<AGENT>_MODEL_PROVIDER / <AGENT>_MODEL_NAME) take priority.
+    model_provider: str = "openai"
+    model_name: str = "gpt-4o-mini"
+    
     openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
+    openai_model: str = ""  # Deprecated – prefer MODEL_NAME
     openai_temperature: float = 0.0
 
     # Neo4j (Knowledge Graph agent)
@@ -100,7 +105,7 @@ class Settings(BaseSettings):
     # Per-agent model configuration
     # For each agent set <AGENT>_MODEL_PROVIDER and <AGENT>_MODEL_NAME to
     # override the model used by that agent.  Leave empty ("") to fall back to
-    # the global OPENAI_MODEL / OPENAI_API_KEY values above.
+    # the global MODEL_PROVIDER / MODEL_NAME values above.
     # Supported providers: "openai" (default), "anthropic", "ollama".
     router_model_provider: str = ""
     router_model_name: str = ""
@@ -162,6 +167,9 @@ class Settings(BaseSettings):
     # Arize Phoenix (agent observability)
     phoenix_collector_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project_name: str = "pangia-geoia"
+
+    # Ollama (local LLM server)
+    ollama_base_url: str = "http://localhost:11434"
 
 
 @lru_cache

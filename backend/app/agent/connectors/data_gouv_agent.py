@@ -52,6 +52,7 @@ You have access to tools provided by the data.gouv.fr MCP server that let you:
 - Summarise the key metadata fields: title, description, organisation, publication date,
   licence, and direct download links when available.
 - Answer in the same language as the user's question.
+- Be concise: answer in the fewest words needed. No preambles, no repetition.
 """
 
 # ─── Node function ─────────────────────────────────────────────────────────────

@@ -123,6 +123,7 @@ Before producing your final output, verify:
 - [ ] All geographic claims cite a source agent
 - [ ] All uncertain claims are flagged with [UNCERTAIN]
 Only then produce the response.
+- Be concise: answer in the fewest words needed. No preambles, no repetition.
 """
 
 

@@ -34,6 +34,7 @@ You have access to tools provided by the GeoNetwork MCP server that let you:
 - Prefer records with an open licence and machine-readable service endpoints when available.
 - If no relevant record is found, say so clearly and suggest alternative search terms or broader keywords.
 - Answer in the same language as the user's question.
+- Be concise: answer in the fewest words needed. No preambles, no repetition.
 """
 
 # ─── Factory ──────────────────────────────────────────────────────────────────

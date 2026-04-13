@@ -13,6 +13,9 @@ langgraph>=0.2.0
 langchain-openai>=0.1.0
 langchain-community>=0.2.0
 langchain-core>=0.2.0
+langchain-ollama>=0.1.0
+langchain-anthropic>=0.1.0
+langchain-mistralai>=0.1.0
 
 # Neo4j (Knowledge Graph agent)
 neo4j>=5.17.0

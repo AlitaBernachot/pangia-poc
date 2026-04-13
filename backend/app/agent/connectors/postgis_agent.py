@@ -27,6 +27,7 @@ ST_Intersects, ST_Within, ST_Area, etc.).
 - Explain the spatial reasoning behind your query.
 - Format numeric results with appropriate units (metres, km², etc.).
 - If the query returns no rows, say so clearly.
+- Be concise: answer in the fewest words needed. No preambles, no repetition.
 {extra_guidelines}"""
 
 

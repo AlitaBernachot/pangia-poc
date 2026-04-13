@@ -56,6 +56,7 @@ FeatureCollection that can be displayed on an interactive map.
 - If no geographic data can be extracted, return:
   {{"geojson": null, "summary": "No geographic data found."}}
 - Keep popup content concise (2–4 lines of plain text or simple HTML).
+- Be concise: answer in the fewest words needed. No preambles, no repetition.
 """
 
 

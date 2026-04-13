@@ -90,6 +90,7 @@ question, then decide whether the data can be meaningfully visualised.
 - Keep KPI values as numbers when possible; include the unit separately.
 - Table columns should be short, clear header strings.
 - Keep all labels concise (≤ 40 characters).
+- Be concise: answer in the fewest words needed. No preambles, no repetition.
 """
 
 

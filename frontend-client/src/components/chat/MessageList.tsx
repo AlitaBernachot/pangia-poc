@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { type Message } from '../../types'
 import { ChatMessage } from './ChatMessage'
-import { Bot } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -40,8 +39,8 @@ export function MessageList({ messages, onSuggestion }: Props) {
       <div className="flex-1 flex flex-col items-center justify-center px-4 gap-8">
         {/* Hero */}
         <div className="text-center space-y-3">
-          <div className="size-16 rounded-2xl bg-yellow-500/15 border border-yellow-500/25 flex items-center justify-center mx-auto">
-            <Bot size={28} className="text-yellow-400" />
+          <div className="flex items-center justify-center mx-auto">
+            <img src="/logo.png" alt="PangIA" className="size-20" />
           </div>
           <h2 className="text-2xl font-semibold text-white">PangIA Assistant</h2>
           <p className="text-white/50 text-sm max-w-sm">

@@ -14,6 +14,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 | **Vector Search** | ChromaDB (embeddings) |
 | **Spatial SQL** | PostgreSQL + PostGIS |
 | **Sessions** | Redis |
+| **Local LLM** | Ollama (Gemma 4, Llama 3, …) |
 | **Observability** | Arize Phoenix (traces, spans, LLM call inspection) |
 | **Infrastructure** | Docker Compose |
 
@@ -53,6 +54,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
     - [Sub-agent hierarchy](#sub-agent-hierarchy)
     - [Configuration](#configuration-1)
     - [Notes](#notes)
+  - [Local LLM with Ollama](docs/ollama-gemma4-setup.md)
 
 ---
 
@@ -227,6 +229,8 @@ VECTOR_CHROMA_AGENT_MODEL_NAME=llama3
 ```
 
 Leave both variables empty (the default) to use the global `OPENAI_MODEL` for every agent.
+
+> 📖 **Using Ollama (local models):** see [`docs/ollama-gemma4-setup.md`](docs/ollama-gemma4-setup.md) for instructions on starting the Ollama service and running Gemma 4 locally.
 
 ### SSE event types
 
@@ -690,6 +694,14 @@ Sub-agents live in `backend/app/agent/`.  To add one:
    (tool selection, output format, error handling) in the base prompt in the agent file.
    Move anything **specific to the active dataset** into the theme's corresponding
    `<store>_guidelines` field so any future theme can override it without touching agent code.
+
+   **Frugality principle** — every system prompt must end with:
+   ```
+   - Be concise: answer in the fewest words needed. No preambles, no repetition.
+   ```
+   This is intentional: PangIA is designed to run on small local models (e.g. `gemma4:e2b`
+   via Ollama) where token budget is precious. Verbose preambles waste inference time and
+   degrade multi-agent throughput. Keep responses dense and direct.
 
 4. **Define the database schema** in the seed theme's `<store>_schema_prompt` field
    (node labels, relationship types, table columns, ontology prefixes, etc.).

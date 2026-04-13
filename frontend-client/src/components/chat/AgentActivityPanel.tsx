@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { type AgentActivity, AGENT_COLORS, agentIcon } from '../../types'
+import { type AgentActivity, AGENT_COLORS } from '../../types'
+import { AgentIcon } from '../AgentIcon'
 import { ChevronDown, ChevronRight, Search } from 'lucide-react'
 
 interface Props {
@@ -23,16 +24,18 @@ export function AgentActivityPanel({ activity }: Props) {
         ) : (
           <ChevronDown size={12} className="text-white/40 shrink-0" />
         )}
-        <span className="text-sm">{agentIcon(activity.agent)}</span>
+        <AgentIcon agent={activity.agent} size={13} />
         <span className="font-medium text-white/80">{activity.agent}</span>
         <span
-          className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] border ${
+          className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
             activity.streaming
-              ? 'text-amber-400 border-amber-400 animate-pulse'
-              : 'text-green-400 border-green-400'
+              ? ''
+              : 'border text-green-400 border-green-400'
           }`}
         >
-          {activity.streaming ? 'Thinking…' : 'Done'}
+          {activity.streaming
+            ? <span className="thinking-indicator">Thinking…</span>
+            : 'Done'}
         </span>
       </button>
 
@@ -47,7 +50,7 @@ export function AgentActivityPanel({ activity }: Props) {
                   key={i}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border ${
                     t.status === 'running'
-                      ? 'text-amber-400 border-amber-400'
+                      ? 'text-cyan-400 border-cyan-400'
                       : 'text-green-400 border-green-400'
                   }`}
                 >
