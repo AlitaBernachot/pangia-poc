@@ -6,7 +6,7 @@ This package centralises the declaration of all **data-source connectors** that 
 
 | File | Role |
 |---|---|
-| `source_registry.yml` | **Canonical data file** — add / edit connectors here |
+| [`backend/config/source_registry.yml`](../../../../config/source_registry.yml) | **Canonical data file** — add / edit connectors here |
 | `source_registry.py` | Python loader — parses the YAML, exposes `SOURCE_REGISTRY` and helpers |
 | `__init__.py` | Package marker |
 
@@ -14,7 +14,7 @@ This package centralises the declaration of all **data-source connectors** that 
 
 ## How it works
 
-At startup `source_registry.py` reads `source_registry.yml` and builds a list of [`SourceEntry`](source_registry.py) Pydantic models.  These entries are then:
+At startup `source_registry.py` reads `backend/config/source_registry.yml` and builds a list of [`SourceEntry`](source_registry.py) Pydantic models.  These entries are then:
 
 1. **Embedded into ChromaDB** (`pangia_source_registry` collection) via `bootstrap_registry_embeddings()` so the Smart Dispatcher can do semantic similarity search on them.
 2. **Iterated by the Orchestrator** to dynamically register MCP-backed connectors (entries where `mcp_url` is set).

@@ -84,7 +84,7 @@ class SourceEntry(BaseModel):
 
 # ─── Registry loader ──────────────────────────────────────────────────────────
 
-_REGISTRY_YAML = Path(__file__).parent / "source_registry.yml"
+_REGISTRY_YAML = Path(__file__).parents[3] / "config" / "source_registry.yml"
 
 
 def _load_registry() -> list[SourceEntry]:

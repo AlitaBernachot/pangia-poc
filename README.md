@@ -300,9 +300,11 @@ in which case the legacy **LLM router** (structured output) takes over agent sel
 
 ### Source Registry
 
-The **Source Registry** (`backend/app/agent/core/source_registry.py`) is the metadata
-catalogue consumed by the Smart Dispatcher.  Every data-source connector declares a
-`SourceEntry` with the following fields:
+The **Source Registry** lives in two files:
+- **`backend/config/source_registry.yml`** — canonical data file, edit this to add/modify connectors.
+- **`backend/app/agent/source/source_registry.py`** — Python loader, exposes `SOURCE_REGISTRY` and helpers.
+
+Every data-source connector declares a `SourceEntry` with the following fields:
 
 | Field | Type | Description |
 |---|---|---|
@@ -325,7 +327,7 @@ only the deterministic rules (the semantic similarity bonus is simply skipped).
 
 **Adding a new source to the registry:**
 
-1. Add a new `SourceEntry` to `SOURCE_REGISTRY` in `source_registry.py`.
+1. Add a new entry to `backend/config/source_registry.yml`.
 2. Choose `capabilities` that match the intent types your agent handles
    (see `_INTENT_CAPABILITIES` in `smart_dispatcher.py`).
 3. Restart the backend — `bootstrap_registry_embeddings()` will upsert the new entry
@@ -459,6 +461,10 @@ pangia-poc/
 ├── backend/
 │   ├── Dockerfile
 │   ├── requirements.txt
+│   ├── config/                  # Runtime configuration files (editable without code changes)
+│   │   ├── source_registry.yml     # Canonical list of data-source connectors (SourceEntry data)
+│   │   ├── agent_descriptions.yml  # Agent descriptions for the legacy LLM router prompt
+│   │   └── orchestrator_config.yml # Router prompt preamble and routing rules
 │   └── app/
 │       ├── main.py              # FastAPI app factory + lifespan
 │       ├── config.py            # Pydantic settings
@@ -473,8 +479,9 @@ pangia-poc/
 │       │   │   ├── geo_orchestrator.py  # Geospatial sub-orchestrator
 │       │   │   ├── humanoutput_agent.py # Output decision (map / dataviz routing)
 │       │   │   ├── intent_parser.py     # Stage 1 – query analysis → ParsedIntent
-│       │   │   ├── smart_dispatcher.py  # Stage 2 – metadata scoring → agents_to_call
-│       │   │   └── source_registry.py   # Source Registry (SourceEntry catalogue + ChromaDB bootstrap)
+│       │   │   └── smart_dispatcher.py  # Stage 2 – metadata scoring → agents_to_call
+│       │   ├── source/              # Source Registry package
+│       │   │   └── source_registry.py   # SourceEntry models + ChromaDB bootstrap (data → backend/config/)
 │       │   ├── connectors/          # Data-source agents (read-only)
 │       │   │   ├── neo4j_agent.py   # Knowledge Graph sub-agent (Cypher)
 │       │   │   ├── rdf_agent.py     # RDF sub-agent (SPARQL / GraphDB)
@@ -649,9 +656,8 @@ Sub-agents live in `backend/app/agent/`.  To add one:
    - Register it in `backend/app/agent/output/synthesis_agent.py → AGENT_LABELS`.
    - Update `ROUTER_SYSTEM` to include its description and routing rules (used as
      legacy fallback when `SMART_DISPATCHER_ENABLED=false`).
-   - **Add a `SourceEntry`** to `SOURCE_REGISTRY` in
-     `backend/app/agent/core/source_registry.py` with appropriate `capabilities`,
-     `topics`, and `geo_scope` so the Smart Dispatcher can route to it.
+   - **Add a `SourceEntry`** to `backend/config/source_registry.yml` with appropriate
+     `capabilities`, `topics`, and `geo_scope` so the Smart Dispatcher can route to it.
 
 3. **Write a clear `_BASE_SYSTEM_PROMPT`** for the agent. Keep generic query mechanics
    (tool selection, output format, error handling) in the base prompt in the agent file.

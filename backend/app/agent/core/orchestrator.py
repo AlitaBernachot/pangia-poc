@@ -34,7 +34,10 @@ the graph.  The user may narrow the parallel agents via `state["selected_agents"
 """
 import logging
 import os
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
@@ -61,60 +64,24 @@ from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-_AGENT_DESCRIPTIONS = {
-    "neo4j": (
-        "  • neo4j   – Knowledge Graph (Cypher queries against Neo4j).\n"
-        "               Best for: entity relationships, graph traversals, structured facts,\n"
-        "               discovering entities and their associated locations or sites,\n"
-        "               relationship chains, co-occurrence, migrations, hierarchies."
-    ),
-    "rdf": (
-        "  • rdf     – RDF/SPARQL (SPARQL queries against GraphDB).\n"
-        "               Best for: ontologies, linked data, semantic relationships, GeoSPARQL."
-    ),
-    "vector": (
-        "  • vector  – Semantic search (embedding similarity via ChromaDB).\n"
-        "               Best for: free-text similarity, document retrieval, concept proximity,\n"
-        "               general descriptive questions (\"tell me about X\")."
-    ),
-    "postgis": (
-        "  • postgis – Spatial SQL (PostGIS queries against PostgreSQL).\n"
-        "               Best for: geometric computations, spatial intersections, distances,\n"
-        "               area calculations, coordinate transformations,\n"
-        "               and retrieving entities with their geographic coordinates\n"
-        "               when precise location data is needed for mapping."
-    ),
-    "data_gouv": (
-        "  • data_gouv – French government open-data (data.gouv.fr via MCP).\n"
-        "               Best for: searching French official datasets, government statistics,\n"
-        "               public-sector open data, administrative boundaries, environmental\n"
-        "               records, and any question whose answer is likely in French open data."
-    ),
-    "geo": (
-        "  • geo       – Advanced geospatial analysis (multi-sub-agent orchestrator).\n"
-        "               Best for: geocoding addresses, computing distances, buffer zones,\n"
-        "               isochrones (accessibility zones), proximity searches, spatial\n"
-        "               intersections, area calculations, hotspot detection, route\n"
-        "               optimisation, elevation profiles, geometry operations,\n"
-        "               spatio-temporal analysis, and viewshed estimation."
-    ),
-}
+_AGENT_DESCRIPTIONS_YAML = Path(__file__).parents[3] / "config" / "agent_descriptions.yml"
+_ORCHESTRATOR_CONFIG_YAML = Path(__file__).parents[3] / "config" / "orchestrator_config.yml"
 
-# Theme-specific routing hints.
-# When adding a new theme, review and update these rules so the router correctly
-# combines agents for domain-specific questions (see README → “Adding a new theme”).
-_EXTRA_ROUTING_RULES = (
-    "  - Questions asking WHERE entities were found, discovered, or are located\n"
-    "    → include BOTH neo4j (relationships) AND postgis (coordinates/geometry).\n"
-    "  - Questions asking to show, map, or visualise locations\n"
-    "    → include BOTH neo4j AND postgis so coordinates are available for the map.\n"
-    "  - Questions about relationships between entities (links, chains, co-occurrence)\n"
-    "    → neo4j.\n"
-    "  - Questions about geocoding, distances, buffers, isochrones, proximity,\n"
-    "    area calculation, hotspot detection, route optimisation, elevation,\n"
-    "    geometry operations, spatio-temporal analysis, or viewshed estimation\n"
-    "    → geo."
-)
+
+def _load_agent_descriptions() -> dict[str, str]:
+    with _AGENT_DESCRIPTIONS_YAML.open(encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def _load_orchestrator_config() -> dict:
+    with _ORCHESTRATOR_CONFIG_YAML.open(encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+_AGENT_DESCRIPTIONS: dict[str, str] = _load_agent_descriptions()
+_ORCHESTRATOR_CONFIG: dict = _load_orchestrator_config()
+
+# Theme-specific routing rules are now in backend/config/orchestrator_config.yml.
 
 # LangGraph node name → run function for each parallel sub-agent.
 # mapviz_agent is intentionally excluded: it always runs sequentially AFTER these
@@ -230,7 +197,7 @@ def _build_router_system(available_agents: list[str]) -> str:
     desc_lines = []
     for a in available_agents:
         if a in _AGENT_DESCRIPTIONS:
-            desc_lines.append(_AGENT_DESCRIPTIONS[a])
+            desc_lines.append(f"  • {a} – {_AGENT_DESCRIPTIONS[a]}")
         else:
             entry = get_entry_by_connector(a)
             desc_lines.append(
@@ -238,21 +205,17 @@ def _build_router_system(available_agents: list[str]) -> str:
             )
     agent_list = "\n".join(desc_lines)
     agent_names = ", ".join(f'"{a}"' for a in available_agents)
+
+    cfg = _ORCHESTRATOR_CONFIG["router_system"]
+    rules = "\n".join(f"  - {r}" for r in cfg["routing_rules"])
+    rules += f'\n  - Only output agent names from: {agent_names}.'
+
     return (
-        "You are the main orchestrator of the PangIA GeoIA platform.\n"
-        "Your role is to analyse a user's geographic question and decide which specialised\n"
-        "sub-agents should be invoked to answer it.\n\n"
+        f"{cfg['intro']}\n\n"
         "Available sub-agents:\n"
         f"{agent_list}\n\n"
         "Rules:\n"
-        "  - Select the minimum set of agents needed to answer the question well.\n"
-        "  - Only select from the available agents listed above.\n"
-        f"{_EXTRA_ROUTING_RULES}\n"
-        "  - A question about semantic similarity alone needs only \"vector\".\n"
-        "  - A question about spatial distance needs only \"postgis\".\n"
-        "  - A complex question might legitimately need several agents.\n"
-        "  - Always include at least one agent.\n"
-        f"  - Only output agent names from: {agent_names}."
+        f"{rules}"
     )
 
 
@@ -482,6 +445,24 @@ def build_graph():
 # Module-level compiled graph reused across requests
 agent_graph = build_graph()
 
+_active = get_active_agents()
+print(
+    "\n"
+    "██████╗  █████╗ ███╗   ██╗ ██████╗ ██╗  █████╗ \n"
+    "██╔══██╗██╔══██╗████╗  ██║██╔════╝ ██║ ██╔══██╗\n"
+    "██████╔╝███████║██╔██╗ ██║██║  ███╗██║ ███████║\n"
+    "██╔═══╝ ██╔══██║██║╚██╗██║██║   ██║██║ ██╔══██║\n"
+    "██║     ██║  ██║██║ ╚████║╚██████╔╝██║ ██║  ██║\n"
+    "╚═╝     ╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝ ╚═╝  ╚═╝  — Geo-AI Platform\n"
+    "\n"
+    f"|  🌍 Orchestrator ready\n"
+    f"|  Active agents : {', '.join(_active)}\n"
+    "|\n"
+    f"|  Config  →  {_AGENT_DESCRIPTIONS_YAML.parent}\n"
+    "|    ↳ source_registry.yml       data-source connector declarations\n"
+    "|    ↳ agent_descriptions.yml    router LLM agent descriptions\n"
+    "|    ↳ orchestrator_config.yml   router prompt & routing rules\n"
+)
 
 # ----------------------------------------
 # Write the Mermaid diagram of the compiled graph to a file for documentation
@@ -494,3 +475,14 @@ with open(_mermaid_path, "w", encoding="utf-8") as _f:
     _f.write(agent_graph.get_graph().draw_mermaid())
 
 logger.info("Mermaid graph written to %s", _mermaid_path)
+
+# ----------------------------------------
+# Log the router system prompt at startup for debugging (agents may vary based on config)
+# ----------------------------------------
+
+_active_agents_at_startup = _active
+logger.debug(
+    "Router system prompt (agents: %s):\n%s",
+    _active_agents_at_startup,
+    _build_router_system(_active_agents_at_startup),
+)
