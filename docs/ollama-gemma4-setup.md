@@ -6,13 +6,16 @@ This guide explains how to run a local **Ollama** server with the **Gemma 4** mo
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Start the Stack](#start-the-stack)
-- [Pull the Gemma 4 Model](#pull-the-gemma-4-model)
-- [Configure Backend Agents to Use Gemma 4](#configure-backend-agents-to-use-gemma-4)
-- [GPU Acceleration (Optional)](#gpu-acceleration-optional)
-- [Running Ollama Outside Docker](#running-ollama-outside-docker)
-- [Troubleshooting](#troubleshooting)
+- [Ollama + Gemma 4 Setup Guide](#ollama--gemma-4-setup-guide)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Create the Ollama Volume (first-time setup)](#create-the-ollama-volume-first-time-setup)
+  - [Start the Stack](#start-the-stack)
+  - [Pull the Gemma 4 Model](#pull-the-gemma-4-model)
+  - [Configure Backend Agents to Use Gemma 4](#configure-backend-agents-to-use-gemma-4)
+  - [GPU Acceleration (Optional)](#gpu-acceleration-optional)
+  - [Running Ollama Outside Docker](#running-ollama-outside-docker)
+  - [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -25,6 +28,24 @@ The Docker Compose stack includes an **Ollama** service that:
 - Is reachable from the backend container at `http://ollama:11434`
 
 The backend `model_config.py` already supports the `ollama` provider via `langchain-ollama`. Setting `<AGENT>_MODEL_PROVIDER=ollama` and `<AGENT>_MODEL_NAME=<model>` for any agent routes that agent's LLM calls to the local Ollama server.
+
+---
+
+## Create the Ollama Volume (first-time setup)
+
+The `ollama_data` volume is declared as **external** in `docker-compose.yml`, which means Docker Compose will **never create or delete it automatically**. This protects downloaded model weights from being wiped by `docker compose down -v`.
+
+Create the volume once before the first `docker compose up`:
+
+```bash
+docker volume create ollama_data
+```
+
+> **Why no project prefix?**
+> Docker Compose only adds the `<project>_` prefix to volumes it **manages itself**. External volumes are referenced by their **exact name** — so the volume must be named `ollama_data`, not `pangia-poc_ollama_data`.
+
+> **`docker compose down -v` safe?**
+> Yes — because the volume is external, `-v` will remove the other volumes (neo4j, postgis, redis…) but will leave `ollama_data` untouched.
 
 ---
 
@@ -99,9 +120,12 @@ Add the following to your `.env` file (copy from `.env.example` as a starting po
 # (already set automatically inside Docker; override only for local dev)
 # OLLAMA_BASE_URL=http://localhost:11434
 
-# ── Use Gemma 4 for specific agents ───────────────────────────────────────────
+# ── Option A: route ALL agents to Gemma 4 via the global fallback ─────────────
+MODEL_PROVIDER=ollama
+MODEL_NAME=gemma4
 
-# Route all agents to Gemma 4 by setting each pair:
+# ── Option B: route specific agents only ──────────────────────────────────────
+# Per-agent settings take priority over the global MODEL_PROVIDER / MODEL_NAME.
 NEO4J_AGENT_MODEL_PROVIDER=ollama
 NEO4J_AGENT_MODEL_NAME=gemma4
 
@@ -123,9 +147,9 @@ DATAVIZ_AGENT_MODEL_NAME=gemma4
 # Router and merge typically benefit from a stronger model.
 # Keep them on OpenAI or point them at a larger Gemma 4 variant:
 # ROUTER_MODEL_PROVIDER=ollama
-# ROUTER_MODEL_NAME=gemma4:27b
+# ROUTER_MODEL_NAME=gemma4:26b
 # MERGE_MODEL_PROVIDER=ollama
-# MERGE_MODEL_NAME=gemma4:27b
+# MERGE_MODEL_NAME=gemma4:26b
 ```
 
 Restart the backend after updating `.env`:

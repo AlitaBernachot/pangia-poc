@@ -29,6 +29,9 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      # Global model fallback (provider + model name used by all agents unless overridden)
+      - MODEL_PROVIDER=${MODEL_PROVIDER:-openai}
+      - MODEL_NAME=${MODEL_NAME:-gpt-4o-mini}
       # Neo4j
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
@@ -222,3 +225,5 @@ volumes:
   redis_data:
   phoenix_data:
   ollama_data:
+    external: true  # Declared external so `docker compose down -v` never deletes it.
+                    # Create it once manually: docker volume create ollama_data

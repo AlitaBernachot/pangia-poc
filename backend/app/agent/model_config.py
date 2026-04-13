@@ -8,6 +8,7 @@ Supported providers
 -------------------
 - ``openai``    – OpenAI chat models (default; requires ``langchain-openai``)
 - ``anthropic`` – Anthropic Claude models (requires ``langchain-anthropic``)
+- ``mistral``   – Mistral AI models (requires ``langchain-mistralai``)
 - ``ollama``    – Locally-hosted models via Ollama (requires ``langchain-ollama``)
 
 Adding a new provider
@@ -34,6 +35,13 @@ try:
     from langchain_anthropic import ChatAnthropic  # type: ignore[import]
 
     PROVIDER_CLASS_MAP["anthropic"] = ChatAnthropic
+except ImportError:
+    pass
+
+try:
+    from langchain_mistralai import ChatMistralAI  # type: ignore[import]
+
+    PROVIDER_CLASS_MAP["mistral"] = ChatMistralAI
 except ImportError:
     pass
 
@@ -148,8 +156,7 @@ def get_agent_model_config(agent_key: str) -> ModelConfig:
 
     Looks up ``<agent_key>_model_provider`` and ``<agent_key>_model_name``
     from the application settings.  Empty or missing values fall back to the
-    global ``openai_model`` / ``openai_api_key`` / ``openai_temperature``
-    settings.
+    global ``model_provider`` / ``model_name`` settings.
 
     Parameters
     ----------
@@ -161,8 +168,8 @@ def get_agent_model_config(agent_key: str) -> ModelConfig:
 
     settings = get_settings()
 
-    provider = getattr(settings, f"{agent_key}_model_provider", "") or "openai"
-    model = getattr(settings, f"{agent_key}_model_name", "") or settings.openai_model
+    provider = getattr(settings, f"{agent_key}_model_provider", "") or settings.model_provider
+    model = getattr(settings, f"{agent_key}_model_name", "") or settings.model_name or settings.openai_model or "gpt-4o-mini"
 
     base_url: str | None = None
     if provider == "ollama":
