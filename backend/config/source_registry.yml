@@ -172,6 +172,7 @@
     - "Quelles statistiques environnementales sont disponibles ?"
 
 - id: my-geonetwork
+  label: "My custom geonetwork Label"
   connector: geonetworkmcp
   description: >
     Catalogue de métadonnées GeoNetwork accessible via MCP. Contient des

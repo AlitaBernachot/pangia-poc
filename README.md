@@ -317,12 +317,16 @@ Every data-source connector declares a `SourceEntry` with the following fields:
 
 | Field | Type | Description |
 |---|---|---|
-| `id` | string | Agent key used in `agents_to_call` (e.g. `neo4j`, `postgis`) |
-| `name` | string | Human-readable label |
+| `id` | string | Unique identifier |
+| `connector` | string | Agent key used in `agents_to_call` (e.g. `neo4j`, `postgis`) |
+| `description` | string | Human-readable description — used for ChromaDB embedding **and** as override for the LLM router prompt |
+| `label` | string \| null | Optional UI label shown in the frontend agent selector — overrides the default in `agent_descriptions.yml` when set |
 | `capabilities` | list[str] | Capability tags matched against `intent_type` |
 | `topics` | list[str] | Domain keywords for entity-overlap scoring |
-| `geo_scope` | string | `global`, `france`, `local`, or `none` |
-| `description` | string | Free-text description embedded into ChromaDB for semantic search |
+| `entity_types` | list[str] | Named entity types stored in this source |
+| `geo_scope` | string \| null | `"france"`, `"global"`, or `null` |
+| `mcp_url` | string \| null | MCP endpoint URL for MCP-backed connectors |
+| `example_questions` | list[str] | Canonical example questions used for embedding |
 
 **Capability vocabulary:** `graph_query`, `sparql_query`, `semantic_search`,
 `spatial_query`, `open_data`, `geo_analysis`, `geocoding`, `routing`,
@@ -478,9 +482,14 @@ pangia-poc/
 │       ├── main.py              # FastAPI app factory + lifespan
 │       ├── config.py            # Pydantic settings
 │       ├── api/
-│       │   └── routes.py        # POST /api/chat (SSE), GET /api/suggestions
+│       │   └── routes/          # Route modules
+│       │       ├── __init__.py      # Router aggregator (prefix /api)
+│       │       ├── chat.py          # POST /api/chat (SSE streaming)
+│       │       ├── suggestions.py   # GET /api/suggestions
+│       │       └── agents.py        # GET /api/agents, GET /api/health
 │       ├── agent/
 │       │   ├── model_config.py      # LLM provider abstraction (per-agent config)
+│       │   ├── utils.py             # Shared helpers: get_active_agents, get_agent_labels, is_agent_enabled
 │       │   ├── graph.py             # Backward-compat shim → core/orchestrator.py
 │       │   ├── core/                # System brains
 │       │   │   ├── state.py             # AgentState + ParsedIntent / GeoZone / TemporalRange models

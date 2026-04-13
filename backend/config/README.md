@@ -14,17 +14,26 @@ This directory contains editable configuration files that are loaded at applicat
 
 ## `agent_descriptions.yml`
 
-A YAML dict loaded by [`app/agent/core/orchestrator.py`](../app/agent/core/orchestrator.py) into `_AGENT_DESCRIPTIONS`.
+A YAML dict loaded by [`app/agent/utils.py`](../app/agent/utils.py) and [`app/agent/core/orchestrator.py`](../app/agent/core/orchestrator.py).
 
-Each key is an agent connector key (e.g. `neo4j`, `postgis`); the value is a free-text description shown to the LLM when it selects which agents to call. This is used by the **legacy LLM router** (`SMART_DISPATCHER_ENABLED=false`).
+Each key is an agent connector key (e.g. `neo4j`, `postgis`); the value is an object with two fields:
 
-MCP connectors declared in `source_registry.yml` do **not** need an entry here — the orchestrator falls back to `SourceEntry.description`.
+| Field | Description |
+|---|---|
+| `label` | Default UI label shown in the frontend agent selector |
+| `description` | Description shown to the LLM when selecting which agents to call (legacy LLM router) |
+
+> **Override priority** — both `label` and `description` can be overridden per-connector directly in `source_registry.yml`. Values set there take precedence over the defaults defined here.
 
 ```yaml
-my_agent: >-
-  Short description of what it does.
-  Best for: use-case A, use-case B.
+my_agent:
+  label: My Agent
+  description: >-
+    Short description of what it does.
+    Best for: use-case A, use-case B.
 ```
+
+MCP connectors not listed here **do not need an entry** — the orchestrator uses `SourceEntry.description` from `source_registry.yml` and falls back to the connector key as label when no `label` is set.
 
 ---
 
@@ -44,8 +53,9 @@ Append an entry to `source_registry.yml` and restart the application:
 ```yaml
 - id: my-source           # unique identifier
   connector: my_source    # must match the agent key in orchestrator._AGENT_NODES
-  description: >
+  description: >          # overrides agent_descriptions.yml description for this connector
     What this source contains.
+  label: "My Source"      # optional — overrides agent_descriptions.yml label in the UI
   topics:
     - keyword1
   entity_types:
