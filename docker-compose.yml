@@ -54,6 +54,8 @@ services:
       # Arize Phoenix (observability)
       - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
       - PHOENIX_PROJECT_NAME=${PHOENIX_PROJECT_NAME:-pangia-geoia}
+      # Ollama (local LLM)
+      - OLLAMA_BASE_URL=http://ollama:11434
     volumes:
       - ./backend/app:/backend/app
       - ./backend/libs:/backend/libs
@@ -78,6 +80,8 @@ services:
         condition: service_healthy
       phoenix:
         condition: service_started
+      ollama:
+        condition: service_healthy
     restart: unless-stopped
 
   # ── Neo4j (Knowledge Graph agent) ─────────────────────────────────────────
@@ -169,6 +173,31 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # ── Ollama (Local LLM server) ─────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Uncomment the lines below to enable NVIDIA GPU support.
+    # Requires the NVIDIA Container Toolkit to be installed on the host:
+    # https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
   # ── Redis (Sessions) ───────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
@@ -192,3 +221,4 @@ volumes:
   postgis_data:
   redis_data:
   phoenix_data:
+  ollama_data:

@@ -163,6 +163,9 @@ class Settings(BaseSettings):
     phoenix_collector_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project_name: str = "pangia-geoia"
 
+    # Ollama (local LLM server)
+    ollama_base_url: str = "http://localhost:11434"
+
 
 @lru_cache
 def get_settings() -> Settings:

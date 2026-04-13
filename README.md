@@ -14,6 +14,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 | **Vector Search** | ChromaDB (embeddings) |
 | **Spatial SQL** | PostgreSQL + PostGIS |
 | **Sessions** | Redis |
+| **Local LLM** | Ollama (Gemma 4, Llama 3, …) |
 | **Observability** | Arize Phoenix (traces, spans, LLM call inspection) |
 | **Infrastructure** | Docker Compose |
 
@@ -53,6 +54,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
     - [Sub-agent hierarchy](#sub-agent-hierarchy)
     - [Configuration](#configuration-1)
     - [Notes](#notes)
+  - [Local LLM with Ollama](docs/ollama-gemma4-setup.md)
 
 ---
 
@@ -227,6 +229,8 @@ VECTOR_CHROMA_AGENT_MODEL_NAME=llama3
 ```
 
 Leave both variables empty (the default) to use the global `OPENAI_MODEL` for every agent.
+
+> 📖 **Using Ollama (local models):** see [`docs/ollama-gemma4-setup.md`](docs/ollama-gemma4-setup.md) for instructions on starting the Ollama service and running Gemma 4 locally.
 
 ### SSE event types
 

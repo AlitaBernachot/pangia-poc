@@ -164,11 +164,16 @@ def get_agent_model_config(agent_key: str) -> ModelConfig:
     provider = getattr(settings, f"{agent_key}_model_provider", "") or "openai"
     model = getattr(settings, f"{agent_key}_model_name", "") or settings.openai_model
 
+    base_url: str | None = None
+    if provider == "ollama":
+        base_url = settings.ollama_base_url or None
+
     return ModelConfig(
         provider=provider,
         model=model,
         temperature=settings.openai_temperature,
         api_key=settings.openai_api_key if settings.openai_api_key else None,
+        base_url=base_url,
     )
 
 
