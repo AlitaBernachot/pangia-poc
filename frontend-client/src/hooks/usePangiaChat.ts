@@ -11,6 +11,8 @@ export function usePangiaChat() {
   const [selectedAgents, setSelectedAgents] = useState<string[]>([])
   const abortRef = useRef<AbortController | null>(null)
 
+  // Empty dependency array: fetchAgents only calls the backend and sets local state;
+  // it doesn't capture any reactive values that would change over time.
   const fetchAgents = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/api/agents`)

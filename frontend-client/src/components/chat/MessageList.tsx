@@ -5,6 +5,7 @@ import { Bot } from 'lucide-react'
 
 interface Props {
   messages: Message[]
+  onSuggestion?: (text: string) => void
 }
 
 const SUGGESTIONS = [
@@ -14,7 +15,7 @@ const SUGGESTIONS = [
   'What are the latest environmental data updates?',
 ]
 
-export function MessageList({ messages }: Props) {
+export function MessageList({ messages, onSuggestion }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -42,7 +43,8 @@ export function MessageList({ messages }: Props) {
             <button
               key={s}
               type="button"
-              className="text-left px-4 py-3 rounded-xl border border-white/10 bg-white/3 hover:bg-white/6 text-sm text-white/60 hover:text-white/80 transition-colors"
+              onClick={() => onSuggestion?.(s)}
+              className="text-left px-4 py-3 rounded-xl border border-white/10 bg-white/3 hover:bg-white/6 text-sm text-white/60 hover:text-white/80 transition-colors cursor-pointer"
             >
               {s}
             </button>
@@ -63,3 +65,4 @@ export function MessageList({ messages }: Props) {
     </div>
   )
 }
+

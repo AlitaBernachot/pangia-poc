@@ -70,13 +70,6 @@ export function PromptInput({
     el.style.height = Math.min(el.scrollHeight, 160) + 'px'
   }, [])
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmit()
-    }
-  }
-
   const handleSubmit = () => {
     const text = draft.trim()
     if ((!text && attachments.length === 0) || isStreaming) return
@@ -85,6 +78,13 @@ export function PromptInput({
     setAttachments([])
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
+    }
+  }
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSubmit()
     }
   }
 

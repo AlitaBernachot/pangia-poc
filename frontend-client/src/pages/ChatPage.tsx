@@ -53,7 +53,7 @@ export function ChatPage() {
       </div>
 
       {/* Messages */}
-      <MessageList messages={messages} />
+      <MessageList messages={messages} onSuggestion={(text) => sendMessage(text)} />
 
       {/* Prompt */}
       <PromptInput
