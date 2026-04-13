@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown'
 import { ExternalLink } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { type Message, AGENT_COLORS } from '../../types'
 import { AgentIcon } from '../AgentIcon'
 import { AgentActivityPanel } from './AgentActivityPanel'
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export function ChatMessage({ message }: Props) {
+  const { t } = useTranslation()
   const isUser = message.role === 'user'
 
   if (isUser) {
@@ -57,7 +59,7 @@ export function ChatMessage({ message }: Props) {
         {/* Routing chips */}
         {message.routingAgents && message.routingAgents.length > 0 && (
           <div className="flex items-center flex-wrap gap-1.5">
-            <span className="text-xs text-white/40 font-medium">Routing to</span>
+            <span className="text-xs text-white/40 font-medium">{t('chatMessage.routingTo')}</span>
             {message.routingAgents.map((agent) => {
               const colors = AGENT_COLORS[agent]
               return (
@@ -103,7 +105,7 @@ export function ChatMessage({ message }: Props) {
             ) : (
               message.streaming && (
                 <span className="thinking-indicator">
-                  Thinking...
+                  {t('chatMessage.thinking')}
                 </span>
               )
             )}

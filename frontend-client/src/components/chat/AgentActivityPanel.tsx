@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { type AgentActivity, AGENT_COLORS } from '../../types'
 import { AgentIcon } from '../AgentIcon'
 import { ChevronDown, ChevronRight, Search } from 'lucide-react'
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function AgentActivityPanel({ activity }: Props) {
+  const { t } = useTranslation()
   const [collapsed, setCollapsed] = useState(false)
   const colors = AGENT_COLORS[activity.agent]
 
@@ -34,8 +36,8 @@ export function AgentActivityPanel({ activity }: Props) {
           }`}
         >
           {activity.streaming
-            ? <span className="thinking-indicator">Thinking…</span>
-            : 'Done'}
+            ? <span className="thinking-indicator">{t('agentActivity.thinking')}</span>
+            : t('agentActivity.done')}
         </span>
       </button>
 

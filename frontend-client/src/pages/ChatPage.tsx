@@ -1,11 +1,13 @@
 import { useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { usePangiaChat } from '../hooks/usePangiaChat'
 import { MessageList } from '../components/chat/MessageList'
 import { PromptInput } from '../components/chat/PromptInput'
 import type { Attachment } from '../types'
 
 export function ChatPage() {
+  const { t } = useTranslation()
   const {
     messages,
     isStreaming,
@@ -34,11 +36,11 @@ export function ChatPage() {
           <button
             type="button"
             onClick={clearMessages}
-            title="Clear conversation"
+            title={t('chat.clearConversation')}
             className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors"
           >
             <Trash2 size={12} />
-            Clear
+            {t('chat.clear')}
           </button>
         )}
       </div>
