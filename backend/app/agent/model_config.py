@@ -117,7 +117,7 @@ AGENT_NAMES = [
     "smart_dispatcher_agent",
     "neo4j_agent",
     "rdf_agent",
-    "vector_agent",
+    "vector_chroma_agent",
     "postgis_agent",
     "mapviz_agent",
     "data_gouv_agent",

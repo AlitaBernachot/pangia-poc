@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api", tags=["chat"])
 _AGENT_LABELS: dict[str, str] = {
     "neo4j_agent": "Neo4j",
     "rdf_agent": "RDF/SPARQL",
-    "vector_agent": "Vector",
+    "vector_chroma_agent": "Vector/Chroma",
     "postgis_agent": "PostGIS",
     "mapviz_agent": "Map",
     "data_gouv_agent": "Data.gouv.fr",

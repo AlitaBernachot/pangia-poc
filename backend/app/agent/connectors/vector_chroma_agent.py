@@ -66,7 +66,7 @@ async def run(state: AgentState) -> dict:
 
 
 async def _run(state: AgentState) -> dict:
-    llm = build_llm(get_agent_model_config("vector_agent"), streaming=True).bind_tools(VECTOR_TOOLS)
+    llm = build_llm(get_agent_model_config("vector_chroma_agent"), streaming=True).bind_tools(VECTOR_TOOLS)
 
     user_query = next(
         (m.content for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
@@ -75,7 +75,7 @@ async def _run(state: AgentState) -> dict:
 
     messages = [SystemMessage(content=_build_system_prompt()), HumanMessage(content=user_query)]
 
-    for _ in range(get_agent_max_iterations("vector_agent")):
+    for _ in range(get_agent_max_iterations("vector_chroma_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
 

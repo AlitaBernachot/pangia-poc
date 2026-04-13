@@ -10,7 +10,7 @@ Topology
         │          │                                   │                    │
         │          ├──────────────► rdf_agent ─────────┤                    │
         │          │                                   │                    │
-        │          ├──────────────► vector_agent ───────┤                    │
+        │          ├──────────────► vector_chroma_agent ──┤                    │
         │          │                                   ▼                    │
         │          └──────────────► postgis_agent ──► post_process_router   │
         │                                                │                  │
@@ -58,7 +58,7 @@ from app.agent.core.intent_parser import run as intent_parser_run
 from app.agent.core.smart_dispatcher import run as smart_dispatcher_run
 from app.agent.core.state import AgentState
 from app.agent.source.source_registry import SOURCE_REGISTRY, get_entry_by_connector
-from app.agent.connectors.vector_agent import run as vector_run
+from app.agent.connectors.vector_chroma_agent import run as vector_run
 from app.agent.output.synthesis_agent import AGENT_LABELS, merge_node, _last_human_message
 from app.config import get_settings
 
@@ -89,7 +89,7 @@ _ORCHESTRATOR_CONFIG: dict = _load_orchestrator_config()
 _AGENT_NODES: dict[str, tuple[str, Any]] = {
     "neo4j": ("neo4j_agent", neo4j_run),
     "rdf": ("rdf_agent", rdf_run),
-    "vector": ("vector_agent", vector_run),
+    "vector": ("vector_chroma_agent", vector_run),
     "postgis": ("postgis_agent", postgis_run),
     "data_gouv": ("data_gouv_agent", data_gouv_run),
     "geo": ("geo_agent", geo_run),
@@ -136,7 +136,7 @@ def get_active_agents() -> list[str]:
     flags: dict[str, bool] = {
         "neo4j": settings.neo4j_agent_enabled,
         "rdf": settings.rdf_agent_enabled,
-        "vector": settings.vector_agent_enabled,
+        "vector": settings.vector_chroma_agent_enabled,
         "postgis": settings.postgis_agent_enabled,
         "data_gouv": settings.data_gouv_agent_enabled,
         "geo": settings.geo_agent_enabled,
