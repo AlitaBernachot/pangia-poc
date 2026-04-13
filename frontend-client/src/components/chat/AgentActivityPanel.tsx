@@ -32,7 +32,7 @@ export function AgentActivityPanel({ activity }: Props) {
               : 'text-green-400 border-green-400'
           }`}
         >
-          {activity.streaming ? 'thinking…' : 'done'}
+          {activity.streaming ? 'Thinking…' : 'Done'}
         </span>
       </button>
 

@@ -8,9 +8,9 @@ interface FaqItem {
 
 const FAQ_ITEMS: FaqItem[] = [
   {
-    question: 'What is PanGIA?',
+    question: 'What is PangIA?',
     answer:
-      'PanGIA (Pansophic Geospatial Intelligence Assistant) is an AI-powered platform that lets you query and analyse geospatial data using natural language. It connects to multiple specialised backends — including graph databases, RDF stores, vector search, and PostGIS — to provide rich, contextual answers about geographic information.',
+      'PangIA (Pansophic Geospatial Intelligence Assistant) is an AI-powered platform that lets you query and analyse geospatial data using natural language. It connects to multiple specialised backends — including graph databases, RDF stores, vector search, and PostGIS — to provide rich, contextual answers about geographic information.',
   },
   {
     question: 'What kind of questions can I ask?',
@@ -20,7 +20,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'Which data agents are available?',
     answer:
-      'PanGIA orchestrates several specialised agents: Neo4j (graph relationships), RDF/SPARQL (linked open data), Vector/Chroma (semantic search), PostGIS (spatial SQL), Map (geocoding & GeoJSON visualisation), Data.gouv.fr (French open data portal), and DataViz (chart & KPI generation). Agents can be toggled individually in the chat prompt.',
+      'PangIA orchestrates several specialised agents: Neo4j (graph relationships), RDF/SPARQL (linked open data), Vector/Chroma (semantic search), PostGIS (spatial SQL), Map (geocoding & GeoJSON visualisation), Data.gouv.fr (French open data portal), and DataViz (chart & KPI generation). Agents can be toggled individually in the chat prompt.',
   },
   {
     question: 'Can I attach files to my messages?',
@@ -30,7 +30,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'How does session memory work?',
     answer:
-      'PanGIA maintains conversation history within a session using a Redis-backed store. The AI can reference earlier messages in the same conversation. Starting a new chat (via the Clear button) begins a fresh session without prior context.',
+      'PangIA maintains conversation history within a session using a Redis-backed store. The AI can reference earlier messages in the same conversation. Starting a new chat (via the Clear button) begins a fresh session without prior context.',
   },
   {
     question: 'Is my data private?',
@@ -45,7 +45,7 @@ const FAQ_ITEMS: FaqItem[] = [
   {
     question: 'What browsers are supported?',
     answer:
-      'PanGIA works best in modern browsers — Chrome, Edge, Firefox, and Safari (latest versions). It requires JavaScript and support for Server-Sent Events (SSE) for the streaming chat feature.',
+      'PangIA works best in modern browsers — Chrome, Edge, Firefox, and Safari (latest versions). It requires JavaScript and support for Server-Sent Events (SSE) for the streaming chat feature.',
   },
 ]
 
@@ -96,17 +96,17 @@ export function FaqPage() {
         </div>
         <h1 className="text-3xl font-semibold text-white">FAQ & About</h1>
         <p className="text-white/50 text-sm max-w-lg mx-auto">
-          Everything you need to know about PanGIA — the Pansophic Geospatial Intelligence
+          Everything you need to know about PangIA — the Pansophic Geospatial Intelligence
           Assistant.
         </p>
       </section>
 
       {/* About section */}
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold text-white">About PanGIA</h2>
+        <h2 className="text-lg font-semibold text-white">About PangIA</h2>
         <div className="bg-white/3 border border-white/8 rounded-xl px-5 py-4 text-sm text-white/70 leading-relaxed space-y-3">
           <p>
-            PanGIA is an open-source proof-of-concept demonstrating how large language models can
+            PangIA is an open-source proof-of-concept demonstrating how large language models can
             be combined with heterogeneous geospatial backends to deliver intelligent, multi-source
             geographic insights via a conversational interface.
           </p>
@@ -185,9 +185,9 @@ export function FaqPage() {
 
       {/* Footer note */}
       <p className="text-center text-xs text-white/25 pb-4">
-        PanGIA · Open-source Proof of Concept ·{' '}
+        PangIA · Open-source Proof of Concept ·{' '}
         <a
-          href="https://github.com/AlitaBernachot/pangia-poc"
+          href="https://github.com/AlitaBernachot/PangIA-poc"
           target="_blank"
           rel="noreferrer"
           className="underline hover:text-white/50 transition-colors"

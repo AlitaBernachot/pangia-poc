@@ -30,15 +30,7 @@ export function ChatPage() {
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-white/6">
-        <div className="flex items-center gap-2">
-          {isStreaming && (
-            <span className="inline-flex items-center gap-1 text-xs text-amber-400">
-              <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
-              Thinking…
-            </span>
-          )}
-        </div>
-        {messages.length > 0 && (
+    {messages.length > 0 && (
           <button
             type="button"
             onClick={clearMessages}

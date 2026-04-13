@@ -43,7 +43,7 @@ export function MessageList({ messages, onSuggestion }: Props) {
           <div className="size-16 rounded-2xl bg-yellow-500/15 border border-yellow-500/25 flex items-center justify-center mx-auto">
             <Bot size={28} className="text-yellow-400" />
           </div>
-          <h2 className="text-2xl font-semibold text-white">PanGIA Assistant</h2>
+          <h2 className="text-2xl font-semibold text-white">PangIA Assistant</h2>
           <p className="text-white/50 text-sm max-w-sm">
             Your intelligent geospatial AI. Ask questions about geographic data, maps, spatial
             analysis, and more.

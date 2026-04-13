@@ -97,3 +97,12 @@
 @keyframes blink {
   50% { opacity: 0; }
 }
+
+/* Thinking indicator shown before first token arrives */
+.thinking-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.875em;
+  animation: blink 1.2s ease-in-out infinite;
+}

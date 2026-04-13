@@ -1,10 +1,10 @@
-# PanGIA Frontend Client
+# PangIA Frontend Client
 
-A React + Vite + Tailwind CSS frontend for the [PanGIA](../README.md) geospatial AI assistant.
+A React + Vite + Tailwind CSS frontend for the [PangIA](../README.md) geospatial AI assistant.
 
 ## Features
 
-- **AI Chat page** — streaming chat with the PanGIA backend over SSE, with:
+- **AI Chat page** — streaming chat with the PangIA backend over SSE, with:
   - File attachment support (click or drag & drop) modelled after [AI SDK Elements Attachments](https://elements.ai-sdk.dev/components/attachments)
   - Agent selector toggles to target specific data agents
   - Per-agent activity panels showing intermediate reasoning and tool calls

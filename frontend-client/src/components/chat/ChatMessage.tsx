@@ -1,9 +1,23 @@
 import ReactMarkdown from 'react-markdown'
+import { ExternalLink } from 'lucide-react'
 import { type Message, AGENT_COLORS, agentIcon } from '../../types'
 import { AgentActivityPanel } from './AgentActivityPanel'
 import { MapViewer } from '../MapViewer'
 import { DataVizViewer } from '../DataViz/DataVizViewer'
-import { User, Bot } from 'lucide-react'
+
+const markdownComponents = {
+  a: ({ href, children }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-0.5 text-blue-400 hover:text-blue-300 underline underline-offset-2"
+    >
+      {children}
+      <ExternalLink size={11} className="shrink-0 opacity-70" />
+    </a>
+  ),
+}
 
 interface Props {
   message: Message
@@ -31,9 +45,6 @@ export function ChatMessage({ message }: Props) {
             </div>
           )}
         </div>
-        <div className="size-8 rounded-full bg-white/10 flex items-center justify-center shrink-0 mt-0.5">
-          <User size={14} className="text-white/60" />
-        </div>
       </div>
     )
   }
@@ -41,11 +52,7 @@ export function ChatMessage({ message }: Props) {
   // Assistant message
   return (
     <div className="flex gap-3 items-start">
-      <div className="size-8 rounded-full bg-yellow-500/20 flex items-center justify-center shrink-0 mt-0.5">
-        <Bot size={14} className="text-yellow-300" />
-      </div>
-
-      <div className="flex flex-col gap-2.5 min-w-0 flex-1 max-w-[82%]">
+      <div className="flex flex-col gap-2.5 min-w-0 flex-1">
         {/* Routing chips */}
         {message.routingAgents && message.routingAgents.length > 0 && (
           <div className="flex items-center flex-wrap gap-1.5">
@@ -74,27 +81,33 @@ export function ChatMessage({ message }: Props) {
           </div>
         )}
 
-        {/* Final answer */}
-        {(message.content || message.streaming) && (
-          <div
-            className={`bg-white/4 border rounded-xl rounded-tl-none px-4 py-3 text-sm text-white leading-relaxed prose-chat ${
-              message.streaming ? 'border-violet-500/50' : 'border-white/8'
-            }`}
-          >
-            {message.content ? (
-              <ReactMarkdown>{message.content}</ReactMarkdown>
-            ) : (
-              message.streaming && <span className="cursor-blink" />
-            )}
-            {message.streaming && message.content && <span className="cursor-blink" />}
-          </div>
-        )}
-
         {/* Map */}
         {message.geojson && <MapViewer geojson={message.geojson} />}
 
         {/* DataViz */}
         {message.dataviz && <DataVizViewer dataviz={message.dataviz} />}
+
+        {/* Final answer — always last */}
+        {(message.content || message.streaming) && (
+          <div
+            className={`rounded-xl rounded-tl-none px-4 py-3 text-sm text-white leading-relaxed prose-chat ${
+              message.streaming ? 'border-white/8' : ''
+            }`}
+          >
+            {message.content ? (
+              <>
+                <ReactMarkdown components={markdownComponents}>{message.content}</ReactMarkdown>
+                {message.streaming && <span className="cursor-blink" />}
+              </>
+            ) : (
+              message.streaming && (
+                <span className="thinking-indicator">
+                  Thinking...
+                </span>
+              )
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

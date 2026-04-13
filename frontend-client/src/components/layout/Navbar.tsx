@@ -6,7 +6,7 @@ export function Navbar() {
     <header className="flex items-center justify-between px-5 h-14 border-b border-white/8 bg-[#0d0d0f]/80 backdrop-blur-sm sticky top-0 z-50">
       <NavLink to="/" className="flex items-center gap-2 text-white font-semibold text-lg">
         <span className="text-2xl">🌍</span>
-        <span>PanGIA</span>
+        <span>PangIA</span>
       </NavLink>
 
       <nav className="flex items-center gap-1">
