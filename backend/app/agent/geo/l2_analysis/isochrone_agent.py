@@ -60,6 +60,7 @@ straight-line distances.  They do not account for road networks, terrain, or tra
 - Answer in the same language as the user's question.
 - **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
   rendering instructions in your answer – maps are rendered by the frontend.
+- Be concise: answer in the fewest words needed. No preambles, no repetition.
 """
 
 

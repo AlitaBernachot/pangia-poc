@@ -11,10 +11,16 @@ This guide explains how to run a local **Ollama** server with the **Gemma 4** mo
   - [Overview](#overview)
   - [Create the Ollama Volume (first-time setup)](#create-the-ollama-volume-first-time-setup)
   - [Start the Stack](#start-the-stack)
+  - [Quick Smoke Test](#quick-smoke-test)
   - [Pull the Gemma 4 Model](#pull-the-gemma-4-model)
   - [Configure Backend Agents to Use Gemma 4](#configure-backend-agents-to-use-gemma-4)
   - [GPU Acceleration (Optional)](#gpu-acceleration-optional)
   - [Running Ollama Outside Docker](#running-ollama-outside-docker)
+  - [CPU Performance Tuning](#cpu-performance-tuning)
+    - [1. Allocate all CPU threads to Ollama](#1-allocate-all-cpu-threads-to-ollama)
+    - [2. Remove Docker CPU/memory caps](#2-remove-docker-cpumemory-caps)
+    - [3. Use a quantized model variant](#3-use-a-quantized-model-variant)
+    - [4. Prevent memory swapping](#4-prevent-memory-swapping)
   - [Troubleshooting](#troubleshooting)
 
 ---
@@ -62,6 +68,23 @@ docker compose ps ollama
 ```
 
 You should see `healthy` in the status column.
+
+---
+
+## Quick Smoke Test
+
+To test Ollama in isolation (without starting the full stack):
+
+```bash
+# Démarrer seulement Ollama en Docker
+docker compose up ollama -d
+
+# Vérifier les modèles disponibles
+docker compose exec ollama ollama list
+
+# Tester une inférence (petit modèle rapide même en CPU)
+docker compose exec ollama ollama run gemma4:e2b "Say hi"
+```
 
 ---
 
@@ -225,6 +248,71 @@ If you prefer to run Ollama directly on your host machine (instead of inside Doc
    ```bash
    docker compose stop ollama
    ```
+
+---
+
+## CPU Performance Tuning
+
+When running without a GPU, inference is slow by default. The following Docker Compose overrides can significantly reduce latency.
+
+### 1. Allocate all CPU threads to Ollama
+
+By default Ollama auto-detects available threads, but inside Docker the count may be wrong. Override it explicitly in `docker-compose.yml`:
+
+```yaml
+ollama:
+  environment:
+    # Set to the number of physical cores on your host (check with `nproc`)
+    - OLLAMA_NUM_THREADS=8
+    # Keep only 1 model loaded at a time to avoid RAM pressure
+    - OLLAMA_MAX_LOADED_MODELS=1
+    # Disable parallel request processing (no benefit on CPU, wastes memory)
+    - OLLAMA_NUM_PARALLEL=1
+    # Enable Flash Attention (reduces memory bandwidth, speeds up inference)
+    - OLLAMA_FLASH_ATTENTION=1
+```
+
+Check your core count:
+```bash
+nproc --all
+```
+
+### 2. Remove Docker CPU/memory caps
+
+Make sure no `cpus` or `mem_limit` is set on the `ollama` service, or raise them:
+
+```yaml
+ollama:
+  deploy:
+    resources:
+      limits:
+        cpus: '0'        # 0 = no limit
+        memory: 16G      # adjust to your available RAM
+```
+
+### 3. Use a quantized model variant
+
+Quantized models are faster and use less RAM with minimal quality loss:
+
+```bash
+# q4_K_M is the best CPU trade-off (speed vs quality)
+docker compose exec ollama ollama pull gemma4:e2b-it-q4_K_M
+```
+
+Then update `.env`:
+```env
+MODEL_NAME=gemma4:e2b-it-q4_K_M
+```
+
+### 4. Prevent memory swapping
+
+Add `mem_swappiness` to keep the model in RAM and avoid swap thrashing:
+
+```yaml
+ollama:
+  sysctls:
+    - vm.swappiness=10
+```
 
 ---
 

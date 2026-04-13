@@ -33,6 +33,7 @@ geographic entities, relationships, and facts using Cypher.
   in your answer.
 - Always explain what you found and cite the relevant nodes/relationships.
 - If the graph contains no relevant data, say so clearly.
+- Be concise: answer in the fewest words needed. No preambles, no repetition.
 {extra_guidelines}"""
 
 

@@ -183,6 +183,16 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    environment:
+      # ── CPU performance tuning ─────────────────────────────────────────────
+      # Set to the number of physical cores on your host (`nproc --all`)
+      - OLLAMA_NUM_THREADS=8
+      # Load only one model at a time to avoid RAM pressure
+      - OLLAMA_MAX_LOADED_MODELS=1
+      # No benefit from parallelism on CPU — saves memory
+      - OLLAMA_NUM_PARALLEL=1
+      # Flash Attention reduces memory bandwidth usage, speeds up inference
+      - OLLAMA_FLASH_ATTENTION=1
     # Uncomment the lines below to enable NVIDIA GPU support.
     # Requires the NVIDIA Container Toolkit to be installed on the host:
     # https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html

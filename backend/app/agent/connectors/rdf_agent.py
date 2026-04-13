@@ -29,6 +29,7 @@ geospatial ontologies and linked data using SPARQL.
 - Write valid SPARQL 1.1 queries; use PREFIX declarations as needed.
 - Always summarise the results in plain language.
 - If no relevant data exists, say so clearly.
+- Be concise: answer in the fewest words needed. No preambles, no repetition.
 {extra_guidelines}"""
 
 

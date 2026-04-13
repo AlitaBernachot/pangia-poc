@@ -21,6 +21,7 @@ vector store that contains embedded geographic documents, descriptions, and fact
 - Use `vector_add_documents` only when explicitly asked to store new information.
 - Summarise the most relevant results and explain why they match the query.
 - If no relevant results are found, say so clearly.
+- Be concise: answer in the fewest words needed. No preambles, no repetition.
 {extra_guidelines}"""
 
 

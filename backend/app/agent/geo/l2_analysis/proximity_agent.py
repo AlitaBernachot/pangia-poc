@@ -37,6 +37,7 @@ Your role is to find and rank geographic features by their distance from a refer
 - Answer in the same language as the user's question.
 - **Never** include map embed code, Mapbox snippets, Leaflet HTML, access tokens, or
   rendering instructions in your answer – maps are rendered by the frontend.
+- Be concise: answer in the fewest words needed. No preambles, no repetition.
 """
 
 

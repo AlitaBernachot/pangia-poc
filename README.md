@@ -695,6 +695,14 @@ Sub-agents live in `backend/app/agent/`.  To add one:
    Move anything **specific to the active dataset** into the theme's corresponding
    `<store>_guidelines` field so any future theme can override it without touching agent code.
 
+   **Frugality principle** — every system prompt must end with:
+   ```
+   - Be concise: answer in the fewest words needed. No preambles, no repetition.
+   ```
+   This is intentional: PangIA is designed to run on small local models (e.g. `gemma4:e2b`
+   via Ollama) where token budget is precious. Verbose preambles waste inference time and
+   degrade multi-agent throughput. Keep responses dense and direct.
+
 4. **Define the database schema** in the seed theme's `<store>_schema_prompt` field
    (node labels, relationship types, table columns, ontology prefixes, etc.).
    The more precise the schema description, the better the LLM will generate correct queries.

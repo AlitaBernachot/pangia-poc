@@ -131,6 +131,7 @@ structured JSON object describing their intent.
 - The intention field must be in the same language as the user's query.
 - Never add keys outside the schema.
 - Never refuse to parse — always return a best-effort result with a low confidence.
+- Be concise: return only the JSON object. No explanation, no preamble.
 """
 
 
