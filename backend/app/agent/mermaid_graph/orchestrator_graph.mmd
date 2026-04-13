@@ -12,7 +12,7 @@ graph TD;
 	humanoutput_agent(humanoutput_agent)
 	neo4j_agent(neo4j_agent)
 	rdf_agent(rdf_agent)
-	vector_agent(vector_agent)
+	vector_chroma_agent(vector_chroma_agent)
 	postgis_agent(postgis_agent)
 	data_gouv_agent(data_gouv_agent)
 	geo_agent(geo_agent)
@@ -42,8 +42,8 @@ graph TD;
 	smart_dispatcher -.-> post_process_router;
 	smart_dispatcher -.-> postgis_agent;
 	smart_dispatcher -.-> rdf_agent;
-	smart_dispatcher -.-> vector_agent;
-	vector_agent --> post_process_router;
+	smart_dispatcher -.-> vector_chroma_agent;
+	vector_chroma_agent --> post_process_router;
 	merge --> __end__;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0

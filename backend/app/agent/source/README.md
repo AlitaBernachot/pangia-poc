@@ -28,9 +28,10 @@ Edit `source_registry.yml` and append an entry following this template:
 ```yaml
 - id: my-source           # unique identifier
   connector: my_source    # must match the agent key in _AGENT_NODES (orchestrator.py)
-  description: >
+  description: >          # overrides agent_descriptions.yml description in the LLM router prompt
     Free-text description of what this source contains.
     Used for ChromaDB embedding and Smart Dispatcher scoring.
+  label: "My Source"      # optional — overrides agent_descriptions.yml UI label
   topics:
     - keyword1
     - keyword2
@@ -43,6 +44,8 @@ Edit `source_registry.yml` and append an entry following this template:
   example_questions:
     - "Example question this source can answer?"
 ```
+
+> **Label & description priority** — `label` and `description` set in `source_registry.yml` take precedence over the defaults defined in `backend/config/agent_descriptions.yml`. Agents not listed in `agent_descriptions.yml` (e.g. dynamically registered MCP connectors) automatically use the registry values.
 
 Then restart the application — the ChromaDB bootstrap is idempotent and will index the new entry automatically.
 

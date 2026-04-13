@@ -58,7 +58,7 @@ services:
       - ./backend/app:/backend/app
       - ./backend/libs:/backend/libs
       - ./backend/config:/backend/config
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-include "*.yml"
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/health || exit 1"]
       interval: 10s

@@ -77,7 +77,7 @@
     - "Listez toutes les instances de la classe 'Zone protégée'."
 
 - id: vector
-  connector: vector
+  connector: vector_chroma
   description: >
     Base de données vectorielle ChromaDB contenant des documents
     géographiques, des descriptions et des faits sous forme d'embeddings.
@@ -172,6 +172,7 @@
     - "Quelles statistiques environnementales sont disponibles ?"
 
 - id: my-geonetwork
+  label: "My custom geonetwork Label"
   connector: geonetworkmcp
   description: >
     Catalogue de métadonnées GeoNetwork accessible via MCP. Contient des

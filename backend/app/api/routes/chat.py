@@ -7,12 +7,11 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
 from pydantic import BaseModel
 
-from app.agent.core.orchestrator import agent_graph, get_active_agents
+from app.agent.core.orchestrator import agent_graph
 from app.agent.core.state import AgentState
 from app.db.redis_client import load_session, save_session
-from app.db.themes import get_active_theme
 
-router = APIRouter(prefix="/api", tags=["chat"])
+router = APIRouter()
 
 # Labels shown in the UI for each sub-agent
 _AGENT_LABELS: dict[str, str] = {
@@ -25,17 +24,6 @@ _AGENT_LABELS: dict[str, str] = {
     "dataviz_agent": "DataViz",
     "merge": "Synthesiser",
     "router": "Router",
-}
-
-# Human-readable labels indexed by the short agent key
-_AGENT_UI_LABELS: dict[str, str] = {
-    "neo4j": "Neo4j",
-    "rdf": "RDF/SPARQL",
-    "vector": "Vector",
-    "postgis": "PostGIS",
-    "map": "Map",
-    "data_gouv": "Data.gouv.fr",
-    "dataviz": "DataViz",
 }
 
 
@@ -63,14 +51,6 @@ def _sse(data: dict) -> str:
 
 def _node_from_event(event: dict) -> str:
     return event.get("metadata", {}).get("langgraph_node", "")
-
-
-# ─── Suggestions endpoint ─────────────────────────────────────────────────────
-
-@router.get("/suggestions")
-async def suggestions() -> dict:
-    theme = get_active_theme()
-    return {"suggestions": theme.suggestions}
 
 
 # ─── SSE streaming endpoint ───────────────────────────────────────────────────
@@ -201,24 +181,3 @@ async def chat(body: ChatRequest) -> StreamingResponse:
             "X-Accel-Buffering": "no",
         },
     )
-
-
-@router.get("/health")
-async def health() -> dict:
-    return {"status": "ok"}
-
-
-@router.get("/agents")
-async def list_agents() -> dict:
-    """Return the list of sub-agents currently enabled in the backend configuration.
-
-    The frontend uses this to render the agent-selector toggle UI and to know
-    which agents it can include in ``selected_agents`` when calling ``/api/chat``.
-    """
-    active = get_active_agents()
-    return {
-        "agents": [
-            {"key": k, "label": _AGENT_UI_LABELS.get(k, k)}
-            for k in active
-        ]
-    }

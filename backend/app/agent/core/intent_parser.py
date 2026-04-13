@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import date
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -76,7 +77,11 @@ _COMPARE_SIGNAL_RE = re.compile(
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
-_SYSTEM_PROMPT = """\
+def _build_system_prompt() -> str:
+    current_year = date.today().year
+    return _SYSTEM_PROMPT_TEMPLATE.replace("{{CURRENT_YEAR}}", str(current_year))
+
+_SYSTEM_PROMPT_TEMPLATE = """\
 You are the Intent Parser for PangIA, a geospatial intelligence platform.
 Your sole responsibility is to analyse the user's question and return a
 structured JSON object describing their intent.
@@ -119,6 +124,10 @@ structured JSON object describing their intent.
 - For geo_zone, prefer named places over coordinates when both are present.
 - For temporal_range, prefer ISO-8601 when the date is explicit; use the raw
   string verbatim when it is relative (e.g. "last 5 years").
+- If no temporal constraint is mentioned at all, set temporal_range to
+  {"start": "{{CURRENT_YEAR}}-01-01", "end": null, "raw": "current year"} as a
+  soft hint only — downstream agents should prioritise recent data but must not
+  exclude older results.
 - The intention field must be in the same language as the user's query.
 - Never add keys outside the schema.
 - Never refuse to parse — always return a best-effort result with a low confidence.
@@ -162,7 +171,7 @@ async def run(state: AgentState) -> dict:
 
         result: ParsedIntent = await structured_llm.ainvoke(
             [
-                SystemMessage(content=_SYSTEM_PROMPT),
+                SystemMessage(content=_build_system_prompt()),
                 HumanMessage(content=f"{query}{hint_line}"),
             ]
         )

@@ -195,7 +195,8 @@ async def dispatch(
 async def run(state: AgentState) -> dict:
     """Smart dispatch node — compute agents_to_call from parsed_intent."""
     # Deferred import to avoid circular dependency at module level
-    from app.agent.core.orchestrator import get_active_agents, _AGENT_NODES  # noqa: PLC0415
+    from app.agent.utils import get_active_agents  # noqa: PLC0415
+    from app.agent.core.orchestrator import _AGENT_NODES  # noqa: PLC0415
 
     active = get_active_agents()
 

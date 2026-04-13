@@ -60,6 +60,7 @@ from app.agent.core.state import AgentState
 from app.agent.source.source_registry import SOURCE_REGISTRY, get_entry_by_connector
 from app.agent.connectors.vector_chroma_agent import run as vector_run
 from app.agent.output.synthesis_agent import AGENT_LABELS, merge_node, _last_human_message
+from app.agent.utils import get_active_agents, get_agent_labels, is_agent_enabled
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -69,8 +70,10 @@ _ORCHESTRATOR_CONFIG_YAML = Path(__file__).parents[3] / "config" / "orchestrator
 
 
 def _load_agent_descriptions() -> dict[str, str]:
+    """Return descriptions dict parsed from agent_descriptions.yml."""
     with _AGENT_DESCRIPTIONS_YAML.open(encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        raw: dict = yaml.safe_load(f)
+    return {k: v["description"] for k, v in raw.items()}
 
 
 def _load_orchestrator_config() -> dict:
@@ -89,13 +92,11 @@ _ORCHESTRATOR_CONFIG: dict = _load_orchestrator_config()
 _AGENT_NODES: dict[str, tuple[str, Any]] = {
     "neo4j": ("neo4j_agent", neo4j_run),
     "rdf": ("rdf_agent", rdf_run),
-    "vector": ("vector_chroma_agent", vector_run),
+    "vector_chroma": ("vector_chroma_agent", vector_run),
     "postgis": ("postgis_agent", postgis_run),
     "data_gouv": ("data_gouv_agent", data_gouv_run),
     "geo": ("geo_agent", geo_run),
 }
-
-_REGISTRY_REQUIRED_AGENTS = {"neo4j", "rdf", "vector", "postgis"}
 
 # Dynamically register MCP connectors declared in the Source Registry.
 # Each SourceEntry with a non-null mcp_url and a unique connector key gets its
@@ -118,59 +119,6 @@ for _entry in SOURCE_REGISTRY:
 
 
 # ─── Active-agent helpers ──────────────────────────────────────────────────────
-
-def get_active_agents() -> list[str]:
-    """Return the list of agent keys that are enabled in configuration.
-
-    Parallel sub-agents: neo4j, rdf, vector, postgis.
-    map and dataviz are handled as sequential post-processing steps and NOT
-    routed to by the router; they are gated by MAPVIZ_AGENT_ENABLED and
-    DATAVIZ_AGENT_ENABLED separately.
-    The orchestrator is always active.  Sub-agents can be disabled
-    individually via ``NEO4J_AGENT_ENABLED``, ``RDF_AGENT_ENABLED``,
-    ``VECTOR_AGENT_ENABLED``, ``POSTGIS_AGENT_ENABLED``, and
-    ``DATA_GOUV_AGENT_ENABLED`` environment variables (all default to
-    ``true``).
-    """
-    settings = get_settings()
-    flags: dict[str, bool] = {
-        "neo4j": settings.neo4j_agent_enabled,
-        "rdf": settings.rdf_agent_enabled,
-        "vector": settings.vector_chroma_agent_enabled,
-        "postgis": settings.postgis_agent_enabled,
-        "data_gouv": settings.data_gouv_agent_enabled,
-        "geo": settings.geo_agent_enabled,
-    }
-
-    # Database connectors require a SourceEntry in the registry to be routable.
-    # If none is declared, the agent has no declared data and is disabled.
-    for agent_key in _REGISTRY_REQUIRED_AGENTS:
-        if flags.get(agent_key) and get_entry_by_connector(agent_key) is None:
-            logger.warning(
-                "Agent '%s' is enabled but has no SourceEntry in the Source Registry — disabling it.",
-                agent_key,
-            )
-            flags[agent_key] = False
-
-    # Dynamic connectors from Source Registry
-    for _entry in SOURCE_REGISTRY:
-        if _entry.connector not in flags:
-            flags[_entry.connector] = is_agent_enabled(_entry.connector)
-    active = [name for name, enabled in flags.items() if enabled]
-    
-    # Guard: always keep at least one agent to avoid an empty graph
-    return active if active else ["neo4j"]
-
-
-def is_agent_enabled(connector_key: str) -> bool:
-    """Return whether the agent identified by *connector_key* is enabled in config.
-
-    Looks up ``<connector_key>_agent_enabled`` on the Settings object.
-    Defaults to ``True`` when no such flag exists (e.g. dynamically-registered
-    MCP connectors that have not yet been given an explicit env variable).
-    """
-    return getattr(get_settings(), f"{connector_key}_agent_enabled", True)
-
 
 def is_map_enabled() -> bool:
     return get_settings().mapviz_agent_enabled
@@ -196,13 +144,13 @@ def _build_router_system(available_agents: list[str]) -> str:
     """Build the router system prompt restricted to *available_agents*."""
     desc_lines = []
     for a in available_agents:
-        if a in _AGENT_DESCRIPTIONS:
+        entry = get_entry_by_connector(a)
+        if entry:
+            desc_lines.append(f"  • {a} – {entry.description}")
+        elif a in _AGENT_DESCRIPTIONS:
             desc_lines.append(f"  • {a} – {_AGENT_DESCRIPTIONS[a]}")
         else:
-            entry = get_entry_by_connector(a)
-            desc_lines.append(
-                f"  • {a} – {entry.description}" if entry else f"  • {a} – specialist agent"
-            )
+            desc_lines.append(f"  • {a} – specialist agent")
     agent_list = "\n".join(desc_lines)
     agent_names = ", ".join(f'"{a}"' for a in available_agents)
 
@@ -278,6 +226,11 @@ def router_node(state: AgentState) -> dict:
 def dispatch_agents(state: AgentState):
     """Fan out to selected parallel sub-agents using LangGraph's Send API."""
     agents = state.get("agents_to_call", [])
+    # Guard: only send to agents whose node was actually compiled into the graph.
+    # If get_active_agents() at request time diverges from build time (e.g. after
+    # a reload), sending to an unknown node produces a LangGraph warning and is
+    # silently dropped — better to filter explicitly here.
+    agents = [a for a in agents if a in _AGENT_NODES]
     if not agents:
         # No parallel agents – jump straight to post-processing (or merge)
         if is_map_enabled() or is_dataviz_enabled():

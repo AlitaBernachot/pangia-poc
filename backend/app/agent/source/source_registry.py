@@ -81,6 +81,10 @@ class SourceEntry(BaseModel):
     example_questions: list[str] = Field(default_factory=list)
     """Canonical example questions this source can answer."""
 
+    label: str | None = None
+    """Optional UI label that overrides the default from agent_descriptions.yml.
+    When set, this value is used in the frontend agent selector instead of the
+    default label defined in ``backend/config/agent_descriptions.yml``."""
 
 # ─── Registry loader ──────────────────────────────────────────────────────────
 
