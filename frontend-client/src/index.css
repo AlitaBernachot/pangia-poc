@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  #root {
+    width: 100%;
+    min-height: 100vh;
+  }
+}
+
+/* Markdown prose styles */
+.prose-chat {
+  line-height: 1.6;
+}
+.prose-chat p {
+  margin: 0 0 0.75em;
+}
+.prose-chat p:last-child {
+  margin-bottom: 0;
+}
+.prose-chat ul, .prose-chat ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+.prose-chat li {
+  margin: 0.25em 0;
+}
+.prose-chat code {
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+  font-size: 0.875em;
+  font-family: 'Fira Code', 'Cascadia Code', monospace;
+}
+.prose-chat pre {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  padding: 1em;
+  overflow-x: auto;
+  margin: 0.75em 0;
+}
+.prose-chat pre code {
+  background: none;
+  padding: 0;
+}
+.prose-chat h1, .prose-chat h2, .prose-chat h3 {
+  font-weight: 600;
+  margin: 1em 0 0.5em;
+}
+.prose-chat a {
+  color: #60a5fa;
+  text-decoration: underline;
+}
+.prose-chat blockquote {
+  border-left: 3px solid rgba(255,255,255,0.2);
+  margin: 0.5em 0;
+  padding-left: 1em;
+  color: rgba(255,255,255,0.6);
+}
+.prose-chat table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.875em;
+  margin: 0.75em 0;
+}
+.prose-chat th, .prose-chat td {
+  border: 1px solid rgba(255,255,255,0.15);
+  padding: 0.5em 0.75em;
+  text-align: left;
+}
+.prose-chat th {
+  background: rgba(255,255,255,0.06);
+}
+
+/* Blinking cursor for streaming */
+.cursor-blink {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: currentColor;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink 0.8s step-end infinite;
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
