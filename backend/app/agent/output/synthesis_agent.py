@@ -35,6 +35,7 @@ AGENT_LABELS = {
     "postgis": "PostGIS Spatial SQL",
     "map": "Map Agent (GeoJSON)",
     "data_gouv": "Data.gouv.fr Open Data",
+    "geonetworkmcp": "GeoNetwork Metadata Catalogue",
     "dataviz": "Data Visualisation",
     "geo": "Geospatial Analysis",
 }

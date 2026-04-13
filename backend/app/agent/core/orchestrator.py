@@ -34,7 +34,7 @@ the graph.  The user may narrow the parallel agents via `state["selected_agents"
 """
 import logging
 import os
-from typing import Any, Literal
+from typing import Any
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import END, StateGraph
@@ -49,10 +49,12 @@ from app.agent.connectors.neo4j_agent import run as neo4j_run
 from app.agent.connectors.postgis_agent import run as postgis_run
 from app.agent.connectors.rdf_agent import run as rdf_run
 from app.agent.connectors.data_gouv_agent import run as data_gouv_run
+from app.agent.connectors.geonetwork_mcp_agent import make_run as _make_geonetworkmcp_run
 from app.agent.core.geo_orchestrator import run as geo_run
 from app.agent.core.intent_parser import run as intent_parser_run
 from app.agent.core.smart_dispatcher import run as smart_dispatcher_run
 from app.agent.core.state import AgentState
+from app.agent.source.source_registry import SOURCE_REGISTRY, get_entry_by_connector
 from app.agent.connectors.vector_agent import run as vector_run
 from app.agent.output.synthesis_agent import AGENT_LABELS, merge_node, _last_human_message
 from app.config import get_settings
@@ -126,6 +128,27 @@ _AGENT_NODES: dict[str, tuple[str, Any]] = {
     "geo": ("geo_agent", geo_run),
 }
 
+_REGISTRY_REQUIRED_AGENTS = {"neo4j", "rdf", "vector", "postgis"}
+
+# Dynamically register MCP connectors declared in the Source Registry.
+# Each SourceEntry with a non-null mcp_url and a unique connector key gets its
+# own agent node. The factory is selected based on the connector type prefix,
+# making it easy to add new MCP connector families in the future.
+for _entry in SOURCE_REGISTRY:
+    if _entry.mcp_url is not None and _entry.connector not in _AGENT_NODES:
+        if _entry.connector == "geonetworkmcp":
+            _AGENT_NODES[_entry.connector] = (
+                f"{_entry.connector}_agent",
+                _make_geonetworkmcp_run(_entry.mcp_url, _entry.connector),
+            )
+        else:
+            logger.warning(
+                "Source Registry entry '%s' has mcp_url but no matching factory "
+                "(connector='%s'). Skipping.",
+                _entry.id,
+                _entry.connector,
+            )
+
 
 # ─── Active-agent helpers ──────────────────────────────────────────────────────
 
@@ -151,9 +174,35 @@ def get_active_agents() -> list[str]:
         "data_gouv": settings.data_gouv_agent_enabled,
         "geo": settings.geo_agent_enabled,
     }
+
+    # Database connectors require a SourceEntry in the registry to be routable.
+    # If none is declared, the agent has no declared data and is disabled.
+    for agent_key in _REGISTRY_REQUIRED_AGENTS:
+        if flags.get(agent_key) and get_entry_by_connector(agent_key) is None:
+            logger.warning(
+                "Agent '%s' is enabled but has no SourceEntry in the Source Registry — disabling it.",
+                agent_key,
+            )
+            flags[agent_key] = False
+
+    # Dynamic connectors from Source Registry
+    for _entry in SOURCE_REGISTRY:
+        if _entry.connector not in flags:
+            flags[_entry.connector] = is_agent_enabled(_entry.connector)
     active = [name for name, enabled in flags.items() if enabled]
+    
     # Guard: always keep at least one agent to avoid an empty graph
     return active if active else ["neo4j"]
+
+
+def is_agent_enabled(connector_key: str) -> bool:
+    """Return whether the agent identified by *connector_key* is enabled in config.
+
+    Looks up ``<connector_key>_agent_enabled`` on the Settings object.
+    Defaults to ``True`` when no such flag exists (e.g. dynamically-registered
+    MCP connectors that have not yet been given an explicit env variable).
+    """
+    return getattr(get_settings(), f"{connector_key}_agent_enabled", True)
 
 
 def is_map_enabled() -> bool:
@@ -178,7 +227,16 @@ def is_smart_dispatcher_enabled() -> bool:
 
 def _build_router_system(available_agents: list[str]) -> str:
     """Build the router system prompt restricted to *available_agents*."""
-    agent_list = "\n".join(_AGENT_DESCRIPTIONS[a] for a in available_agents)
+    desc_lines = []
+    for a in available_agents:
+        if a in _AGENT_DESCRIPTIONS:
+            desc_lines.append(_AGENT_DESCRIPTIONS[a])
+        else:
+            entry = get_entry_by_connector(a)
+            desc_lines.append(
+                f"  • {a} – {entry.description}" if entry else f"  • {a} – specialist agent"
+            )
+    agent_list = "\n".join(desc_lines)
     agent_names = ", ".join(f'"{a}"' for a in available_agents)
     return (
         "You are the main orchestrator of the PangIA GeoIA platform.\n"
@@ -201,7 +259,7 @@ def _build_router_system(available_agents: list[str]) -> str:
 # ─── Structured routing output ────────────────────────────────────────────────
 
 class RoutingDecision(BaseModel):
-    agents: list[Literal["neo4j", "rdf", "vector", "postgis", "data_gouv", "geo"]]
+    agents: list[str]
     reasoning: str
 
 
@@ -424,10 +482,15 @@ def build_graph():
 # Module-level compiled graph reused across requests
 agent_graph = build_graph()
 
+
+# ----------------------------------------
 # Write the Mermaid diagram of the compiled graph to a file for documentation
+# ----------------------------------------
+
 _mermaid_dir = os.path.join(os.path.dirname(__file__), "..", "mermaid_graph")
 os.makedirs(_mermaid_dir, exist_ok=True)
 _mermaid_path = os.path.join(_mermaid_dir, "orchestrator_graph.mmd")
 with open(_mermaid_path, "w", encoding="utf-8") as _f:
     _f.write(agent_graph.get_graph().draw_mermaid())
+
 logger.info("Mermaid graph written to %s", _mermaid_path)

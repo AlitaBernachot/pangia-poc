@@ -121,6 +121,7 @@ AGENT_NAMES = [
     "postgis_agent",
     "mapviz_agent",
     "data_gouv_agent",
+    "geonetwork_mcp_agent",
     "dataviz_agent",
     "humanoutput_agent",
     "geo_agent",

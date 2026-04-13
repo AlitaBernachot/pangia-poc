@@ -49,7 +49,7 @@ from __future__ import annotations
 
 import logging
 
-from app.agent.core.source_registry import (
+from app.agent.source.source_registry import (
     SourceEntry,
     get_registry,
     semantic_search_sources,

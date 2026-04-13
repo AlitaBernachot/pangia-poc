@@ -34,8 +34,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from pathlib import Path
 from typing import Any
 
+import yaml
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
@@ -68,142 +70,30 @@ class SourceEntry(BaseModel):
     """Capability tags — see module docstring for the vocabulary."""
 
     geo_scope: str | None = None
-    """Named geographic scope (e.g. ``"france"``, ``"commune_X"``).
-    ``None`` means globally applicable (no spatial restriction)."""
+    """Named geographic scope (e.g. ``"france"``, ``"commune_X"``). ``None`` means globally applicable."""
+
+    mcp_url: str | None = None
+    """MCP endpoint URL for connectors that are backed by an MCP server (e.g. GeoNetwork, data.gouv.fr).
+    When set, the orchestrator will dynamically register this entry as a routable agent.
+    Multiple entries can share the same connector *type* with different URLs — each must have a unique
+    ``connector`` key (e.g. ``"geonetwork_ign"``, ``"geonetwork_local"``)."""
 
     example_questions: list[str] = Field(default_factory=list)
     """Canonical example questions this source can answer."""
 
 
-# ─── Default registry ─────────────────────────────────────────────────────────
+# ─── Registry loader ──────────────────────────────────────────────────────────
 
-SOURCE_REGISTRY: list[SourceEntry] = [
-    SourceEntry(
-        id="neo4j",
-        connector="neo4j",
-        description=(
-            "Graphe de connaissances stockant les entités, leurs relations, "
-            "les faits géographiques et les données historiques. Requêtes Cypher "
-            "sur Neo4j. Idéal pour explorer des chaînes de relations complexes, "
-            "des co-occurrences, des hiérarchies et des migrations d'entités."
-        ),
-        topics=["entités", "relations", "graphe", "connaissances", "faits", "hiérarchie"],
-        entity_types=["entité", "lieu", "organisation", "événement", "personne", "territoire"],
-        capabilities=["relationship", "graph_traversal", "entity_search", "co-occurrence", "hierarchy"],
-        geo_scope=None,
-        example_questions=[
-            "Quels acteurs sont impliqués dans ce projet ?",
-            "Qui finance cette initiative ?",
-            "Quelles sont les relations entre ces entités ?",
-            "Montrez-moi la chaîne de relations entre X et Y.",
-        ],
-    ),
-    SourceEntry(
-        id="rdf",
-        connector="rdf",
-        description=(
-            "Triplestore RDF (GraphDB / Ontotext) contenant des ontologies "
-            "géospatiales et des données liées. Requêtes SPARQL et GeoSPARQL. "
-            "Idéal pour le raisonnement sémantique, les données liées et les "
-            "relations ontologiques."
-        ),
-        topics=["ontologie", "données liées", "sémantique", "RDF", "linked data"],
-        entity_types=["concept", "classe", "instance", "propriété"],
-        capabilities=["ontology", "linked_data", "sparql", "semantic_reasoning", "geosparql"],
-        geo_scope=None,
-        example_questions=[
-            "Quels sont les types d'occupation du sol dans cette région ?",
-            "Définissez la relation entre ces deux concepts géographiques.",
-            "Listez toutes les instances de la classe 'Zone protégée'.",
-        ],
-    ),
-    SourceEntry(
-        id="vector",
-        connector="vector",
-        description=(
-            "Base de données vectorielle ChromaDB contenant des documents "
-            "géographiques, des descriptions et des faits sous forme d'embeddings. "
-            "Recherche par similarité sémantique. Idéal pour les questions ouvertes, "
-            "la recherche documentaire et les questions descriptives générales."
-        ),
-        topics=["documents", "texte", "descriptions", "géographie", "sémantique"],
-        entity_types=["document", "fragment", "description", "fiche"],
-        capabilities=["semantic_search", "similarity", "document_retrieval", "embedding"],
-        geo_scope=None,
-        example_questions=[
-            "Parlez-moi de cette espèce.",
-            "Quels documents parlent de la biodiversité en Bretagne ?",
-            "Qu'est-ce que je dois savoir sur ce territoire ?",
-        ],
-    ),
-    SourceEntry(
-        id="postgis",
-        connector="postgis",
-        description=(
-            "Base de données spatiale PostgreSQL/PostGIS contenant les données "
-            "géométriques, les coordonnées, les zones et les requêtes spatiales SQL. "
-            "Idéal pour les calculs géométriques, les intersections, le calcul de "
-            "surfaces, les distances et la récupération de coordonnées précises."
-        ),
-        topics=["géométrie", "coordonnées", "spatial", "zones", "surfaces", "distances"],
-        entity_types=["point", "polygone", "ligne", "zone", "parcelle", "bâtiment"],
-        capabilities=["spatial_query", "buffer", "intersection", "area", "distance", "coordinates", "geometry"],
-        geo_scope=None,
-        example_questions=[
-            "Quelles entités se trouvent dans un rayon de 500 m ?",
-            "Quelle est la surface de cette zone ?",
-            "Où se trouvent les coordonnées de ce lieu ?",
-            "Quelles parcelles intersectent cette zone ?",
-        ],
-    ),
-    SourceEntry(
-        id="data_gouv",
-        connector="data_gouv",
-        description=(
-            "Catalogue open data du gouvernement français (data.gouv.fr) accessible "
-            "via MCP. Contient des jeux de données officiels : statistiques "
-            "publiques, données administratives, limites territoriales, "
-            "données environnementales et tout ce qui est en open data français."
-        ),
-        topics=["open data", "statistiques", "gouvernement", "données publiques", "France", "officiel"],
-        entity_types=["jeu de données", "ressource", "organisation", "thème"],
-        capabilities=["open_data", "official_statistics", "government_data", "french_datasets"],
-        geo_scope="france",
-        example_questions=[
-            "Quelles sont les données officielles sur la population de cette commune ?",
-            "Trouvez des jeux de données sur la qualité de l'air en France.",
-            "Quelles statistiques environnementales sont disponibles ?",
-        ],
-    ),
-    SourceEntry(
-        id="geo",
-        connector="geo",
-        description=(
-            "Orchestrateur d'analyse géospatiale avancée. Regroupe le géocodage "
-            "d'adresses, le calcul de distances, les zones tampon, les isochrones "
-            "(zones d'accessibilité), la recherche de proximité, les intersections, "
-            "le calcul de surfaces, la détection de clusters (hotspots), "
-            "l'optimisation d'itinéraires, les profils d'élévation, les opérations "
-            "sur les géométries GeoJSON, l'analyse spatio-temporelle et les calculs "
-            "de co-visibilité (viewshed)."
-        ),
-        topics=["géocodage", "distance", "buffer", "isochrone", "proximité", "itinéraire", "altitude"],
-        entity_types=["adresse", "coordonnées", "zone tampon", "isochrone", "itinéraire"],
-        capabilities=[
-            "geocoding", "routing", "isochrone", "elevation", "viewshed",
-            "hotspot", "temporal_analysis", "proximity", "buffer", "area",
-            "distance", "coordinates",
-        ],
-        geo_scope=None,
-        example_questions=[
-            "Géocodez cette adresse.",
-            "Quelle est la distance entre ces deux points ?",
-            "Calculez l'isochrone de 15 minutes à pied depuis ce lieu.",
-            "Quel est l'itinéraire le plus court entre ces points ?",
-            "Quelle est l'altitude de ce sommet ?",
-        ],
-    ),
-]
+_REGISTRY_YAML = Path(__file__).parent / "source_registry.yml"
+
+
+def _load_registry() -> list[SourceEntry]:
+    with _REGISTRY_YAML.open(encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    return [SourceEntry(**entry) for entry in data]
+
+
+SOURCE_REGISTRY: list[SourceEntry] = _load_registry()
 
 
 # ─── ChromaDB bootstrap ───────────────────────────────────────────────────────
@@ -318,3 +208,8 @@ def get_registry() -> list[SourceEntry]:
 def get_entry(source_id: str) -> SourceEntry | None:
     """Return the registry entry for *source_id*, or None if not found."""
     return next((e for e in SOURCE_REGISTRY if e.id == source_id), None)
+
+
+def get_entry_by_connector(connector_key: str) -> SourceEntry | None:
+    """Return the first registry entry whose *connector* matches *connector_key*, or None."""
+    return next((e for e in SOURCE_REGISTRY if e.connector == connector_key), None)

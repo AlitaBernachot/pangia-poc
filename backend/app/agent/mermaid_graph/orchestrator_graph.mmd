@@ -16,6 +16,7 @@ graph TD;
 	postgis_agent(postgis_agent)
 	data_gouv_agent(data_gouv_agent)
 	geo_agent(geo_agent)
+	geonetworkmcp_agent(geonetworkmcp_agent)
 	smart_dispatcher(smart_dispatcher)
 	intent_parser(intent_parser)
 	__end__([<p>__end__</p>]):::last
@@ -23,6 +24,7 @@ graph TD;
 	data_gouv_agent --> post_process_router;
 	dataviz_agent --> merge;
 	geo_agent --> post_process_router;
+	geonetworkmcp_agent --> post_process_router;
 	humanoutput_agent -.-> dataviz_agent;
 	humanoutput_agent -.-> mapviz_agent;
 	humanoutput_agent -.-> merge;
@@ -34,6 +36,7 @@ graph TD;
 	rdf_agent --> post_process_router;
 	smart_dispatcher -.-> data_gouv_agent;
 	smart_dispatcher -.-> geo_agent;
+	smart_dispatcher -.-> geonetworkmcp_agent;
 	smart_dispatcher -.-> merge;
 	smart_dispatcher -.-> neo4j_agent;
 	smart_dispatcher -.-> post_process_router;

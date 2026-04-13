@@ -8,7 +8,7 @@ from phoenix.otel import register
 
 from app.api.routes import router
 from app.config import get_settings
-from app.agent.core.source_registry import bootstrap_registry_embeddings
+from app.agent.source.source_registry import bootstrap_registry_embeddings
 from app.db.chroma_client import close_client as close_chroma
 from app.db.neo4j_client import close_driver
 from app.db.postgis_client import close_pool
