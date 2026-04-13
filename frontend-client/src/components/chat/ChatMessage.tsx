@@ -1,6 +1,7 @@
 import ReactMarkdown from 'react-markdown'
 import { ExternalLink } from 'lucide-react'
-import { type Message, AGENT_COLORS, agentIcon } from '../../types'
+import { type Message, AGENT_COLORS } from '../../types'
+import { AgentIcon } from '../AgentIcon'
 import { AgentActivityPanel } from './AgentActivityPanel'
 import { MapViewer } from '../MapViewer'
 import { DataVizViewer } from '../DataViz/DataVizViewer'
@@ -65,7 +66,7 @@ export function ChatMessage({ message }: Props) {
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border"
                   style={colors ? { color: colors.text, borderColor: colors.border, background: colors.bg } : {}}
                 >
-                  {agentIcon(agent)} {agent}
+                  <AgentIcon agent={agent} size={11} /> {agent}
                 </span>
               )
             })}

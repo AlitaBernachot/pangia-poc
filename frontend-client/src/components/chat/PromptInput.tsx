@@ -6,7 +6,7 @@ import {
   type KeyboardEvent,
   type DragEvent,
 } from 'react'
-import { ArrowUp, Paperclip, X, File, Square } from 'lucide-react'
+import { ArrowUp, Paperclip, X, File, Square, Share2, Link2, Layers, Map, Globe, BarChart2, Bot } from 'lucide-react'
 import type { AgentInfo, Attachment } from '../../types'
 
 interface Props {
@@ -31,7 +31,7 @@ function isImageType(type: string): boolean {
 const AGENT_COLORS_MAP: Record<string, string> = {
   'Neo4j':        'border-[#4ade80] text-[#4ade80] bg-[rgba(74,222,128,0.10)]',
   'RDF/SPARQL':   'border-[#fb923c] text-[#fb923c] bg-[rgba(251,146,60,0.10)]',
-  'Vector':       'border-[#a78bfa] text-[#a78bfa] bg-[rgba(167,139,250,0.10)]',
+  'Vector':       'border-[#60a5fa] text-[#60a5fa] bg-[rgba(96,165,250,0.10)]',
   'PostGIS':      'border-[#38bdf8] text-[#38bdf8] bg-[rgba(56,189,248,0.10)]',
   'Data.gouv.fr': 'border-[#f43f5e] text-[#f43f5e] bg-[rgba(244,63,94,0.10)]',
 }
@@ -40,13 +40,13 @@ function agentActiveClass(label: string): string {
   return AGENT_COLORS_MAP[label] ?? 'border-white/40 text-white/80 bg-white/5'
 }
 
-const AGENT_ICONS: Record<string, string> = {
-  'Neo4j': '🔷',
-  'RDF/SPARQL': '🔗',
-  'Vector': '🧲',
-  'PostGIS': '🗺️',
-  'Data.gouv.fr': '🇫🇷',
-  'DataViz': '📊',
+const AGENT_ICONS: Record<string, React.ReactElement> = {
+  'Neo4j':        <Share2 size={12} />,
+  'RDF/SPARQL':   <Link2 size={12} />,
+  'Vector':       <Layers size={12} />,
+  'PostGIS':      <Map size={12} />,
+  'Data.gouv.fr': <Globe size={12} />,
+  'DataViz':      <BarChart2 size={12} />,
 }
 
 export function PromptInput({
@@ -146,10 +146,10 @@ export function PromptInput({
       <div
         className={`mx-auto max-w-3xl rounded-xl border bg-white/4 backdrop-blur flex flex-col transition-all duration-150 ${
           isDragging
-            ? 'border-violet-400/60 bg-violet-500/5'
+            ? 'border-cyan-400/60 bg-cyan-500/5'
             : isStreaming
               ? 'border-white/8 opacity-90'
-              : 'border-white/10 focus-within:border-yellow-500/60'
+              : 'border-white/10 focus-within:border-cyan-500/60'
         }`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -158,7 +158,7 @@ export function PromptInput({
         {/* Drag overlay hint */}
         {isDragging && (
           <div className="absolute inset-0 flex items-center justify-center rounded-xl pointer-events-none z-10">
-            <span className="text-sm text-violet-300 font-medium">Drop files here</span>
+            <span className="text-sm text-cyan-300 font-medium">Drop files here</span>
           </div>
         )}
 
@@ -226,7 +226,7 @@ export function PromptInput({
                     : 'border-white/15 text-white/30 bg-transparent hover:text-white/50'
                 }`}
               >
-                <span>{AGENT_ICONS[agent.label] ?? '🤖'}</span>
+                {AGENT_ICONS[agent.label] ?? <Bot size={12} />}
                 {agent.label}
               </button>
             ))}

@@ -63,7 +63,7 @@ export function MapViewer({ geojson }: Props) {
       pointToLayer(_feature: any, latlng: L.LatLng) {
         return L.circleMarker(latlng, {
           radius: 8,
-          fillColor: '#fbbf24',
+          fillColor: '#38bdf8',
           color: '#ffffff',
           weight: 1.5,
           opacity: 1,
@@ -71,7 +71,7 @@ export function MapViewer({ geojson }: Props) {
         })
       },
       style() {
-        return { color: '#fbbf24', weight: 2, opacity: 0.85, fillColor: '#fbbf24', fillOpacity: 0.2 }
+        return { color: '#38bdf8', weight: 2, opacity: 0.85, fillColor: '#38bdf8', fillOpacity: 0.2 }
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       onEachFeature(feature: any, l: L.Layer) {

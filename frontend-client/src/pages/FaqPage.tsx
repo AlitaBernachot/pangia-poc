@@ -63,9 +63,9 @@ const AGENTS_INFO = [
     description: 'Linked open data & semantic web queries.',
   },
   {
-    icon: <Zap size={20} className="text-[#a78bfa]" />,
+    icon: <Zap size={20} className="text-[#60a5fa]" />,
     name: 'Vector / Chroma',
-    color: 'border-[#a78bfa]/30 bg-[rgba(167,139,250,0.06)]',
+    color: 'border-[#60a5fa]/30 bg-[rgba(96,165,250,0.06)]',
     description: 'Semantic similarity & embedding search.',
   },
   {
@@ -91,8 +91,8 @@ export function FaqPage() {
     <div className="max-w-3xl mx-auto px-4 py-10 space-y-12">
       {/* Hero */}
       <section className="text-center space-y-3">
-        <div className="inline-flex size-14 rounded-2xl bg-yellow-500/15 border border-yellow-500/25 items-center justify-center">
-          <HelpCircle size={26} className="text-yellow-400" />
+        <div className="inline-flex size-14 rounded-2xl bg-cyan-500/15 border border-cyan-500/25 items-center justify-center">
+          <HelpCircle size={26} className="text-cyan-400" />
         </div>
         <h1 className="text-3xl font-semibold text-white">FAQ & About</h1>
         <p className="text-white/50 text-sm max-w-lg mx-auto">
