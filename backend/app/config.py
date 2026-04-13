@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     # Set any of these to false via environment variable to disable that agent.
     neo4j_agent_enabled: bool = True
     rdf_agent_enabled: bool = True
-    vector_agent_enabled: bool = True
+    vector_chroma_agent_enabled: bool = True
     postgis_agent_enabled: bool = True
     mapviz_agent_enabled: bool = True
     data_gouv_agent_enabled: bool = True
@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     # Set to 0 (default) to fall back to the global AGENT_MAX_ITERATIONS value.
     neo4j_agent_max_iterations: int = 0
     rdf_agent_max_iterations: int = 0
-    vector_agent_max_iterations: int = 0
+    vector_chroma_agent_max_iterations: int = 0
     postgis_agent_max_iterations: int = 0
     mapviz_agent_max_iterations: int = 0
     data_gouv_agent_max_iterations: int = 0
@@ -108,8 +108,8 @@ class Settings(BaseSettings):
     neo4j_agent_model_name: str = ""
     rdf_agent_model_provider: str = ""
     rdf_agent_model_name: str = ""
-    vector_agent_model_provider: str = ""
-    vector_agent_model_name: str = ""
+    vector_chroma_agent_model_provider: str = ""
+    vector_chroma_agent_model_name: str = ""
     postgis_agent_model_provider: str = ""
     postgis_agent_model_name: str = ""
     mapviz_agent_model_provider: str = ""

@@ -152,7 +152,7 @@ into a final streamed answer.
 | `SMART_DISPATCHER_ENABLED` | `true` | Stage 2 – metadata-based router (replaces LLM router when on) |
 | `NEO4J_AGENT_ENABLED` | `true` | Knowledge Graph connector (Cypher / Neo4j) |
 | `RDF_AGENT_ENABLED` | `true` | RDF/Linked Data connector (SPARQL / GraphDB) |
-| `VECTOR_AGENT_ENABLED` | `true` | Semantic search connector (ChromaDB) |
+| `VECTOR_CHROMA_AGENT_ENABLED` | `true` | Semantic search connector (ChromaDB) |
 | `POSTGIS_AGENT_ENABLED` | `true` | Spatial SQL connector (PostGIS) |
 | `DATA_GOUV_AGENT_ENABLED` | `true` | French open-data connector (data.gouv.fr via MCP) |
 | `GEO_AGENT_ENABLED` | `true` | Geospatial analysis orchestrator (geo sub-agents) |
@@ -188,7 +188,7 @@ The number of iterations is configurable at two levels:
 | `INTENT_PARSER_AGENT_MAX_ITERATIONS` | `0` | Intent Parser override (0 = use global) |
 | `NEO4J_AGENT_MAX_ITERATIONS` | `0` | Neo4j agent override (0 = use global) |
 | `RDF_AGENT_MAX_ITERATIONS` | `0` | RDF/SPARQL agent override |
-| `VECTOR_AGENT_MAX_ITERATIONS` | `0` | Vector agent override |
+| `VECTOR_CHROMA_AGENT_MAX_ITERATIONS` | `0` | Vector agent override |
 | `POSTGIS_AGENT_MAX_ITERATIONS` | `0` | PostGIS agent override |
 | `MAPVIZ_AGENT_MAX_ITERATIONS` | `0` | Map agent override |
 | `DATA_GOUV_AGENT_MAX_ITERATIONS` | `0` | data.gouv.fr agent override |
@@ -206,7 +206,7 @@ Every agent (including the router and the merge node) can use a **different LLM 
 | `<AGENT>_MODEL_PROVIDER` | `openai`, `anthropic`, `ollama` | Provider for this agent. Leave empty to use the global provider. |
 | `<AGENT>_MODEL_NAME` | `gpt-4o`, `claude-3-5-sonnet-latest`, `llama3` | Model name for this agent. Leave empty to fall back to `OPENAI_MODEL`. |
 
-Available `<AGENT>` prefixes: `ROUTER`, `INTENT_PARSER_AGENT`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_AGENT`, `POSTGIS_AGENT`, `MAPVIZ_AGENT`, `DATA_GOUV_AGENT`, `DATAVIZ_AGENT`, `MERGE`.
+Available `<AGENT>` prefixes: `ROUTER`, `INTENT_PARSER_AGENT`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_CHROMA_AGENT`, `POSTGIS_AGENT`, `MAPVIZ_AGENT`, `DATA_GOUV_AGENT`, `DATAVIZ_AGENT`, `MERGE`.
 
 Example `.env` — use a powerful model for the router and merge, a cheaper one for sub-agents:
 
@@ -221,9 +221,9 @@ ROUTER_MODEL_NAME=gpt-4o
 MERGE_MODEL_PROVIDER=openai
 MERGE_MODEL_NAME=gpt-4o
 
-# Use a local Ollama model for the vector agent
-VECTOR_AGENT_MODEL_PROVIDER=ollama
-VECTOR_AGENT_MODEL_NAME=llama3
+# Use a local Ollama model for the vector chroma agent
+VECTOR_CHROMA_AGENT_MODEL_PROVIDER=ollama
+VECTOR_CHROMA_AGENT_MODEL_NAME=llama3
 ```
 
 Leave both variables empty (the default) to use the global `OPENAI_MODEL` for every agent.
@@ -485,7 +485,7 @@ pangia-poc/
 │       │   ├── connectors/          # Data-source agents (read-only)
 │       │   │   ├── neo4j_agent.py   # Knowledge Graph sub-agent (Cypher)
 │       │   │   ├── rdf_agent.py     # RDF sub-agent (SPARQL / GraphDB)
-│       │   │   ├── vector_agent.py  # Vector sub-agent (ChromaDB)
+│       │   │   ├── vector_chroma_agent.py  # Vector sub-agent (ChromaDB)
 │       │   │   ├── postgis_agent.py # Spatial SQL sub-agent (PostGIS)
 │       │   │   └── data_gouv_agent.py # French open-data sub-agent (data.gouv.fr MCP)
 │       │   ├── geo/                 # Geospatial processing agents
