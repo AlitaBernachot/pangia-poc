@@ -6,7 +6,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | Vue 3 + ai-elements-vue, Vite, TypeScript |
+| **Frontend** | React 19 + Tailwind CSS v4, Vite, TypeScript (`frontend-client/`) |
 | **Backend** | FastAPI, Server-Sent Events (SSE) |
 | **Orchestration** | LangChain + LangGraph (2-stage routing: Intent Parser + Smart Dispatcher + parallel sub-agents) |
 | **Knowledge Graph** | Neo4j (Cypher) |
@@ -539,25 +539,32 @@ pangia-poc/
 │           └── themes/
 │               ├── __init__.py  # SeedTheme dataclass + get_active_theme()
 │               └── dinosaurs.py # Built-in seed theme (Mesozoic palaeontology)
-└── frontend/
+└── frontend-client/         # ← active frontend (React 19 + Tailwind CSS v4)
     ├── Dockerfile
-    ├── nginx.conf
     ├── package.json
     ├── vite.config.ts
     └── src/
-        ├── main.ts              # PrimeVue setup + theme (Yellow/Aura preset)
-        ├── types.ts             # Message, AgentActivity types + helpers
-        ├── assets/
-        │   └── main.css
+        ├── App.tsx              # Root layout (Sidebar + main)
+        ├── main.tsx
+        ├── types.ts             # Message, DataViz types
+        ├── hooks/
+        │   ├── usePangiaChat.ts # SSE streaming hook
+        │   └── useSuggestions.ts
         └── components/
-            ├── ChatView.vue             # Root chat controller (SSE, state)
-            └── ChatView/
-                ├── ChatHeader.vue       # Session ID display
-                ├── ChatMessages.vue     # Message list + suggestions
-                ├── ChatMessage.vue      # Router: user vs agent
-                ├── ChatUserMessage.vue  # User bubble
-                ├── ChatAgentMessage.vue # Agent bubble (activity panels + answer)
-                └── ChatPrompt.vue       # Textarea + send button
+            ├── layout/
+            │   └── Sidebar.tsx
+            ├── chat/
+            │   ├── ChatMessage.tsx
+            │   ├── MessageList.tsx
+            │   └── ChatInput.tsx
+            ├── MapViewer.tsx    # Leaflet dark map
+            └── DataViz/
+                ├── DataVizViewer.tsx
+                ├── ChartViewer.tsx  # D3 bar/line/pie/scatter
+                ├── KpiCards.tsx
+                └── TableViewer.tsx
+
+> **Deprecated:** `frontend/` (Vue 3 + PrimeVue) is no longer maintained.
 ```
 
 ## Development (without Docker)
@@ -574,11 +581,13 @@ uvicorn app.main:app --reload
 
 ### Frontend
 
+> **Note:** `frontend/` (Vue 3) is deprecated. Use `frontend-client/` (React 19 + Tailwind CSS v4) instead.
+
 ```bash
-cd frontend
-npm install --legacy-peer-deps
-npm run dev
-# → http://localhost:5173 (proxies /api to localhost:8000)
+cd frontend-client
+npm install
+npm start
+# → http://localhost:3000 (proxies /api to localhost:8000)
 ```
 
 ---
