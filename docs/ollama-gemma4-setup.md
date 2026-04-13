@@ -49,20 +49,36 @@ You should see `healthy` in the status column.
 Once the Ollama container is running, pull the Gemma 4 model into it. This downloads the model weights into the `ollama_data` volume so they persist across restarts.
 
 ```bash
-# Pull the default (recommended) Gemma 4 variant
+# Pull the default (recommended) Gemma 4 variant (e4b, 9.6 GB)
 docker compose exec ollama ollama pull gemma4
 
-# Or pull a specific parameter size:
-docker compose exec ollama ollama pull gemma4:9b    # 9 billion parameters
-docker compose exec ollama ollama pull gemma4:27b   # 27 billion parameters (requires more RAM/VRAM)
+# Or pull a specific variant:
+docker compose exec ollama ollama pull gemma4:e2b          # 2B MoE — lightest
+docker compose exec ollama ollama pull gemma4:e4b          # 4B MoE — default
+docker compose exec ollama ollama pull gemma4:26b          # 26B — high quality
+docker compose exec ollama ollama pull gemma4:31b          # 31B — best quality (requires lots of RAM/VRAM)
 ```
 
-> **Disk & RAM requirements**
+> **Available tags**
 >
-> | Variant | Approx. model size | Minimum RAM (CPU) |
-> |---|---|---|
-> | `gemma4:9b` (default) | ~6 GB | 16 GB |
-> | `gemma4:27b` | ~18 GB | 32 GB |
+> | Tag | Size | Context | Input |
+> |---|---|---|---|
+> | `gemma4:latest` / `gemma4:e4b` | 9.6 GB | 128K | Text, Image |
+> | `gemma4:e2b` | 7.2 GB | 128K | Text, Image |
+> | `gemma4:26b` | 18 GB | 256K | Text, Image |
+> | `gemma4:31b` | 20 GB | 256K | Text, Image |
+> | `gemma4:e2b-it-q4_K_M` | 7.2 GB | 128K | Text, Image |
+> | `gemma4:e2b-it-q8_0` | 8.1 GB | 128K | Text, Image |
+> | `gemma4:e2b-it-bf16` | 10 GB | 128K | Text, Image |
+> | `gemma4:e4b-it-q4_K_M` | 9.6 GB | 128K | Text, Image |
+> | `gemma4:e4b-it-q8_0` | 12 GB | 128K | Text, Image |
+> | `gemma4:e4b-it-bf16` | 16 GB | 128K | Text, Image |
+> | `gemma4:26b-a4b-it-q4_K_M` | 18 GB | 256K | Text, Image |
+> | `gemma4:26b-a4b-it-q8_0` | 28 GB | 256K | Text, Image |
+> | `gemma4:31b-it-q4_K_M` | 20 GB | 256K | Text, Image |
+> | `gemma4:31b-it-q8_0` | 34 GB | 256K | Text, Image |
+> | `gemma4:31b-it-bf16` | 63 GB | 256K | Text, Image |
+> | `gemma4:31b-cloud` | — | 256K | Text, Image |
 >
 > GPU users: see [GPU Acceleration](#gpu-acceleration-optional) below.
 
@@ -195,5 +211,5 @@ If you prefer to run Ollama directly on your host machine (instead of inside Doc
 | `ollama` container stuck in `starting` | Wait for the health check to pass (~20 s). Run `docker compose logs ollama` to see errors. |
 | Model pull fails with a network error | Check your internet connection and Docker DNS settings. |
 | Backend agent returns `Unknown model provider 'ollama'` | Ensure `langchain-ollama` is installed (`pip install langchain-ollama`). It is included in `requirements.txt` by default. |
-| Out-of-memory when running `gemma4:27b` | Switch to `gemma4:9b`, or enable GPU acceleration. |
+| Out-of-memory when running `gemma4:26b` or `gemma4:31b` | Switch to `gemma4:e4b` (9.6 GB) or `gemma4:e2b` (7.2 GB), or enable GPU acceleration. |
 | `http://ollama:11434` unreachable from backend | Make sure the backend `depends_on` the `ollama` service (already configured) and that the `ollama` container is healthy. |

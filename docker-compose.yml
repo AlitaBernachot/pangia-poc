@@ -175,7 +175,7 @@ services:
 
   # ── Ollama (Local LLM server) ─────────────────────────────────────────────
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.20.6
     ports:
       - "11434:11434"
     volumes:
