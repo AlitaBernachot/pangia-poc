@@ -77,7 +77,7 @@
     - "Listez toutes les instances de la classe 'Zone protégée'."
 
 - id: vector
-  connector: vector
+  connector: vector_chroma
   description: >
     Base de données vectorielle ChromaDB contenant des documents
     géographiques, des descriptions et des faits sous forme d'embeddings.

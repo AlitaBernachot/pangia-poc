@@ -89,13 +89,13 @@ _ORCHESTRATOR_CONFIG: dict = _load_orchestrator_config()
 _AGENT_NODES: dict[str, tuple[str, Any]] = {
     "neo4j": ("neo4j_agent", neo4j_run),
     "rdf": ("rdf_agent", rdf_run),
-    "vector": ("vector_chroma_agent", vector_run),
+    "vector_chroma": ("vector_chroma_agent", vector_run),
     "postgis": ("postgis_agent", postgis_run),
     "data_gouv": ("data_gouv_agent", data_gouv_run),
     "geo": ("geo_agent", geo_run),
 }
 
-_REGISTRY_REQUIRED_AGENTS = {"neo4j", "rdf", "vector", "postgis"}
+_REGISTRY_REQUIRED_AGENTS = {"neo4j", "rdf", "vector_chroma", "postgis"}
 
 # Dynamically register MCP connectors declared in the Source Registry.
 # Each SourceEntry with a non-null mcp_url and a unique connector key gets its
@@ -128,7 +128,7 @@ def get_active_agents() -> list[str]:
     DATAVIZ_AGENT_ENABLED separately.
     The orchestrator is always active.  Sub-agents can be disabled
     individually via ``NEO4J_AGENT_ENABLED``, ``RDF_AGENT_ENABLED``,
-    ``VECTOR_AGENT_ENABLED``, ``POSTGIS_AGENT_ENABLED``, and
+    ``VECTOR_CHROMA_AGENT_ENABLED``, ``POSTGIS_AGENT_ENABLED``, and
     ``DATA_GOUV_AGENT_ENABLED`` environment variables (all default to
     ``true``).
     """
@@ -136,7 +136,7 @@ def get_active_agents() -> list[str]:
     flags: dict[str, bool] = {
         "neo4j": settings.neo4j_agent_enabled,
         "rdf": settings.rdf_agent_enabled,
-        "vector": settings.vector_chroma_agent_enabled,
+        "vector_chroma": settings.vector_chroma_agent_enabled,
         "postgis": settings.postgis_agent_enabled,
         "data_gouv": settings.data_gouv_agent_enabled,
         "geo": settings.geo_agent_enabled,
@@ -278,6 +278,11 @@ def router_node(state: AgentState) -> dict:
 def dispatch_agents(state: AgentState):
     """Fan out to selected parallel sub-agents using LangGraph's Send API."""
     agents = state.get("agents_to_call", [])
+    # Guard: only send to agents whose node was actually compiled into the graph.
+    # If get_active_agents() at request time diverges from build time (e.g. after
+    # a reload), sending to an unknown node produces a LangGraph warning and is
+    # silently dropped — better to filter explicitly here.
+    agents = [a for a in agents if a in _AGENT_NODES]
     if not agents:
         # No parallel agents – jump straight to post-processing (or merge)
         if is_map_enabled() or is_dataviz_enabled():

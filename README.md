@@ -275,6 +275,15 @@ The agent can be disabled by setting `INTENT_PARSER_ENABLED=false`.  When disabl
 `parsed_intent` remains `null` in the state and downstream stages fall back to their
 own logic (Smart Dispatcher uses hard rules only; the LLM router uses its own prompt).
 
+**Default temporal range (soft hint):**
+When the user query contains no explicit date or time reference, the Intent Parser
+automatically sets `temporal_range` to the start of the **current calendar year**
+(e.g. `{"start": "2026-01-01", "end": null, "raw": "current year"}`).
+This is a **soft hint only** — connector agents should use it to sort results by
+recency (most recent first) but must **not** exclude older data records.
+The year is computed dynamically at request time, so no code change is needed when
+the year rolls over.
+
 ### Smart Dispatcher
 
 The **Smart Dispatcher** (`smart_dispatcher`) is the **second preparatory stage**

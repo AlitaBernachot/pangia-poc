@@ -19,7 +19,7 @@ rdf: >-
   RDF/SPARQL (SPARQL queries against GraphDB).
   Best for: ontologies, linked data, semantic relationships, GeoSPARQL.
 
-vector: >-
+vector_chroma: >-
   Semantic search (embedding similarity via ChromaDB).
   Best for: free-text similarity, document retrieval, concept proximity,
   general descriptive questions ("tell me about X").
