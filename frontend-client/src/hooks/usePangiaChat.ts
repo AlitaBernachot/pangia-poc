@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import type { AgentActivity, AgentInfo, Message, ToolActivity } from '../types'
+import type { AgentActivity, AgentInfo, DataVizPayload, Message, ToolActivity } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -160,6 +160,11 @@ export function usePangiaChat() {
               updateAssistant((m) => ({
                 ...m,
                 geojson: event.data as Record<string, unknown>,
+              }))
+            } else if (type === 'dataviz') {
+              updateAssistant((m) => ({
+                ...m,
+                dataviz: event.data as DataVizPayload,
               }))
             } else if (type === 'done') {
               updateAssistant((m) => {

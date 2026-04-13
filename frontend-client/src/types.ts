@@ -10,6 +10,44 @@ export interface AgentActivity {
   tools: ToolActivity[]
 }
 
+// ─── DataViz types ────────────────────────────────────────────────────────────
+
+export interface DataVizDataset {
+  label: string
+  /** For bar/line/pie/histogram: array of numbers. For scatter: array of {x,y} objects. */
+  data: (number | { x: number; y: number })[]
+}
+
+export interface DataVizChart {
+  chart_type: 'bar' | 'line' | 'pie' | 'scatter' | 'histogram'
+  title: string
+  labels: string[]
+  datasets: DataVizDataset[]
+}
+
+export interface DataVizKpi {
+  label: string
+  value: string | number
+  unit?: string
+  variation?: string
+  trend: 'up' | 'down' | 'stable'
+  threshold?: string
+}
+
+export interface DataVizTable {
+  title: string
+  columns: string[]
+  rows: (string | number)[][]
+}
+
+export interface DataVizPayload {
+  charts?: DataVizChart[]
+  kpis?: DataVizKpi[]
+  tables?: DataVizTable[]
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -18,6 +56,7 @@ export interface Message {
   routingAgents?: string[]
   agentActivity?: AgentActivity[]
   geojson?: Record<string, unknown> | null
+  dataviz?: DataVizPayload | null
   attachments?: Attachment[]
 }
 

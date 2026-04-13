@@ -1,6 +1,8 @@
 import ReactMarkdown from 'react-markdown'
 import { type Message, AGENT_COLORS, agentIcon } from '../../types'
 import { AgentActivityPanel } from './AgentActivityPanel'
+import { MapViewer } from '../MapViewer'
+import { DataVizViewer } from '../DataViz/DataVizViewer'
 import { User, Bot } from 'lucide-react'
 
 interface Props {
@@ -87,6 +89,12 @@ export function ChatMessage({ message }: Props) {
             {message.streaming && message.content && <span className="cursor-blink" />}
           </div>
         )}
+
+        {/* Map */}
+        {message.geojson && <MapViewer geojson={message.geojson} />}
+
+        {/* DataViz */}
+        {message.dataviz && <DataVizViewer dataviz={message.dataviz} />}
       </div>
     </div>
   )
