@@ -31,7 +31,6 @@ export function ChatPage() {
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between px-5 py-3 border-b border-white/6">
         <div className="flex items-center gap-2">
-          <h1 className="text-sm font-medium text-white/70">AI Chat</h1>
           {isStreaming && (
             <span className="inline-flex items-center gap-1 text-xs text-amber-400">
               <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />

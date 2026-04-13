@@ -1,22 +1,35 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { type Message } from '../../types'
 import { ChatMessage } from './ChatMessage'
 import { Bot } from 'lucide-react'
+
+const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
 interface Props {
   messages: Message[]
   onSuggestion?: (text: string) => void
 }
 
-const SUGGESTIONS = [
-  'What geospatial datasets are available?',
-  'Show me flood-prone areas in Paris',
-  'Find all hospitals within 5km of the city center',
-  'What are the latest environmental data updates?',
-]
+function useSuggestions(): string[] {
+  const [suggestions, setSuggestions] = useState<string[]>([])
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/suggestions`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.suggestions?.length) setSuggestions(data.suggestions)
+      })
+      .catch(() => {
+        // backend not available yet — keep empty
+      })
+  }, [])
+
+  return suggestions
+}
 
 export function MessageList({ messages, onSuggestion }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
+  const suggestions = useSuggestions()
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -39,7 +52,7 @@ export function MessageList({ messages, onSuggestion }: Props) {
 
         {/* Suggestion chips */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xl w-full">
-          {SUGGESTIONS.map((s) => (
+          {suggestions.map((s) => (
             <button
               key={s}
               type="button"
