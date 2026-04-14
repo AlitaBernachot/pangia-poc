@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import type { AgentActivity, AgentInfo, DataVizPayload, Message, ToolActivity } from '../types'
+import type { AgentActivity, AgentInfo, DatasetCandidate, DataVizPayload, Message, ToolActivity } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -165,6 +165,11 @@ export function usePangiaChat() {
               updateAssistant((m) => ({
                 ...m,
                 dataviz: event.data as DataVizPayload,
+              }))
+            } else if (type === 'dataset_choice') {
+              updateAssistant((m) => ({
+                ...m,
+                datasetChoice: event.candidates as DatasetCandidate[],
               }))
             } else if (type === 'done') {
               updateAssistant((m) => {

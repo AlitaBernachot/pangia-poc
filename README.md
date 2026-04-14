@@ -244,8 +244,44 @@ Leave both variables empty (the default) to use the global `OPENAI_MODEL` for ev
 | `tool_end` | A sub-agent tool call completed |
 | `geojson` | GeoJSON FeatureCollection from the Map agent (rendered as interactive Leaflet map) |
 | `dataviz` | Visualisation payload from the DataViz agent (charts, KPI cards, tables) |
+| `dataset_choice` | Human-in-the-loop: list of dataset candidates for user disambiguation (see below) |
 | `error` | An error occurred |
 | `done` | Stream complete |
+
+### Human-in-the-Loop: Dataset Disambiguation
+
+When the `data_gouv_agent` searches for a dataset and finds **multiple results with different titles**, it will not arbitrarily pick one.  Instead it:
+
+1. **Asks the user** to specify which dataset they want to work with (the agent's text response lists the candidates).
+2. **Emits a `dataset_choice` SSE event** containing structured candidate data so the frontend can render interactive selection cards.
+
+**`dataset_choice` event payload:**
+
+```json
+{
+  "type": "dataset_choice",
+  "candidates": [
+    {
+      "id": "abc123",
+      "title": "Capteur d'ondes électromagnétiques — site A",
+      "description": "Mesures journalières des champs électromagnétiques…",
+      "url": "https://www.data.gouv.fr/fr/datasets/abc123/",
+      "organization": "ANFR"
+    }
+  ]
+}
+```
+
+When the user clicks a candidate card, the frontend sends a new message of the form:
+`Je veux travailler avec le dataset : "<title>" (ID: <id>)`
+
+The agent then fetches and displays the selected dataset.  
+The disambiguation step is **only triggered when**:
+- the search returns ≥ 2 distinct datasets, **and**
+- no data file was actually fetched in the same turn.
+
+> **AgentState field:** `pending_dataset_choice: list[dict] | None`  
+> Populated by `data_gouv_agent`; cleared to `None` after successful data retrieval.
 
 ### Intent Parser
 

@@ -1,12 +1,10 @@
 import { useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
 import { usePangiaChat } from '../hooks/usePangiaChat'
 import { MessageList } from '../components/chat/MessageList'
 import { PromptInput } from '../components/chat/PromptInput'
 import type { Attachment } from '../types'
 
 export function ChatPage() {
-  const { t } = useTranslation()
   const {
     messages,
     isStreaming,
@@ -33,7 +31,7 @@ export function ChatPage() {
       <div className="shrink-0 border-b border-white/6" />
 
       {/* Messages */}
-      <MessageList messages={messages} onSuggestion={(text) => sendMessage(text)} onClear={clearMessages} isStreaming={isStreaming} />
+      <MessageList messages={messages} onSuggestion={(text) => sendMessage(text)} onSendMessage={(text) => sendMessage(text)} onClear={clearMessages} isStreaming={isStreaming} />
 
       {/* Prompt */}
       <PromptInput

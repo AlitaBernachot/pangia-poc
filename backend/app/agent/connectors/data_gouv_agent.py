@@ -29,7 +29,24 @@ You have access to:
 - A local tool `fetch_resource_file` that downloads and parses the **complete raw file**
   (CSV, JSON, GeoJSON) from a direct URL and returns all rows.
 
-## Two modes — choose based on the user's intent
+## Three modes — choose based on the user's intent
+
+### 0. Disambiguation (PRIORITY RULE — check FIRST before doing anything else)
+When a search returns **2 or more datasets with different titles**, you MUST stop and ask
+the user which specific dataset they want to work with.
+**DO NOT proceed to fetch any data until the user has explicitly chosen one dataset.**
+
+Format your response exactly like this (adapt the language to the user's):
+"J'ai trouvé **N datasets** correspondant à votre recherche. Lequel souhaitez-vous utiliser ?
+
+1. **[Titre 1]** — [description courte, max 1 phrase] *(Organisation: [org])*
+2. **[Titre 2]** — [description courte, max 1 phrase] *(Organisation: [org])*
+...
+
+Veuillez me préciser le numéro ou le titre exact du dataset souhaité."
+
+Exception: if the user's message already contains a dataset ID (e.g. a UUID) or the exact
+title of one of the results, proceed directly with that dataset.
 
 ### 1. Metadata / discovery questions
 *"What datasets exist about X?", "Who publishes data on Y?", "Is there open data for Z?"*
@@ -70,6 +87,75 @@ When the intent is ambiguous, default to **Strategy B** (full retrieval).
 - Answer in the same language as the user's question.
 - Be concise: answer in the fewest words needed. No preambles, no repetition.
 """
+
+# ─── Dataset candidate extraction helper ──────────────────────────────────────
+
+def _extract_dataset_candidates(messages) -> list[dict]:
+    """Parse search tool results from the ReAct loop and return dataset candidates.
+
+    Handles both the standard data.gouv.fr search response
+    ``{"data": [...], "total": N}`` and bare list responses.
+    Returns a deduplicated list of dicts with keys:
+    ``id``, ``title``, ``description``, ``url``, ``organization``.
+    """
+    candidates: list[dict] = []
+    seen_ids: set[str] = set()
+
+    for msg in messages:
+        if not isinstance(msg, ToolMessage):
+            continue
+        raw = msg.content
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        try:
+            data = json.loads(raw)
+        except (json.JSONDecodeError, ValueError):
+            continue
+
+        # data.gouv.fr search: {"data": [...], "total": N}
+        dataset_list: list | None = None
+        if isinstance(data, dict) and "data" in data and isinstance(data["data"], list):
+            dataset_list = data["data"]
+        elif isinstance(data, list):
+            dataset_list = data
+
+        if not dataset_list:
+            continue
+
+        for ds in dataset_list:
+            if not isinstance(ds, dict):
+                continue
+            ds_id = str(ds.get("id", ""))
+            title = str(ds.get("title", ds.get("id", "")))
+            if not ds_id and not title:
+                continue
+            if ds_id and ds_id in seen_ids:
+                continue
+            if ds_id:
+                seen_ids.add(ds_id)
+
+            org = ds.get("organization") or {}
+            if isinstance(org, dict):
+                org_name = org.get("name", "")
+            else:
+                org_name = str(org)
+
+            raw_desc = ds.get("description") or ""
+            # Strip Markdown-ish markup and truncate for display
+            description = " ".join(raw_desc.split())[:250]
+
+            candidates.append(
+                {
+                    "id": ds_id,
+                    "title": title,
+                    "description": description,
+                    "url": ds.get("page", ds.get("url", "")),
+                    "organization": org_name,
+                }
+            )
+
+    return candidates
+
 
 # ─── Local tool ───────────────────────────────────────────────────────────────
 
@@ -218,6 +304,19 @@ async def _run(state: AgentState) -> dict:
         result_content = "data.gouv.fr agent returned no result."
 
     state_update: dict = {"sub_results": {"data_gouv": result_content}}
+
+    # ── Human-in-the-loop: dataset disambiguation ─────────────────────────────
+    # When the agent asked the user to choose among multiple datasets (i.e., no
+    # data was actually fetched), extract the candidates from search tool results
+    # and surface them via state so the API layer can emit a `dataset_choice` event.
+    if tabular_data is None and geojson_data is None:
+        candidates = _extract_dataset_candidates(messages)
+        if len(candidates) > 1:
+            state_update["pending_dataset_choice"] = candidates
+        else:
+            state_update["pending_dataset_choice"] = None
+    else:
+        state_update["pending_dataset_choice"] = None
 
     # ── Populate state["geojson"] from the GeoJSON fetch ──────────────────────
     if geojson_data is not None:

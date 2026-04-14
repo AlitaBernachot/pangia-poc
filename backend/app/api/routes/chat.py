@@ -81,6 +81,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         "dataviz": None,
         "output_decision": None,
         "parsed_intent": None,
+        "pending_dataset_choice": None,
     }
 
     async def event_stream() -> AsyncGenerator[str, None]:
@@ -108,6 +109,14 @@ async def chat(body: ChatRequest) -> StreamingResponse:
                         agents = output.get("agents_to_call", [])
                         if agents:
                             yield _sse({"type": "routing", "agents": agents})
+
+                # ── Data.gouv dataset-choice (human-in-the-loop) ──────────
+                elif kind == "on_chain_end" and node == "data_gouv_agent":
+                    output = event.get("data", {}).get("output", {})
+                    if isinstance(output, dict):
+                        candidates = output.get("pending_dataset_choice")
+                        if candidates and isinstance(candidates, list):
+                            yield _sse({"type": "dataset_choice", "candidates": candidates})
 
                 # ── Map agent GeoJSON output ───────────────────────────────
                 elif kind == "on_chain_end" and node == "mapviz_agent":

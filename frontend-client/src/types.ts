@@ -46,6 +46,16 @@ export interface DataVizPayload {
   tables?: DataVizTable[]
 }
 
+// ─── Dataset choice (human-in-the-loop) ──────────────────────────────────────
+
+export interface DatasetCandidate {
+  id: string
+  title: string
+  description: string
+  url: string
+  organization: string
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface Message {
@@ -57,6 +67,7 @@ export interface Message {
   agentActivity?: AgentActivity[]
   geojson?: Record<string, unknown> | null
   dataviz?: DataVizPayload | null
+  datasetChoice?: DatasetCandidate[] | null
   attachments?: Attachment[]
 }
 
