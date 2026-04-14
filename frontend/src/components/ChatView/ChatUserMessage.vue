@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 <template>
   <div class="flex justify-end gap-3">
     <div class="max-w-[72%] bg-white/8 border border-white/10 rounded-xl rounded-tr-none px-4 py-3 text-sm leading-relaxed">

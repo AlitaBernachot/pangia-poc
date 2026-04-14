@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 AlitaBernachot
+//
+// SPDX-License-Identifier: MIT
+
 import { useState } from 'react'
 import { useTranslation, Trans } from 'react-i18next'
 import { ChevronDown, ChevronUp, Globe, Database, Zap, Shield, HelpCircle } from 'lucide-react'

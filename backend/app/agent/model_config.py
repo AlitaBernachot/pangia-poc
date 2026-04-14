@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 """Model configuration interface for PangIA agents.
 
 Each agent can be individually configured to use a specific LLM provider and

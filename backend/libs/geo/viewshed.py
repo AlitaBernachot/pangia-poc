@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 """Viewshed / line-of-sight geometric helpers."""
 from __future__ import annotations
 

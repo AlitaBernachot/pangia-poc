@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+# SPDX-License-Identifier: MIT
+
+# Development and compliance tools
+# Install with: pip install -r requirements-dev.txt
+
+# SPDX / REUSE compliance (https://reuse.software/)
+reuse>=4.0

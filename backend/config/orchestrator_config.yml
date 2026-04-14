@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 # Orchestrator configuration — loaded at startup by orchestrator.py.
 # Edit routing rules and the prompt preamble here without touching Python code.
 

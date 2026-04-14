@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 <template>
   <ChatUserMessage v-if="msg.role === 'user'" :msg="msg" />
   <ChatAgentMessage v-else :msg="msg" />

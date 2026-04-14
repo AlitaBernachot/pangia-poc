@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 from neo4j import AsyncGraphDatabase, AsyncDriver
 from app.config import get_settings
 

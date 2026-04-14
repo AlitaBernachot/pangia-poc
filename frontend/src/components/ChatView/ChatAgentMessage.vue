@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 <template>
   <div class="flex gap-3 items-start">
     <Avatar icon="pi pi-globe" shape="circle" size="small" class="shrink-0 mt-1 bg-yellow-500/20! text-yellow-300!" />

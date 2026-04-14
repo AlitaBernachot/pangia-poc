@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 <template>
   <div class="chart-wrapper rounded-xl border border-white/10 bg-white/3 p-4">
     <h3 class="text-sm font-semibold text-white/80 mb-3">{{ chart.title }}</h3>

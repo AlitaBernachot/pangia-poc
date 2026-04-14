@@ -1,4 +1,8 @@
 ---
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 description: "Use when building Vue components or UI features with PrimeVue. Covers available components, import rules, and documentation URLs."
 applyTo: "**/*.vue"
 ---

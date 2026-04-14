@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 sse-starlette>=1.8.2
@@ -35,3 +39,4 @@ langchain-mcp-adapters>=0.2.2
 # Arize Phoenix (agent observability)
 arize-phoenix-otel>=0.8.0
 openinference-instrumentation-langchain>=0.1.0
+

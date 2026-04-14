@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 # `agent/source` — Source Registry
 
 This package centralises the declaration of all **data-source connectors** that Pangia can route queries to.

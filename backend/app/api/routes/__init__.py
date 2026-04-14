@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 from fastapi import APIRouter
 
 from app.api.routes.agents import router as agents_router

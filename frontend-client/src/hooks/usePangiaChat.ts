@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 AlitaBernachot
+//
+// SPDX-License-Identifier: MIT
+
 import { useCallback, useRef, useState } from 'react'
 import type { AgentActivity, AgentInfo, DataVizPayload, Message, ToolActivity } from '../types'
 

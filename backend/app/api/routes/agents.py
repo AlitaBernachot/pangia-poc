@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 from fastapi import APIRouter
 
 from app.agent.utils import get_active_agents, get_agent_labels
