@@ -37,6 +37,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agent.model_config import build_llm, get_agent_model_config
 from app.agent.core.state import AgentState
+from libs.filereader import _find_coord_columns
 
 logger = logging.getLogger(__name__)
 
@@ -114,10 +115,30 @@ async def run(state: AgentState) -> dict:
 
 async def _run(state: AgentState) -> dict:
     sub_results: dict[str, str] = state.get("sub_results", {})
+    existing_dataviz = state.get("dataviz")
+    existing_geojson = state.get("geojson")
     user_query = next(
         (m.content for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
         "",
     )
+
+    # ── Fast-path: dataviz/geojson already built overrides heuristics ─────────
+    # When dataviz or geojson is pre-populated (e.g. by data_gouv_agent) we know
+    # for certain what to render without calling the LLM.
+    has_prebuilt_dataviz = existing_dataviz and (
+        existing_dataviz.get("tables") or existing_dataviz.get("charts") or existing_dataviz.get("kpis")
+    )
+    if has_prebuilt_dataviz or existing_geojson is not None:
+        tables = (existing_dataviz or {}).get("tables", [])
+        columns = tables[0].get("columns", []) if tables else []
+        lat_col, lon_col = _find_coord_columns(columns)
+        needs_map = existing_geojson is not None or (lat_col is not None and lon_col is not None)
+        return {
+            "output_decision": {
+                "needs_map": needs_map,
+                "needs_dataviz": bool(has_prebuilt_dataviz),
+            }
+        }
 
     sub_text = "\n\n".join(
         f"[{agent.upper()} RESULTS]:\n{result}"

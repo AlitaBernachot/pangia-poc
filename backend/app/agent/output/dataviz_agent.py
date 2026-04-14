@@ -79,6 +79,10 @@ question, then decide whether the data can be meaningfully visualised.
 - Only include visualisations that are genuinely useful given the data.
 - If there is no visualisable data, return:
   {{"charts": [], "kpis": [], "tables": []}}
+- **Display-only rule**: when the user only asks to *show*, *display*, *list*
+  or *afficher*, *montrer*, *lister* data WITHOUT requesting charts, analysis,
+  statistics, or comparisons, call ONLY `build_table`. Do NOT call `build_chart`
+  or `build_kpi`.
 - Use "bar" charts for comparisons, "line" for time-series / trends, "pie"
   for proportions (≤ 8 slices), "scatter" for correlations, "histogram"
   for distributions.
@@ -157,8 +161,15 @@ def build_chart(
 
     try:
         datasets = _lenient_json_loads(datasets_json)
-    except (json.JSONDecodeError, ValueError) as exc:
-        return f"Invalid datasets_json: {exc}"
+    except (json.JSONDecodeError, ValueError):
+        # Common LLM mistake: extra closing brace at end, e.g. [{...}}  or  [{...}}]
+        repaired = re.sub(r"\}\}(\s*\]?\s*)$", r"}\1", datasets_json.strip())
+        if not repaired.rstrip().endswith("]"):
+            repaired = repaired.rstrip() + "]"
+        try:
+            datasets = _lenient_json_loads(repaired)
+        except (json.JSONDecodeError, ValueError) as exc:
+            return f"Invalid datasets_json: {exc}"
 
     if not isinstance(labels, list):
         return "labels_json must be a JSON array."
@@ -258,6 +269,20 @@ _NUMERIC_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# User intent is purely "show me the data" (no analysis/chart request)
+_DISPLAY_ONLY_RE = re.compile(
+    r"\b(?:affich[e|er]r?|montr[er]r?|list[e|er]r?|donn[e|er]r?|voir|vois|show|display|donne[- ]moi|affiche[- ]moi|montre[- ]moi)\b",
+    re.IGNORECASE,
+)
+
+# Explicit chart / analysis / statistics request
+_ANALYSIS_INTENT_RE = re.compile(
+    r"\b(?:graphi?(?:que)?|chart|graph|courbe|histogramme|histogram|camembert|pie|bar(?:re)?|"
+    r"statistiques?|statistics?|analys[e|er]|comparer?|comparaison|évolution|tendance|trend|"
+    r"visualis[e|er]|kpi|dashboard)",
+    re.IGNORECASE,
+)
+
 
 # ─── Node function ────────────────────────────────────────────────────────────
 
@@ -276,9 +301,17 @@ async def run(state: AgentState) -> dict:
 
 async def _run(state: AgentState) -> dict:
     sub_results: dict[str, str] = state.get("sub_results", {})
+    existing_dataviz: dict[str, Any] | None = state.get("dataviz")
     user_query = next(
         (m.content for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
         "",
+    )
+
+    # Detect table-only mode: user just wants to see the data, no charts
+    _uq = str(user_query)
+    table_only_mode = (
+        bool(_DISPLAY_ONLY_RE.search(_uq))
+        and not bool(_ANALYSIS_INTENT_RE.search(_uq))
     )
 
     # Build enriched context from all sub-agent results
@@ -288,28 +321,65 @@ async def _run(state: AgentState) -> dict:
         if result and result.strip()
     )
 
+    # ── Pre-seed collected results with dataviz tables already built ───────────
+    # When dataviz is pre-populated (e.g. by data_gouv_agent), reuse its tables
+    # and only ask the LLM to add charts/KPIs if the data is numeric.
+    preseeded_tables: list[dict[str, Any]] = []
+    if existing_dataviz and existing_dataviz.get("tables"):
+        preseeded_tables = list(existing_dataviz["tables"])
+        first_table = preseeded_tables[0]
+        cols = first_table.get("columns", [])
+        all_rows = first_table.get("rows", [])
+        total = len(all_rows)
+        # Reconstruct list-of-dicts for LLM sample context
+        sample_rows = [dict(zip(cols, r)) for r in all_rows[:50]]
+        sub_text = (
+            f"[DONNÉES COMPLÈTES – {total} lignes, colonnes: {', '.join(cols)}]\n"
+            f"Exemple (premières {len(sample_rows)} lignes): {json.dumps(sample_rows, ensure_ascii=False, default=str)}\n\n"
+            f"NOTE: Un tableau avec TOUTES les {total} lignes a déjà été construit. "
+            f"N'appelle PAS build_table. Appelle uniquement build_chart ou build_kpi si pertinent."
+        )
+
     # Quick heuristic: skip entirely if there is no numeric / statistical signal
     combined_check = f"{sub_text} {user_query}"
-    if not _NUMERIC_HINT_RE.search(combined_check):
+    if not preseeded_tables and not _NUMERIC_HINT_RE.search(combined_check):
         return {"sub_results": {"dataviz": ""}, "dataviz": None}
 
+    # ── Short-circuit: table-only mode or non-numeric preseeded data ──────────
+    # When the user only asks to display data (no analysis/chart request),
+    # or when there is no numeric signal, return tables only — skip the LLM.
+    if preseeded_tables and (table_only_mode or not _NUMERIC_HINT_RE.search(combined_check)):
+        dataviz_data = {"charts": [], "kpis": [], "tables": preseeded_tables}
+        return {
+            "sub_results": {"dataviz": "Visualisations generated: 1 table(s)."},
+            "dataviz": dataviz_data,
+        }
+
     llm = build_llm(get_agent_model_config("dataviz_agent"), streaming=True).bind_tools(
-        DATAVIZ_TOOLS
+        DATAVIZ_TOOLS if not table_only_mode else [build_table]
+    )
+
+    table_only_note = (
+        "\n\nIMPORTANT: The user only wants to see the data displayed. "
+        "Call ONLY build_table. Do NOT call build_chart or build_kpi."
+        if table_only_mode
+        else ""
     )
 
     dataviz_input = (
-        f"{sub_text}\n\nOriginal user question: {user_query}"
+        f"{sub_text}\n\nOriginal user question: {user_query}{table_only_note}"
         if sub_text
-        else user_query
+        else f"{user_query}{table_only_note}"
     )
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=dataviz_input)]
 
     # Accumulate structured results from tool calls directly, so we don't
     # depend on the LLM reproducing them in its final message.
+    # Pre-seed tables with raw file data (takes priority over LLM-built tables).
     collected_charts: list[dict[str, Any]] = []
     collected_kpis: list[dict[str, Any]] = []
-    collected_tables: list[dict[str, Any]] = []
+    collected_tables: list[dict[str, Any]] = list(preseeded_tables)
 
     for _ in range(get_agent_max_iterations("dataviz_agent")):
         response: AIMessage = await llm.ainvoke(messages)
@@ -318,6 +388,7 @@ async def _run(state: AgentState) -> dict:
         if not getattr(response, "tool_calls", None):
             break
 
+        all_errors = True
         for tc in response.tool_calls:
             tool_fn = _TOOL_MAP.get(tc["name"])
             if tool_fn is None:
@@ -328,8 +399,12 @@ async def _run(state: AgentState) -> dict:
                 except Exception as exc:
                     result = f"Tool error: {exc}"
 
+            is_error = isinstance(result, str) and result.startswith(("Unknown tool", "Tool error", "Invalid"))
+            if not is_error:
+                all_errors = False
+
             # Collect structured output from each tool call
-            if isinstance(result, str) and not result.startswith(("Unknown tool", "Tool error", "Invalid")):
+            if not is_error:
                 try:
                     item = json.loads(result)
                     if isinstance(item, dict):
@@ -337,12 +412,17 @@ async def _run(state: AgentState) -> dict:
                             collected_charts.append(item)
                         elif tc["name"] == "build_kpi" and "label" in item:
                             collected_kpis.append(item)
-                        elif tc["name"] == "build_table" and "columns" in item:
+                        elif tc["name"] == "build_table" and "columns" in item and not preseeded_tables:
+                            # Only add LLM-built tables when no preseeded table exists
                             collected_tables.append(item)
                 except (json.JSONDecodeError, ValueError):
                     pass
 
             messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
+
+        # All tool calls failed: no point sending the same args again
+        if all_errors:
+            break
 
     # Build dataviz_data from collected tool results first (most reliable).
     # Fall back to parsing the LLM's final message if no tools were called.

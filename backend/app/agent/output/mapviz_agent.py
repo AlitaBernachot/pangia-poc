@@ -23,6 +23,7 @@ from langchain_core.tools import tool
 
 from app.agent.model_config import build_llm, get_agent_model_config, get_agent_max_iterations
 from app.agent.core.state import AgentState
+from libs.filereader import rows_to_geojson
 
 # ─── System prompt ────────────────────────────────────────────────────────────
 
@@ -307,10 +308,46 @@ async def run(state: AgentState) -> dict:
 
 async def _run(state: AgentState) -> dict:
     sub_results: dict[str, str] = state.get("sub_results", {})
+    existing_dataviz: dict[str, Any] | None = state.get("dataviz")
     user_query = next(
         (m.content for m in reversed(state["messages"]) if isinstance(m, HumanMessage)),
         "",
     )
+
+    # ── GeoJSON already computed by a connector (e.g. data_gouv_agent) ────────
+    # Return it directly without calling the LLM.
+    if state.get("geojson"):
+        return {
+            "sub_results": {"map": "GeoJSON pré-chargé par l'agent connecteur."},
+            "geojson": state["geojson"],
+        }
+
+    # ── For dataviz tables with coordinate columns, build GeoJSON directly ─────
+    # Reconstruct list-of-dicts from the table (rows stored as list-of-lists).
+    if existing_dataviz and existing_dataviz.get("tables"):
+        first_table = existing_dataviz["tables"][0]
+        cols = first_table.get("columns", [])
+        all_rows = [dict(zip(cols, r)) for r in first_table.get("rows", [])]
+        if all_rows:
+            fc = rows_to_geojson(all_rows, cols)
+            if fc:
+                total = len(all_rows)
+                return {
+                    "sub_results": {"map": f"{len(fc['features'])} features extraits ({total} enregistrements)."},
+                    "geojson": fc,
+                }
+            # Auto-detection failed: inject sample as context for the LLM.
+            sample = all_rows[:30]
+            sample_text = json.dumps(sample, ensure_ascii=False, default=str)
+            _raw_injection = (
+                f"[DONNÉES COMPLÈTES – {len(all_rows)} enregistrements, "
+                f"colonnes: {', '.join(cols)}]\n"
+                f"Extrait (30 premières lignes): {sample_text}\n\n"
+            )
+        else:
+            _raw_injection = ""
+    else:
+        _raw_injection = ""
 
     # ── Extract pre-built GeoJSON features from structured sub-result payloads ─
     # Some sub-agents (e.g. geo_isochrone) embed GeoJSON directly in their
@@ -336,16 +373,17 @@ async def _run(state: AgentState) -> dict:
         return val
 
     # Build enriched context from all sub-agent results
-    sub_text = "\n\n".join(
+    sub_text = _raw_injection + "\n\n".join(
         f"[{agent.upper()} RESULTS]:\n{_unwrap_sub_result(result)}"
         for agent, result in sub_results.items()
         if result and result.strip()
     )
 
     # Quick heuristic: skip entirely if there is no geographic signal.
-    # Exception: if sub-agents already provided direct GeoJSON features, keep them.
+    # Exception: bypass the gate when raw file injection is present (we already
+    # decided the LLM should try to geocode) or when direct features were found.
     combined_check = f"{sub_text} {user_query}"
-    if not _COORD_HINT_RE.search(combined_check):
+    if not _raw_injection and not _COORD_HINT_RE.search(combined_check):
         if direct_features:
             return {
                 "sub_results": {"map": ""},

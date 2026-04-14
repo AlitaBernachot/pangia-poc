@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Trash2 } from 'lucide-react'
 import { type Message } from '../../types'
 import { ChatMessage } from './ChatMessage'
 
@@ -8,6 +9,8 @@ const API_BASE = import.meta.env.VITE_API_URL ?? ''
 interface Props {
   messages: Message[]
   onSuggestion?: (text: string) => void
+  onClear?: () => void
+  isStreaming?: boolean
 }
 
 function useSuggestions(): string[] {
@@ -27,7 +30,7 @@ function useSuggestions(): string[] {
   return suggestions
 }
 
-export function MessageList({ messages, onSuggestion }: Props) {
+export function MessageList({ messages, onSuggestion, onClear, isStreaming }: Props) {
   const { t } = useTranslation()
   const bottomRef = useRef<HTMLDivElement>(null)
   const suggestions = useSuggestions()
@@ -73,6 +76,19 @@ export function MessageList({ messages, onSuggestion }: Props) {
         {messages.map((msg) => (
           <ChatMessage key={msg.id} message={msg} />
         ))}
+        {messages.length > 0 && !isStreaming && onClear && (
+          <div className="flex justify-center pt-2">
+            <button
+              type="button"
+              onClick={onClear}
+              title={t('chat.clearConversation')}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors"
+            >
+              <Trash2 size={12} />
+              {t('chat.clear')}
+            </button>
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
     </div>

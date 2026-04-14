@@ -5,7 +5,7 @@ export function Sidebar() {
   const { t } = useTranslation()
 
   return (
-    <aside className="w-14 shrink-0 h-screen sticky top-0 flex flex-col items-center justify-end pb-4 border-r border-white/8 bg-[#0d0d0f]">
+    <aside className="w-14 shrink-0 flex flex-col items-center justify-end pb-4 border-r border-white/8 bg-[#0d0d0f]">
       {/* Cog icon — future settings menu */}
       <button
         type="button"

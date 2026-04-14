@@ -1,5 +1,23 @@
 import type { DataVizTable } from '../../types'
 
+const IMAGE_URL_RE = /^https?:\/\/.+\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i
+
+function CellContent({ value }: { value: string | number }) {
+  const s = String(value)
+  if (IMAGE_URL_RE.test(s)) {
+    return (
+      <img
+        src={s}
+        alt=""
+        className="size-10 object-cover rounded"
+        loading="lazy"
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+      />
+    )
+  }
+  return <>{s}</>
+}
+
 interface Props {
   table: DataVizTable
 }
@@ -37,10 +55,10 @@ export function TableViewer({ table }: Props) {
         </button>
       </div>
       {/* Table */}
-      <div className="overflow-auto max-h-60">
+      <div className="overflow-auto max-h-128">
         <table className="w-full text-[11px]">
           <thead className="sticky top-0">
-            <tr>
+            <tr style={{"background": "#151517"}}>
               {table.columns.map((col) => (
                 <th
                   key={col}
@@ -56,13 +74,17 @@ export function TableViewer({ table }: Props) {
               <tr key={i} className="border-b border-white/5 last:border-0">
                 {row.map((cell, j) => (
                   <td key={j} className="text-white/75 py-1 px-2">
-                    {cell}
+                    <CellContent value={cell} />
                   </td>
                 ))}
               </tr>
             ))}
           </tbody>
         </table>
+      </div>
+      {/* Footer */}
+      <div className="px-3 py-1.5 border-t border-white/8 text-[11px] text-white/35">
+        {table.rows.length} enregistrement{table.rows.length !== 1 ? 's' : ''}
       </div>
     </div>
   )
