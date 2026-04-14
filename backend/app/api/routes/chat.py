@@ -79,6 +79,8 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         "sub_results": {},
         "geojson": None,
         "dataviz": None,
+        "output_decision": None,
+        "parsed_intent": None,
     }
 
     async def event_stream() -> AsyncGenerator[str, None]:
