@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { type Message } from '../../types'
 import { ChatMessage } from './ChatMessage'
 
@@ -27,6 +28,7 @@ function useSuggestions(): string[] {
 }
 
 export function MessageList({ messages, onSuggestion }: Props) {
+  const { t } = useTranslation()
   const bottomRef = useRef<HTMLDivElement>(null)
   const suggestions = useSuggestions()
 
@@ -42,10 +44,9 @@ export function MessageList({ messages, onSuggestion }: Props) {
           <div className="flex items-center justify-center mx-auto">
             <img src="/logo.png" alt="PangIA" className="size-20" />
           </div>
-          <h2 className="text-2xl font-semibold text-white">PangIA Assistant</h2>
+          <h2 className="text-2xl font-semibold text-white">{t('messageList.title')}</h2>
           <p className="text-white/50 text-sm max-w-sm">
-            Your intelligent geospatial AI. Ask questions about geographic data, maps, spatial
-            analysis, and more.
+            {t('messageList.subtitle')}
           </p>
         </div>
 

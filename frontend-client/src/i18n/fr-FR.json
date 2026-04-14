@@ -1,0 +1,79 @@
+{
+  "navbar": {
+    "chat": "Chat",
+    "faq": "FAQ"
+  },
+  "sidebar": {
+    "settings": "Paramètres",
+    "user": "Utilisateur"
+  },
+  "chat": {
+    "clearConversation": "Effacer la conversation",
+    "clear": "Effacer"
+  },
+  "messageList": {
+    "title": "Assistant PangIA",
+    "subtitle": "Votre IA géospatiale intelligente. Posez des questions sur les données géographiques, les cartes, l'analyse spatiale, et bien plus encore."
+  },
+  "promptInput": {
+    "placeholder": "Posez n'importe quelle question sur les données géospatiales…",
+    "dropFiles": "Déposez les fichiers ici",
+    "attach": "Joindre",
+    "attachFiles": "Joindre des fichiers",
+    "stopGenerating": "Arrêter la génération",
+    "send": "Envoyer",
+    "removeAttachment": "Supprimer",
+    "hint": "Entrée pour envoyer · Maj+Entrée pour une nouvelle ligne · Glisser-déposer des fichiers pour les joindre",
+    "deselectAgent": "Désélectionner {{agent}}",
+    "selectAgent": "Sélectionner {{agent}}"
+  },
+  "chatMessage": {
+    "routingTo": "Routage vers",
+    "thinking": "Réflexion en cours..."
+  },
+  "agentActivity": {
+    "thinking": "Réflexion en cours…",
+    "done": "Terminé"
+  },
+  "faq": {
+    "heroTitle": "FAQ & À propos",
+    "heroSubtitle": "Tout ce que vous devez savoir sur PangIA — l'Assistant d'Intelligence Géospatiale Pansophique.",
+    "aboutTitle": "À propos de PangIA",
+    "aboutP1": "PangIA est une preuve de concept open-source démontrant comment les grands modèles de langage peuvent être combinés avec des backends géospatiaux hétérogènes pour fournir des informations géographiques intelligentes et multi-sources via une interface conversationnelle.",
+    "aboutP2": "Le backend est construit avec <b>FastAPI</b> et <b>LangGraph</b>, orchestrant un graphe d'agents spécialisés qui interrogent chacun une source de données différente. Les réponses sont diffusées en temps réel via les Server-Sent Events.",
+    "aboutP3": "Ce client frontend est construit avec <b>React</b>, <b>Vite</b> et <b>Tailwind CSS</b>. La prise en charge des pièces jointes est modélisée d'après le modèle de composant <link>AI SDK Elements Attachments</link>.",
+    "faqTitle": "Questions Fréquentes",
+    "footerNote": "PangIA · Preuve de concept open-source ·",
+    "footerGithub": "GitHub",
+    "agents": {
+      "neo4j": "Base de données graphe pour des requêtes riches en relations.",
+      "rdf": "Données ouvertes liées et requêtes du web sémantique.",
+      "vector": "Recherche par similarité sémantique et embeddings.",
+      "postgis": "Requêtes SQL spatiales sur des données géographiques.",
+      "datagouv": "Portail des données ouvertes du gouvernement français."
+    },
+    "questions": {
+      "q0": "Qu'est-ce que PangIA ?",
+      "q1": "Quel type de questions puis-je poser ?",
+      "q2": "Quels agents de données sont disponibles ?",
+      "q3": "Puis-je joindre des fichiers à mes messages ?",
+      "q4": "Comment fonctionne la mémoire de session ?",
+      "q5": "Mes données sont-elles privées ?",
+      "q6": "Que signifient les panneaux d'activité des agents ?",
+      "q7": "Quels navigateurs sont pris en charge ?"
+    },
+    "answers": {
+      "a0": "PangIA (Pansophic Geospatial Intelligence Assistant) est une plateforme alimentée par l'IA qui vous permet d'interroger et d'analyser des données géospatiales en langage naturel. Elle se connecte à plusieurs backends spécialisés — notamment des bases de données graphes, des stores RDF, la recherche vectorielle et PostGIS — pour fournir des réponses riches et contextuelles sur les informations géographiques.",
+      "a1": "Vous pouvez poser n'importe quelle question relative aux données géospatiales. Exemples : « Montrez-moi tous les hôpitaux dans un rayon de 5 km de la Tour Eiffel », « Quels jeux de données environnementaux sont disponibles pour le département de Seine-Saint-Denis ? », « Trouvez les routes intersectant les zones inondables à Lyon » ou « Visualisez la densité de population en Île-de-France ». L'assistant routera votre requête vers les agents de données appropriés.",
+      "a2": "PangIA orchestre plusieurs agents spécialisés : Neo4j (relations de graphe), RDF/SPARQL (données ouvertes liées), Vector/Chroma (recherche sémantique), PostGIS (SQL spatial), Map (géocodage et visualisation GeoJSON), Data.gouv.fr (portail de données ouvertes français) et DataViz (génération de graphiques et KPI). Les agents peuvent être activés individuellement dans la zone de saisie du chat.",
+      "a3": "Oui ! Vous pouvez joindre des fichiers en cliquant sur l'icône trombone ou en faisant glisser et déposant des fichiers sur la zone de saisie. Les fichiers image afficheront un aperçu miniature. Notez que le traitement des fichiers dépend de la configuration du backend — vérifiez auprès de votre administrateur quels types de fichiers sont pris en charge.",
+      "a4": "PangIA maintient l'historique des conversations au sein d'une session en utilisant un store Redis. L'IA peut se référer aux messages précédents de la même conversation. Commencer un nouveau chat (via le bouton Effacer) démarre une nouvelle session sans contexte préalable.",
+      "a5": "Les requêtes sont traitées côté serveur par le fournisseur LLM configuré et les agents spécialisés. Veuillez consulter les politiques de gestion des données de votre organisation avant de soumettre des informations sensibles ou personnelles. L'historique du chat est stocké dans Redis et est lié à un identifiant de session.",
+      "a6": "Lorsque l'assistant génère une réponse, vous pouvez voir des panneaux pliables pour chaque agent interrogé. Ceux-ci affichent le raisonnement intermédiaire de l'agent et tous les outils qu'il a invoqués (p. ex. des requêtes de base de données). Une fois que l'agent a terminé, le panneau se réduit et un badge « terminé » est affiché. Cette transparence vous aide à comprendre comment la réponse a été construite.",
+      "a7": "PangIA fonctionne mieux dans les navigateurs modernes — Chrome, Edge, Firefox et Safari (dernières versions). Il nécessite JavaScript et la prise en charge des Server-Sent Events (SSE) pour la fonctionnalité de chat en streaming."
+    }
+  },
+  "languageSwitcher": {
+    "label": "Langue"
+  }
+}

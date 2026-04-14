@@ -6,6 +6,7 @@ import {
   type KeyboardEvent,
   type DragEvent,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowUp, Paperclip, X, File, Square, Share2, Link2, Layers, Map, Globe, BarChart2, Bot } from 'lucide-react'
 import type { AgentInfo, Attachment } from '../../types'
 
@@ -57,6 +58,7 @@ export function PromptInput({
   onSubmit,
   onStop,
 }: Props) {
+  const { t } = useTranslation()
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [isDragging, setIsDragging] = useState(false)
@@ -158,7 +160,7 @@ export function PromptInput({
         {/* Drag overlay hint */}
         {isDragging && (
           <div className="absolute inset-0 flex items-center justify-center rounded-xl pointer-events-none z-10">
-            <span className="text-sm text-cyan-300 font-medium">Drop files here</span>
+          <span className="text-sm text-cyan-300 font-medium">{t('promptInput.dropFiles')}</span>
           </div>
         )}
 
@@ -184,7 +186,7 @@ export function PromptInput({
             autoResize()
           }}
           onKeyDown={handleKeyDown}
-          placeholder={isDragging ? '' : 'Ask anything about geospatial data…'}
+          placeholder={isDragging ? '' : t('promptInput.placeholder')}
           rows={1}
           disabled={isStreaming}
           className="w-full bg-transparent border-none outline-none resize-none text-sm text-white placeholder:text-white/30 leading-relaxed px-4 pt-4 pb-2 min-h-14 max-h-40 overflow-y-auto font-sans disabled:cursor-not-allowed"
@@ -199,11 +201,11 @@ export function PromptInput({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isStreaming}
-              title="Attach files"
+              title={t('promptInput.attachFiles')}
               className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Paperclip size={13} />
-              <span>Attach</span>
+              <span>{t('promptInput.attach')}</span>
             </button>
             <input
               ref={fileInputRef}
@@ -219,7 +221,7 @@ export function PromptInput({
                 key={agent.key}
                 type="button"
                 onClick={() => toggleAgent(agent.key)}
-                title={`${isAgentSelected(agent.key) ? 'Deselect' : 'Select'} ${agent.label}`}
+                title={isAgentSelected(agent.key) ? t('promptInput.deselectAgent', { agent: agent.label }) : t('promptInput.selectAgent', { agent: agent.label })}
                 className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors duration-150 cursor-pointer select-none ${
                   isAgentSelected(agent.key)
                     ? agentActiveClass(agent.label)
@@ -237,7 +239,7 @@ export function PromptInput({
             <button
               type="button"
               onClick={onStop}
-              title="Stop generating"
+              title={t('promptInput.stopGenerating')}
               className="size-8 p-0 shrink-0 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
             >
               <Square size={14} className="text-white" />
@@ -247,7 +249,7 @@ export function PromptInput({
               type="button"
               onClick={handleSubmit}
               disabled={(!draft.trim() && attachments.length === 0) || isStreaming}
-              title="Send"
+              title={t('promptInput.send')}
               className="size-8 p-0 shrink-0 rounded-full bg-white flex items-center justify-center hover:bg-white/90 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <ArrowUp size={15} className="text-black" />
@@ -257,7 +259,7 @@ export function PromptInput({
       </div>
 
       <p className="text-center text-xs text-white/20 mt-2">
-        Enter to send · Shift+Enter for new line · Drag & drop files to attach
+        {t('promptInput.hint')}
       </p>
     </div>
   )
@@ -271,6 +273,7 @@ interface AttachmentPreviewProps {
 }
 
 function AttachmentPreview({ attachment, onRemove }: AttachmentPreviewProps) {
+  const { t } = useTranslation()
   return (
     <div className="relative group flex items-center gap-2 bg-white/8 border border-white/12 rounded-lg p-1.5 pr-2 text-xs text-white/70 max-w-[180px]">
       {isImageType(attachment.type) ? (
@@ -294,7 +297,7 @@ function AttachmentPreview({ attachment, onRemove }: AttachmentPreviewProps) {
         type="button"
         onClick={onRemove}
         className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-zinc-700 border border-white/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-zinc-600"
-        title="Remove"
+        title={t('promptInput.removeAttachment')}
       >
         <X size={9} className="text-white" />
       </button>

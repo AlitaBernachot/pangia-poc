@@ -1,0 +1,79 @@
+{
+  "navbar": {
+    "chat": "Chat",
+    "faq": "FAQ"
+  },
+  "sidebar": {
+    "settings": "Configuración",
+    "user": "Usuario"
+  },
+  "chat": {
+    "clearConversation": "Borrar conversación",
+    "clear": "Borrar"
+  },
+  "messageList": {
+    "title": "Asistente PangIA",
+    "subtitle": "Tu IA geoespacial inteligente. Haz preguntas sobre datos geográficos, mapas, análisis espacial y mucho más."
+  },
+  "promptInput": {
+    "placeholder": "Pregunta cualquier cosa sobre datos geoespaciales…",
+    "dropFiles": "Suelta los archivos aquí",
+    "attach": "Adjuntar",
+    "attachFiles": "Adjuntar archivos",
+    "stopGenerating": "Detener generación",
+    "send": "Enviar",
+    "removeAttachment": "Eliminar",
+    "hint": "Intro para enviar · Mayús+Intro para nueva línea · Arrastra y suelta archivos para adjuntar",
+    "deselectAgent": "Deseleccionar {{agent}}",
+    "selectAgent": "Seleccionar {{agent}}"
+  },
+  "chatMessage": {
+    "routingTo": "Enrutando a",
+    "thinking": "Pensando..."
+  },
+  "agentActivity": {
+    "thinking": "Pensando…",
+    "done": "Listo"
+  },
+  "faq": {
+    "heroTitle": "FAQ y Acerca de",
+    "heroSubtitle": "Todo lo que necesitas saber sobre PangIA — el Asistente de Inteligencia Geoespacial Pansófico.",
+    "aboutTitle": "Acerca de PangIA",
+    "aboutP1": "PangIA es una prueba de concepto de código abierto que demuestra cómo los grandes modelos de lenguaje pueden combinarse con backends geoespaciales heterogéneos para ofrecer información geográfica inteligente y de múltiples fuentes a través de una interfaz conversacional.",
+    "aboutP2": "El backend está construido con <b>FastAPI</b> y <b>LangGraph</b>, orquestando un grafo de agentes especializados que consultan cada uno una fuente de datos diferente. Las respuestas se transmiten en tiempo real mediante Server-Sent Events.",
+    "aboutP3": "Este cliente frontend está construido con <b>React</b>, <b>Vite</b> y <b>Tailwind CSS</b>. El soporte de archivos adjuntos está modelado según el patrón de componente <link>AI SDK Elements Attachments</link>.",
+    "faqTitle": "Preguntas Frecuentes",
+    "footerNote": "PangIA · Prueba de concepto de código abierto ·",
+    "footerGithub": "GitHub",
+    "agents": {
+      "neo4j": "Base de datos de grafos para consultas ricas en relaciones.",
+      "rdf": "Datos abiertos enlazados y consultas de web semántica.",
+      "vector": "Búsqueda por similitud semántica y embeddings.",
+      "postgis": "Consultas SQL espaciales sobre datos geográficos.",
+      "datagouv": "Portal de datos abiertos del gobierno francés."
+    },
+    "questions": {
+      "q0": "¿Qué es PangIA?",
+      "q1": "¿Qué tipo de preguntas puedo hacer?",
+      "q2": "¿Qué agentes de datos están disponibles?",
+      "q3": "¿Puedo adjuntar archivos a mis mensajes?",
+      "q4": "¿Cómo funciona la memoria de sesión?",
+      "q5": "¿Son privados mis datos?",
+      "q6": "¿Qué significan los paneles de actividad de los agentes?",
+      "q7": "¿Qué navegadores son compatibles?"
+    },
+    "answers": {
+      "a0": "PangIA (Pansophic Geospatial Intelligence Assistant) es una plataforma impulsada por IA que te permite consultar y analizar datos geoespaciales usando lenguaje natural. Se conecta a múltiples backends especializados — incluyendo bases de datos de grafos, almacenes RDF, búsqueda vectorial y PostGIS — para proporcionar respuestas ricas y contextuales sobre información geográfica.",
+      "a1": "Puedes preguntar cualquier cosa relacionada con datos geoespaciales. Ejemplos: «Muéstrame todos los hospitales en un radio de 5 km de la Torre Eiffel», «¿Qué conjuntos de datos medioambientales están disponibles para el departamento de Sena-Saint-Denis?», «Encuentra carreteras que se intersecan con zonas de inundación en Lyon» o «Visualiza la densidad de población en Île-de-France». El asistente enrutará tu consulta a los agentes de datos apropiados.",
+      "a2": "PangIA orquesta varios agentes especializados: Neo4j (relaciones de grafo), RDF/SPARQL (datos abiertos enlazados), Vector/Chroma (búsqueda semántica), PostGIS (SQL espacial), Map (geocodificación y visualización GeoJSON), Data.gouv.fr (portal de datos abiertos francés) y DataViz (generación de gráficos y KPI). Los agentes pueden activarse individualmente en el área de entrada del chat.",
+      "a3": "¡Sí! Puedes adjuntar archivos haciendo clic en el icono del clip o arrastrando y soltando archivos en el área de entrada. Los archivos de imagen mostrarán una vista previa en miniatura. Ten en cuenta que el procesamiento de archivos depende de la configuración del backend — consulta con tu administrador para confirmar qué tipos de archivos son compatibles.",
+      "a4": "PangIA mantiene el historial de conversaciones dentro de una sesión usando un almacén respaldado por Redis. La IA puede hacer referencia a mensajes anteriores en la misma conversación. Comenzar un nuevo chat (mediante el botón Borrar) inicia una sesión nueva sin contexto previo.",
+      "a5": "Las consultas son procesadas en el servidor por el proveedor LLM configurado y los agentes especializados. Por favor, consulta las políticas de manejo de datos de tu organización antes de enviar información sensible o personal. El historial del chat se almacena en Redis y está vinculado a un identificador de sesión.",
+      "a6": "Cuando el asistente está generando una respuesta, puede que veas paneles plegables para cada agente consultado. Estos muestran el razonamiento intermedio del agente y todas las herramientas que invocó (p. ej. consultas de base de datos). Una vez que el agente termina, el panel se colapsa y se muestra un distintivo «listo». Esta transparencia te ayuda a entender cómo se construyó la respuesta.",
+      "a7": "PangIA funciona mejor en navegadores modernos — Chrome, Edge, Firefox y Safari (últimas versiones). Requiere JavaScript y soporte para Server-Sent Events (SSE) para la función de chat en streaming."
+    }
+  },
+  "languageSwitcher": {
+    "label": "Idioma"
+  }
+}
