@@ -90,6 +90,9 @@ When the intent is ambiguous, default to **Strategy B** (full retrieval).
 
 # ─── Dataset candidate extraction helper ──────────────────────────────────────
 
+_MAX_DESCRIPTION_LENGTH = 250
+
+
 def _extract_dataset_candidates(messages) -> list[dict]:
     """Parse search tool results from the ReAct loop and return dataset candidates.
 
@@ -126,8 +129,8 @@ def _extract_dataset_candidates(messages) -> list[dict]:
             if not isinstance(ds, dict):
                 continue
             ds_id = str(ds.get("id", ""))
-            title = str(ds.get("title", ds.get("id", "")))
-            if not ds_id and not title:
+            title = str(ds.get("title", "")) or "Untitled Dataset"
+            if not ds_id and title == "Untitled Dataset":
                 continue
             if ds_id and ds_id in seen_ids:
                 continue
@@ -142,7 +145,7 @@ def _extract_dataset_candidates(messages) -> list[dict]:
 
             raw_desc = ds.get("description") or ""
             # Strip Markdown-ish markup and truncate for display
-            description = " ".join(raw_desc.split())[:250]
+            description = " ".join(raw_desc.split())[:_MAX_DESCRIPTION_LENGTH]
 
             candidates.append(
                 {
