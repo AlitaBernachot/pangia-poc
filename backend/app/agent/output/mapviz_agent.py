@@ -164,10 +164,21 @@ async def geocode_address(address: str) -> str:
 @tool
 def create_geojson(features_json: str) -> str:
     """Create a GeoJSON FeatureCollection from a JSON array of Feature objects or a single Feature."""
+    # The LLM sometimes wraps the JSON in markdown fences or appends explanatory text.
+    # Try strict parse first; fall back to extracting the first complete JSON value.
+    raw = features_json.strip()
+    # Strip markdown code fences if present
+    raw = re.sub(r"^```[^\n]*\n?", "", raw)
+    raw = re.sub(r"\n?```$", "", raw.strip())
     try:
-        data = json.loads(features_json)
-    except json.JSONDecodeError as exc:
-        return f"Invalid JSON: {exc}"
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        # Attempt to extract the first complete JSON array or object using a decoder
+        decoder = json.JSONDecoder()
+        try:
+            data, _ = decoder.raw_decode(raw)
+        except json.JSONDecodeError as exc:
+            return f"Invalid JSON: {exc}"
 
     if isinstance(data, dict):
         if data.get("type") == "FeatureCollection":
@@ -488,6 +499,9 @@ async def _run(state: AgentState) -> dict:
 
     messages = [SystemMessage(content=_SYSTEM_PROMPT), HumanMessage(content=map_input)]
 
+    # Track (tool_name, args_key) → result to avoid re-invoking identical calls
+    _call_cache: dict[tuple[str, str], str] = {}
+
     for _ in range(get_agent_max_iterations("mapviz_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
@@ -500,10 +514,17 @@ async def _run(state: AgentState) -> dict:
             if tool_fn is None:
                 result = f"Unknown tool: {tc['name']}"
             else:
-                try:
-                    result = await tool_fn.ainvoke(tc["args"])
-                except Exception as exc:
-                    result = f"Tool error: {exc}"
+                cache_key = (tc["name"], json.dumps(tc["args"], sort_keys=True))
+                if cache_key in _call_cache:
+                    # Same tool+args already executed — return cached result directly
+                    # to avoid an infinite retry loop on persistent errors.
+                    result = _call_cache[cache_key]
+                else:
+                    try:
+                        result = await tool_fn.ainvoke(tc["args"])
+                    except Exception as exc:
+                        result = f"Tool error: {exc}"
+                    _call_cache[cache_key] = str(result)
             messages.append(ToolMessage(content=str(result), tool_call_id=tc["id"]))
 
     result_content = messages[-1].content if messages else ""
