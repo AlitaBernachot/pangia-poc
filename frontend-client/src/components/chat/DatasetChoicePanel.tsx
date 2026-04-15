@@ -5,10 +5,11 @@ import type { DatasetCandidate } from '../../types'
 interface Props {
   candidates: DatasetCandidate[]
   onSelect: (candidate: DatasetCandidate) => void
+  onPrefillPrompt?: (title: string) => void
   disabled?: boolean
 }
 
-export function DatasetChoicePanel({ candidates, onSelect, disabled }: Props) {
+export function DatasetChoicePanel({ candidates, onSelect, onPrefillPrompt, disabled }: Props) {
   const { t } = useTranslation()
 
   return (
@@ -30,9 +31,16 @@ export function DatasetChoicePanel({ candidates, onSelect, disabled }: Props) {
             {/* Content */}
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
-                <span className="text-sm font-medium text-white leading-snug">
+                {/* Clickable title — pre-fills the prompt input */}
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onPrefillPrompt?.(candidate.title)}
+                  title={t('datasetChoice.clickTitle')}
+                  className="text-sm font-medium text-white leading-snug text-left hover:text-[#f43f5e] hover:underline underline-offset-2 transition-colors disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                >
                   {candidate.title}
-                </span>
+                </button>
                 {candidate.url && (
                   <a
                     href={candidate.url}
@@ -56,7 +64,7 @@ export function DatasetChoicePanel({ candidates, onSelect, disabled }: Props) {
               )}
             </div>
 
-            {/* Select button */}
+            {/* Select button — sends immediately */}
             <button
               type="button"
               disabled={disabled}

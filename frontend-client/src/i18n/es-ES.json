@@ -34,7 +34,8 @@
   "datasetChoice": {
     "prompt": "{{count}} datasets encontrados. ¿Cuál deseas usar?",
     "select": "Seleccionar",
-    "openSource": "Abrir página fuente"
+    "openSource": "Abrir página fuente",
+    "clickTitle": "Clic para rellenar el campo de entrada con el nombre de este dataset"
   },
   "agentActivity": {
     "thinking": "Pensando…",

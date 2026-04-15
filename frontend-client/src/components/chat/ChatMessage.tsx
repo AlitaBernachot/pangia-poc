@@ -25,10 +25,11 @@ const markdownComponents = {
 interface Props {
   message: Message
   onSelectDataset?: (candidate: DatasetCandidate) => void
+  onPrefillPrompt?: (text: string) => void
   isStreaming?: boolean
 }
 
-export function ChatMessage({ message, onSelectDataset, isStreaming }: Props) {
+export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStreaming }: Props) {
   const { t } = useTranslation()
   const isUser = message.role === 'user'
 
@@ -98,6 +99,7 @@ export function ChatMessage({ message, onSelectDataset, isStreaming }: Props) {
           <DatasetChoicePanel
             candidates={message.datasetChoice}
             onSelect={(candidate) => onSelectDataset?.(candidate)}
+            onPrefillPrompt={(title) => onPrefillPrompt?.(`use this dataset: ${title}`)}
             disabled={isStreaming}
           />
         )}

@@ -10,6 +10,7 @@ interface Props {
   messages: Message[]
   onSuggestion?: (text: string) => void
   onSendMessage?: (text: string) => void
+  onPrefillPrompt?: (text: string) => void
   onClear?: () => void
   isStreaming?: boolean
 }
@@ -31,7 +32,7 @@ function useSuggestions(): string[] {
   return suggestions
 }
 
-export function MessageList({ messages, onSuggestion, onSendMessage, onClear, isStreaming }: Props) {
+export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPrompt, onClear, isStreaming }: Props) {
   const { t } = useTranslation()
   const bottomRef = useRef<HTMLDivElement>(null)
   const suggestions = useSuggestions()
@@ -83,6 +84,7 @@ export function MessageList({ messages, onSuggestion, onSendMessage, onClear, is
                 `Je veux travailler avec le dataset : "${candidate.title}"${candidate.id ? ` (ID: ${candidate.id})` : ''}`,
               )
             }
+            onPrefillPrompt={onPrefillPrompt}
             isStreaming={isStreaming}
           />
         ))}
