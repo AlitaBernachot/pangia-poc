@@ -6,7 +6,8 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type AgentActivity, AGENT_COLORS } from '../../types'
 import { AgentIcon } from '../AgentIcon'
-import { ChevronDown, ChevronRight, Search } from 'lucide-react'
+import { ToolIcon } from '../ToolIcon'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 
 interface Props {
   activity: AgentActivity
@@ -16,6 +17,9 @@ export function AgentActivityPanel({ activity }: Props) {
   const { t } = useTranslation()
   const [collapsed, setCollapsed] = useState(false)
   const colors = AGENT_COLORS[activity.agent]
+
+  // The most recently started running tool (last in list with status 'running')
+  const runningTool = [...activity.tools].reverse().find((tool) => tool.status === 'running')
 
   return (
     <div className="rounded-lg border border-white/8 overflow-hidden text-xs">
@@ -39,9 +43,22 @@ export function AgentActivityPanel({ activity }: Props) {
               : 'border text-green-400 border-green-400'
           }`}
         >
-          {activity.streaming
-            ? <span className="thinking-indicator">{t('agentActivity.thinking')}</span>
-            : t('agentActivity.done')}
+          {activity.streaming ? (
+            runningTool ? (
+              <span className="inline-flex items-center gap-1">
+                <span className="shimmer-icon">
+                  <ToolIcon tool={runningTool.tool} size={10} />
+                </span>
+                <span className="thinking-indicator">
+                  {t(`toolLabels.${runningTool.tool}`, runningTool.tool)}
+                </span>
+              </span>
+            ) : (
+              <span className="thinking-indicator">{t('agentActivity.thinking')}</span>
+            )
+          ) : (
+            t('agentActivity.done')
+          )}
         </span>
       </button>
 
@@ -51,17 +68,21 @@ export function AgentActivityPanel({ activity }: Props) {
           {/* Tool badges */}
           {activity.tools.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-2">
-              {activity.tools.map((t, i) => (
+              {activity.tools.map((tool, i) => (
                 <span
                   key={i}
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] border ${
-                    t.status === 'running'
+                    tool.status === 'running'
                       ? 'text-cyan-400 border-cyan-400'
                       : 'text-green-400 border-green-400'
                   }`}
                 >
-                  <Search size={9} />
-                  {t.tool}
+                  <span className={tool.status === 'running' ? 'shimmer-icon' : ''}>
+                    <ToolIcon tool={tool.tool} size={9} />
+                  </span>
+                  <span className={tool.status === 'running' ? 'thinking-indicator' : ''}>
+                    {t(`toolLabels.${tool.tool}`, tool.tool)}
+                  </span>
                   <span className="size-1.5 rounded-full bg-current" />
                 </span>
               ))}
