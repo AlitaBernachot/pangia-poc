@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 AlitaBernachot
+//
+// SPDX-License-Identifier: MIT
+
 import type { DataVizPayload } from '../../types'
 import { KpiCards } from './KpiCards'
 import { ChartViewer } from './ChartViewer'

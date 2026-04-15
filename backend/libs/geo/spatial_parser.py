@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 """Spatial text-parsing helpers: regex patterns and coordinate extraction."""
 from __future__ import annotations
 

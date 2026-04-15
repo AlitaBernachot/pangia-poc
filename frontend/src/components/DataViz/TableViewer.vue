@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 <template>
   <div class="table-wrapper rounded-xl border border-white/10 bg-white/3 overflow-hidden">
     <div class="flex items-center px-3 py-2 border-b border-white/8">

@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 <template>
   <header class="shrink-0 flex items-center gap-3 px-6 py-4 border-b border-white/8">
     <span class="text-2xl">🌍</span>

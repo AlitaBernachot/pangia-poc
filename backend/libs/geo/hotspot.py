@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 """Spatial hotspot / clustering helpers."""
 from __future__ import annotations
 

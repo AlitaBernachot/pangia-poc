@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 AlitaBernachot
+//
+// SPDX-License-Identifier: MIT
+
 import { createApp } from 'vue'
 import PrimeVue from 'primevue/config'
 import { definePreset } from '@primevue/themes'

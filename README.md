@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 ![PangIA Banner](docs/pangIA_logo.png)
 
 # PangIA – Multi-agent system 🌍

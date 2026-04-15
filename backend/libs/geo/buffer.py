@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 """Geographic buffer (offset polygon) helpers."""
 from __future__ import annotations
 

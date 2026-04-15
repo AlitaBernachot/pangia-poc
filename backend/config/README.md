@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 # `backend/config` — Runtime configuration files
 
 This directory contains editable configuration files that are loaded at application startup. They can be modified without recompiling or restarting the Python environment (except where noted).

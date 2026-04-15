@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 <template>
   <div ref="scrollRef" class="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6">
 

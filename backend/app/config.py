@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 

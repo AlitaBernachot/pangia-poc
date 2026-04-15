@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 <template>
   <div class="dark h-full flex flex-col bg-[#0d0d0f] text-white font-sans antialiased">
     <ChatView />

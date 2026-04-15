@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 import operator
 from typing import Annotated, Any, Literal, Sequence, TypedDict
 

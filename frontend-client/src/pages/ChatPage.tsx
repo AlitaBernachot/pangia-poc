@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 AlitaBernachot
+//
+// SPDX-License-Identifier: MIT
+
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { usePangiaChat } from '../hooks/usePangiaChat'

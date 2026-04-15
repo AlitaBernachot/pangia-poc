@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 <template>
   <div class="shrink-0 px-4 pb-5 pt-3">
     <div

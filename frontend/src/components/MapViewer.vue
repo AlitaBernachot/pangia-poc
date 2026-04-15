@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 <template>
   <div class="map-viewer-wrapper rounded-xl overflow-hidden border border-white/10 mt-2">
     <div class="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">

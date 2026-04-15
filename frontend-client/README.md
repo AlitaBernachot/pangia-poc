@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 # PangIA Frontend Client
 
 A React + Vite + Tailwind CSS frontend for the [PangIA](../README.md) geospatial AI assistant.
