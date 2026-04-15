@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 AlitaBernachot
+//
+// SPDX-License-Identifier: MIT
+
 import { NavLink } from 'react-router-dom'
 import { MessageSquare, HelpCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'

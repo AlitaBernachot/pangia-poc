@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 """
 Database seeding for dev / demo mode.
 

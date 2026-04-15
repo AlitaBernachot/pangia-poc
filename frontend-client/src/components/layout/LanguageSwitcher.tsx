@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 AlitaBernachot
+//
+// SPDX-License-Identifier: MIT
+
 import { useTranslation } from 'react-i18next'
 import { SUPPORTED_LANGUAGES, type LanguageCode } from '../../i18n/i18n'
 

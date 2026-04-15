@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 # Ollama + Gemma 4 Setup Guide
 
 This guide explains how to run a local **Ollama** server with the **Gemma 4** model inside the PangIA Docker Compose stack, and how to configure the backend agents to use it.

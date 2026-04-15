@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 AlitaBernachot
+//
+// SPDX-License-Identifier: MIT
+
 import { useEffect, useRef } from 'react'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'

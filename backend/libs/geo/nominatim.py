@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 """OpenStreetMap Nominatim HTTP helper functions.
 
 Raw async functions that call the Nominatim REST API and return Python dicts/lists.

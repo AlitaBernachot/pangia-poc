@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 """
 data.gouv.fr MCP sub-agent.
 
@@ -222,6 +226,10 @@ async def _run(state: AgentState) -> dict:
         HumanMessage(content=user_query),
     ]
 
+    # Raw fetch_resource_file payloads, stored separately so the LLM only sees
+    # a compact acknowledgement while post-processing has full access to the data.
+    fetch_payloads: list[dict] = []
+
     for _ in range(get_agent_max_iterations("data_gouv_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
@@ -241,37 +249,48 @@ async def _run(state: AgentState) -> dict:
                     result = await tool_fn.ainvoke(tc["args"])
                 except Exception as exc:
                     result = f"Tool error: {exc}"
+
+            # For fetch_resource_file, the full payload can be many MB.
+            # Store it separately and only pass a compact acknowledgement to the
+            # LLM so it never hits the OpenAI 10 MB message limit.
+            tool_content = str(result)
+            if tc["name"] == "fetch_resource_file":
+                try:
+                    parsed_tool = json.loads(tool_content)
+                    if isinstance(parsed_tool, dict) and "rows" in parsed_tool:
+                        fetch_payloads.append(parsed_tool)
+                        fmt = parsed_tool.get("format", "data")
+                        total = parsed_tool.get("total_rows", len(parsed_tool["rows"]))
+                        cols = parsed_tool.get("columns", [])
+                        tool_content = (
+                            f"[fetch_resource_file OK] format={fmt}, "
+                            f"total_rows={total}, columns={cols}"
+                        )
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
             messages.append(
-                ToolMessage(content=str(result), tool_call_id=tc["id"])
+                ToolMessage(content=tool_content, tool_call_id=tc["id"])
             )
 
     result_content = (
         messages[-1].content if messages else "data.gouv.fr agent returned no result."
     )
 
-    # Collect ALL successful fetch_resource_file results from tool messages.
+    # Collect ALL successful fetch_resource_file results from fetch_payloads.
     # Separate tabular files (csv/json) from geojson files so both pipelines
     # can be fed independently.
     tabular_data: dict | None = None   # first csv/json result found
     geojson_data: dict | None = None   # first geojson result found
 
-    for msg in messages:
-        if not (isinstance(msg, ToolMessage) and isinstance(msg.content, str) and msg.content):
-            continue
-        try:
-            parsed = json.loads(msg.content)
-        except (json.JSONDecodeError, ValueError):
-            continue
-        if not isinstance(parsed, dict) or "rows" not in parsed or "columns" not in parsed:
-            continue
-
-        fmt = parsed.get("format", "")
+    for payload in fetch_payloads:
+        fmt = payload.get("format", "")
         if fmt == "geojson":
             if geojson_data is None:
-                geojson_data = parsed
+                geojson_data = payload
         else:
             if tabular_data is None:
-                tabular_data = parsed
+                tabular_data = payload
 
     # If only a GeoJSON was fetched (no separate CSV), fall back to using it
     # for the table as well (its rows contain feature properties).

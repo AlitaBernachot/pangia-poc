@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 AlitaBernachot
+//
+// SPDX-License-Identifier: MIT
+
 import { useEffect, useState } from 'react'
 import { usePangiaChat } from '../hooks/usePangiaChat'
 import { MessageList } from '../components/chat/MessageList'

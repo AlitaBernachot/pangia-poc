@@ -1,0 +1,43 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: pangia-poc
+Upstream-Contact: AlitaBernachot
+Source: https://github.com/AlitaBernachot/pangia-poc
+
+# Binary image assets
+Files: docs/pangIA_logo.png
+ docs/pangIA_logo_only.png
+ frontend-client/public/logo.png
+ frontend-client/src/assets/hero.png
+Copyright: 2026 AlitaBernachot
+License: MIT
+
+# SVG / vector assets
+Files: frontend-client/public/favicon.svg
+ frontend-client/public/icons.svg
+ frontend-client/src/assets/vite.svg
+Copyright: 2026 AlitaBernachot
+License: MIT
+
+# Auto-generated lock files
+Files: frontend/package-lock.json
+ frontend-client/package-lock.json
+Copyright: 2026 AlitaBernachot
+License: MIT
+
+# JSON configuration files (strict JSON — no inline comments supported)
+Files: frontend/package.json
+ frontend/tsconfig.json
+ frontend-client/package.json
+ frontend-client/tsconfig.json
+ frontend-client/tsconfig.app.json
+ frontend-client/tsconfig.node.json
+ .vscode/mcp.json
+Copyright: 2026 AlitaBernachot
+License: MIT
+
+# i18n JSON files
+Files: frontend-client/src/i18n/en-US.json
+ frontend-client/src/i18n/es-ES.json
+ frontend-client/src/i18n/fr-FR.json
+Copyright: 2026 AlitaBernachot
+License: MIT

@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 # Agent descriptions used by the legacy LLM router prompt.
 #
 # Each key must match the agent connector key declared in source_registry.yml

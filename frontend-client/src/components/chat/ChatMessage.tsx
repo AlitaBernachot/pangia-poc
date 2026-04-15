@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 AlitaBernachot
+//
+// SPDX-License-Identifier: MIT
+
 import ReactMarkdown from 'react-markdown'
 import { ExternalLink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'

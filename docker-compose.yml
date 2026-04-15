@@ -1,31 +1,15 @@
-services:
-  # ── Frontend (Vue 3 + PrimeVue + Tailwind) ──────────────────────────────────────
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: builder      # stop at the node stage, skip nginx
-    ports:
-      - "3000:5173"
-    volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/index.html:/app/index.html
-      - /app/node_modules  # preserve container node_modules
-    environment:
-      - BACKEND_URL=http://backend:8000
-    command: npm run dev -- --host
-    # depends_on:
-    #   backend:
-    #     condition: service_healthy
-    restart: unless-stopped
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
 
+services:
   # ── Backend (FastAPI + LangGraph multi-agent) ──────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "8084:8084"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
@@ -53,7 +37,7 @@ services:
       - SEED_DB=${SEED_DB:-true}
       # Seed theme – selects which dataset to load.  Built-in: pandemic
       - SEED_THEME=${SEED_THEME:-pandemic}
-      - CORS_ORIGINS=["http://localhost:3000","http://frontend"]
+      - CORS_ORIGINS=["http://localhost:3000","http://frontend-client"]
       # Arize Phoenix (observability)
       - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
       - PHOENIX_PROJECT_NAME=${PHOENIX_PROJECT_NAME:-pangia-geoia}
@@ -63,9 +47,9 @@ services:
       - ./backend/app:/backend/app
       - ./backend/libs:/backend/libs
       - ./backend/config:/backend/config
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-include "*.yml"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8084 --reload --reload-include "*.yml"
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8084/api/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10

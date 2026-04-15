@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 """
 Geo Hotspot Agent – spatial cluster detection.
 

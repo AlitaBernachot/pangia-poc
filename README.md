@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 ![PangIA Banner](docs/pangIA_logo.png)
 
 # PangIA – Multi-agent system 🌍
@@ -44,7 +50,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
   - [Project structure](#project-structure)
   - [Development (without Docker)](#development-without-docker)
     - [Backend](#backend)
-    - [Frontend](#frontend)
+    - [Frontend](#frontend-1)
   - [Seed themes](#seed-themes)
     - [PostGIS schema isolation](#postgis-schema-isolation)
     - [Switching the theme](#switching-the-theme)
@@ -471,7 +477,7 @@ docker compose up --build
 | Service | URL | Purpose |
 |---|---|---|
 | Frontend | http://localhost:3000 | Chat UI |
-| Backend API | http://localhost:8000 | FastAPI + LangGraph |
+| Backend API | http://localhost:8084 | FastAPI + LangGraph |
 | Neo4j Browser | http://localhost:7474 | Knowledge graph |
 | GraphDB Workbench | http://localhost:7200 | RDF triplestore |
 | ChromaDB | http://localhost:8001 | Vector store |
@@ -579,7 +585,7 @@ pangia-poc/
 │           └── themes/
 │               ├── __init__.py  # SeedTheme dataclass + get_active_theme()
 │               └── dinosaurs.py # Built-in seed theme (Mesozoic palaeontology)
-└── frontend-client/         # ← active frontend (React 19 + Tailwind CSS v4)
+└── frontend-client/         # ← frontend (React 19 + Tailwind CSS v4)
     ├── Dockerfile
     ├── package.json
     ├── vite.config.ts
@@ -603,8 +609,6 @@ pangia-poc/
                 ├── ChartViewer.tsx  # D3 bar/line/pie/scatter
                 ├── KpiCards.tsx
                 └── TableViewer.tsx
-
-> **Deprecated:** `frontend/` (Vue 3 + PrimeVue) is no longer maintained.
 ```
 
 ## Development (without Docker)
@@ -621,13 +625,11 @@ uvicorn app.main:app --reload
 
 ### Frontend
 
-> **Note:** `frontend/` (Vue 3) is deprecated. Use `frontend-client/` (React 19 + Tailwind CSS v4) instead.
-
 ```bash
 cd frontend-client
 npm install
 npm start
-# → http://localhost:3000 (proxies /api to localhost:8000)
+# → http://localhost:3000 (proxies /api to localhost:8084)
 ```
 
 ---

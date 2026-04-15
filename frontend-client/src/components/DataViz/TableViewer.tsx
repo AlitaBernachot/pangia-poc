@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 AlitaBernachot
+//
+// SPDX-License-Identifier: MIT
+
 import type { DataVizTable } from '../../types'
 
 const IMAGE_URL_RE = /^https?:\/\/.+\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i

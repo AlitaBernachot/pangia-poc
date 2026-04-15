@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 """Shared geodetic constants and helper functions.
 
 Used across all geo lib modules – never import from app.agent here.

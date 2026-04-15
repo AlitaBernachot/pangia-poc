@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 from fastapi import APIRouter
 
 from app.db.themes import get_active_theme

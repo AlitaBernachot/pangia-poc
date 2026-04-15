@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 AlitaBernachot
+
+SPDX-License-Identifier: MIT
+-->
+
 # PangIA Frontend Client
 
 A React + Vite + Tailwind CSS frontend for the [PangIA](../README.md) geospatial AI assistant.
@@ -33,11 +39,11 @@ A React + Vite + Tailwind CSS frontend for the [PangIA](../README.md) geospatial
 # Install dependencies
 npm install
 
-# Start the dev server (proxies /api to localhost:8000)
+# Start the dev server (proxies /api to localhost:8084)
 npm run dev
 ```
 
-The dev server runs at `http://localhost:5173`. API requests to `/api/*` are proxied to the backend at `http://localhost:8000`.
+The dev server runs at `http://localhost:5173`. API requests to `/api/*` are proxied to the backend at `http://localhost:8084`.
 
 ### Production Build
 

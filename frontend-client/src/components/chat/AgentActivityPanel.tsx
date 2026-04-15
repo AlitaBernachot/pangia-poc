@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 AlitaBernachot
+//
+// SPDX-License-Identifier: MIT
+
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { type AgentActivity, AGENT_COLORS } from '../../types'

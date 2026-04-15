@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 """Human Output Agent – decides whether map and/or dataviz visualisations are
 needed for the current response.
 

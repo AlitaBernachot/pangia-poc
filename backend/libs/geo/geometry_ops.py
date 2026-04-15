@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
 """GeoJSON geometry helpers: coordinate collection, simplification, and validation."""
 from __future__ import annotations
 
