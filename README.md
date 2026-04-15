@@ -435,7 +435,7 @@ docker compose up --build
 | Service | URL | Purpose |
 |---|---|---|
 | Frontend | http://localhost:3000 | Chat UI |
-| Backend API | http://localhost:8000 | FastAPI + LangGraph |
+| Backend API | http://localhost:8084 | FastAPI + LangGraph |
 | Neo4j Browser | http://localhost:7474 | Knowledge graph |
 | GraphDB Workbench | http://localhost:7200 | RDF triplestore |
 | ChromaDB | http://localhost:8001 | Vector store |
@@ -591,7 +591,7 @@ uvicorn app.main:app --reload
 cd frontend-client
 npm install
 npm start
-# → http://localhost:3000 (proxies /api to localhost:8000)
+# → http://localhost:3000 (proxies /api to localhost:8084)
 ```
 
 ---

@@ -37,6 +37,8 @@ FeatureCollection that can be displayed on an interactive map.
    specialised sub-agents (e.g. Neo4j, PostGIS) enriched with coordinates, site
    names, and country information.
 2. For each location found in the context:
+   - If a WKT geometry string is present (POLYGON, MULTIPOLYGON, LINESTRING, BOX, etc.),
+     use `parse_wkt_to_geojson` to convert it to a GeoJSON Feature.
    - If exact coordinates (lat/lon) are present in the text, use
      `extract_geojson_from_text` passing the relevant excerpt.
    - If only a name or address is given, use `geocode_address` to obtain
@@ -275,12 +277,91 @@ def add_popup_content(geojson: str, popup_content: str) -> str:
     return "Expected a GeoJSON Feature, FeatureCollection, or array of Features."
 
 
+@tool
+def parse_wkt_to_geojson(wkt: str) -> str:
+    """Convert a WKT (Well-Known Text) or EWKT geometry string to a GeoJSON Feature.
+
+    Handles POINT, LINESTRING, POLYGON, MULTIPOINT, MULTILINESTRING, MULTIPOLYGON,
+    and BOX types returned by PostGIS (e.g. from ST_Extent / ST_AsText).
+    Automatically strips SRID prefixes (e.g. ``SRID=4326;POLYGON(...)``).
+    """
+    wkt = wkt.strip()
+    # Strip SRID prefix
+    wkt = re.sub(r"^SRID=\d+;", "", wkt, flags=re.IGNORECASE).strip()
+
+    def _parse_point_pair(s: str) -> list[float]:
+        parts = s.strip().split()
+        return [float(parts[0]), float(parts[1])]
+
+    def _parse_ring(s: str) -> list[list[float]]:
+        return [_parse_point_pair(p) for p in s.strip().split(",") if p.strip()]
+
+    try:
+        # BOX(-17.5 -34.8,51.3 37.5) – returned by ST_Extent
+        box_m = re.match(
+            r"BOX\s*\(\s*(-?[\d.]+)\s+(-?[\d.]+)\s*,\s*(-?[\d.]+)\s+(-?[\d.]+)\s*\)",
+            wkt, re.IGNORECASE,
+        )
+        if box_m:
+            minx, miny, maxx, maxy = (float(box_m.group(i)) for i in range(1, 5))
+            geometry: dict[str, Any] = {
+                "type": "Polygon",
+                "coordinates": [[
+                    [minx, miny], [minx, maxy],
+                    [maxx, maxy], [maxx, miny],
+                    [minx, miny],
+                ]],
+            }
+            return json.dumps({"type": "Feature", "geometry": geometry, "properties": {}})
+
+        m = re.match(r"^(\w+)\s*\((.*)\)$", wkt, re.IGNORECASE | re.DOTALL)
+        if not m:
+            return f"Could not parse WKT: {wkt[:120]}"
+
+        geom_type = m.group(1).upper()
+        inner = m.group(2).strip()
+
+        if geom_type == "POINT":
+            geometry = {"type": "Point", "coordinates": _parse_point_pair(inner)}
+
+        elif geom_type == "LINESTRING":
+            geometry = {"type": "LineString", "coordinates": _parse_ring(inner)}
+
+        elif geom_type == "POLYGON":
+            rings_raw = re.findall(r"\(([^()]+)\)", inner)
+            geometry = {"type": "Polygon", "coordinates": [_parse_ring(r) for r in rings_raw]}
+
+        elif geom_type == "MULTIPOLYGON":
+            polygons = []
+            # Each polygon: ((...), (...))
+            for poly_block in re.finditer(r"\(\s*(\((?:[^()]+)\)(?:\s*,\s*\([^()]+\))*)\s*\)", inner):
+                rings_raw = re.findall(r"\(([^()]+)\)", poly_block.group(1))
+                polygons.append([_parse_ring(r) for r in rings_raw])
+            geometry = {"type": "MultiPolygon", "coordinates": polygons}
+
+        elif geom_type == "MULTILINESTRING":
+            lines_raw = re.findall(r"\(([^()]+)\)", inner)
+            geometry = {"type": "MultiLineString", "coordinates": [_parse_ring(r) for r in lines_raw]}
+
+        elif geom_type == "MULTIPOINT":
+            geometry = {"type": "MultiPoint", "coordinates": _parse_ring(inner)}
+
+        else:
+            return f"Unsupported WKT geometry type: {geom_type}"
+
+        return json.dumps({"type": "Feature", "geometry": geometry, "properties": {}})
+
+    except Exception as exc:
+        return f"WKT parsing error: {exc}"
+
+
 MAP_TOOLS = [
     extract_geojson_from_text,
     geocode_address,
     create_geojson,
     calculate_bounds,
     add_popup_content,
+    parse_wkt_to_geojson,
 ]
 _TOOL_MAP = {t.name: t for t in MAP_TOOLS}
 
@@ -288,7 +369,8 @@ _TOOL_MAP = {t.name: t for t in MAP_TOOLS}
 # ─── Node function ────────────────────────────────────────────────────────────
 
 _COORD_HINT_RE = re.compile(
-    r"lat(?:itude)?|lon(?:gitude)?|°[NS]|°[EW]|\b\d{1,3}\.\d+\b",
+    r"lat(?:itude)?|lon(?:gitude)?|°[NS]|°[EW]|\b\d{1,3}\.\d+\b"
+    r"|\b(?:POLYGON|MULTIPOLYGON|LINESTRING|MULTILINESTRING|MULTIPOINT|GEOMETRYCOLLECTION|POINT)\s*\(",
     re.IGNORECASE,
 )
 
