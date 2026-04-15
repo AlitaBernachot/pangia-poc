@@ -50,7 +50,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
   - [Project structure](#project-structure)
   - [Development (without Docker)](#development-without-docker)
     - [Backend](#backend)
-    - [Frontend](#frontend)
+    - [Frontend](#frontend-1)
   - [Seed themes](#seed-themes)
     - [PostGIS schema isolation](#postgis-schema-isolation)
     - [Switching the theme](#switching-the-theme)
@@ -549,7 +549,7 @@ pangia-poc/
 │           └── themes/
 │               ├── __init__.py  # SeedTheme dataclass + get_active_theme()
 │               └── dinosaurs.py # Built-in seed theme (Mesozoic palaeontology)
-└── frontend-client/         # ← active frontend (React 19 + Tailwind CSS v4)
+└── frontend-client/         # ← frontend (React 19 + Tailwind CSS v4)
     ├── Dockerfile
     ├── package.json
     ├── vite.config.ts
@@ -573,8 +573,6 @@ pangia-poc/
                 ├── ChartViewer.tsx  # D3 bar/line/pie/scatter
                 ├── KpiCards.tsx
                 └── TableViewer.tsx
-
-> **Deprecated:** `frontend/` (Vue 3 + PrimeVue) is no longer maintained.
 ```
 
 ## Development (without Docker)
@@ -590,8 +588,6 @@ uvicorn app.main:app --reload
 ```
 
 ### Frontend
-
-> **Note:** `frontend/` (Vue 3) is deprecated. Use `frontend-client/` (React 19 + Tailwind CSS v4) instead.
 
 ```bash
 cd frontend-client

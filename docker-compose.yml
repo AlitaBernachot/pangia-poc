@@ -3,26 +3,6 @@
 # SPDX-License-Identifier: MIT
 
 services:
-  # ── Frontend (Vue 3 + PrimeVue + Tailwind) ──────────────────────────────────────
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: builder      # stop at the node stage, skip nginx
-    ports:
-      - "3000:5173"
-    volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/index.html:/app/index.html
-      - /app/node_modules  # preserve container node_modules
-    environment:
-      - BACKEND_URL=http://backend:8084
-    command: npm run dev -- --host
-    # depends_on:
-    #   backend:
-    #     condition: service_healthy
-    restart: unless-stopped
-
   # ── Backend (FastAPI + LangGraph multi-agent) ──────────────────────────────
   backend:
     build:
@@ -57,7 +37,7 @@ services:
       - SEED_DB=${SEED_DB:-true}
       # Seed theme – selects which dataset to load.  Built-in: pandemic
       - SEED_THEME=${SEED_THEME:-pandemic}
-      - CORS_ORIGINS=["http://localhost:3000","http://frontend"]
+      - CORS_ORIGINS=["http://localhost:3000","http://frontend-client"]
       # Arize Phoenix (observability)
       - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
       - PHOENIX_PROJECT_NAME=${PHOENIX_PROJECT_NAME:-pangia-geoia}

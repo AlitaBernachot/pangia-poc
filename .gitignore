@@ -5,11 +5,6 @@
 # Environment
 .env
 
-# Frontend build artifacts & dependencies
-frontend/node_modules/
-frontend/dist/
-frontend/.vite/
-
 # Backend virtual envs & caches
 backend/.venv/
 backend/__pycache__/
