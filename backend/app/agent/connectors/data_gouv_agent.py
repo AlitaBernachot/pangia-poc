@@ -144,7 +144,7 @@ def _extract_dataset_candidates(messages) -> list[dict]:
                 org_name = str(org)
 
             raw_desc = ds.get("description") or ""
-            # Strip Markdown-ish markup and truncate for display
+            # Collapse whitespace and truncate for display
             description = " ".join(raw_desc.split())[:_MAX_DESCRIPTION_LENGTH]
 
             candidates.append(
