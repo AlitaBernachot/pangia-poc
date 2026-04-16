@@ -72,6 +72,7 @@ export interface Message {
   geojson?: Record<string, unknown> | null
   dataviz?: DataVizPayload | null
   datasetChoice?: DatasetCandidate[] | null
+  datasetChoiceTotal?: number | null
   attachments?: Attachment[]
 }
 

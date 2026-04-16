@@ -12,10 +12,10 @@ export function Navbar() {
 
   return (
     <header className="flex items-center justify-between px-5 h-14 border-b border-white/8 bg-[#0d0d0f]/80 backdrop-blur-sm sticky top-0 z-50">
-      <NavLink to="/" className="flex items-center gap-2 text-white font-semibold text-lg">
+      <a href="/" className="flex items-center gap-2 text-white font-semibold text-lg">
         <img src="/logo.png" alt="PangIA" className="size-7 rounded" />
         <span>PangIA</span>
-      </NavLink>
+      </a>
 
       <div className="flex items-center gap-3">
         <nav className="flex items-center gap-1">

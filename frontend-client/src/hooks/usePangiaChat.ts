@@ -174,6 +174,7 @@ export function usePangiaChat() {
               updateAssistant((m) => ({
                 ...m,
                 datasetChoice: event.candidates as DatasetCandidate[],
+                datasetChoiceTotal: (event.total as number | null) ?? null,
               }))
             } else if (type === 'done') {
               updateAssistant((m) => {

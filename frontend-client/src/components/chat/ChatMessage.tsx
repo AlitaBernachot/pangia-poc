@@ -102,6 +102,7 @@ export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStrea
         {message.datasetChoice && message.datasetChoice.length > 0 && (
           <DatasetChoicePanel
             candidates={message.datasetChoice}
+            total={message.datasetChoiceTotal}
             onSelect={(candidate) => onSelectDataset?.(candidate)}
             onPrefillPrompt={onPrefillPrompt}
             disabled={isStreaming}
@@ -111,9 +112,7 @@ export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStrea
         {/* Final answer — always last */}
         {(message.content || message.streaming) && (
           <div
-            className={`rounded-xl rounded-tl-none px-4 py-3 text-sm text-white leading-relaxed prose-chat ${
-              message.streaming ? 'border-white/8' : ''
-            }`}
+            className={`px-4 py-3 text-sm text-white leading-relaxed prose-chat`}
           >
             {message.content ? (
               <>

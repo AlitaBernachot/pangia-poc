@@ -4,18 +4,22 @@ import type { DatasetCandidate } from '../../types'
 
 interface Props {
   candidates: DatasetCandidate[]
+  total?: number | null
   onSelect: (candidate: DatasetCandidate) => void
   onPrefillPrompt?: (title: string) => void
   disabled?: boolean
 }
 
-export function DatasetChoicePanel({ candidates, onSelect, onPrefillPrompt, disabled }: Props) {
+export function DatasetChoicePanel({ candidates, total, onSelect, onPrefillPrompt, disabled }: Props) {
   const { t } = useTranslation()
+  const showingAll = !total || total <= candidates.length
 
   return (
     <div className="flex flex-col gap-2 w-full">
-      <p className="text-xs text-white/50 font-medium uppercase tracking-wide">
-        {t('datasetChoice.prompt', { count: candidates.length })}
+      <p className="text-sm text-white/50 font-medium uppercase tracking-wide">
+        {showingAll
+          ? t('datasetChoice.prompt', { count: candidates.length })
+          : t('datasetChoice.promptWithTotal', { shown: candidates.length, total })}
       </p>
       <div className="flex flex-col gap-2">
         {candidates.map((candidate) => (
@@ -79,6 +83,14 @@ export function DatasetChoicePanel({ candidates, onSelect, onPrefillPrompt, disa
           </div>
         ))}
       </div>
+      {!showingAll && (
+        <p className="text-sm text-amber-400/70 mt-0.5">
+          {t('datasetChoice.refineHint', { total })}
+        </p>
+      )}
+      <p className="text-sm text-white mt-1">
+        {t('datasetChoice.selectHint')}
+      </p>
     </div>
   )
 }

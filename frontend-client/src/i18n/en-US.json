@@ -25,7 +25,9 @@
     "removeAttachment": "Remove",
     "hint": "Enter to send · Shift+Enter for new line · Drag & drop files to attach",
     "deselectAgent": "Deselect {{agent}}",
-    "selectAgent": "Select {{agent}}"
+    "selectAgent": "Select {{agent}}",
+    "sources": "Sources",
+    "sourcesLabel": "Data sources"
   },
   "chatMessage": {
     "routingTo": "Routing to",
@@ -33,10 +35,13 @@
   },
   "datasetChoice": {
     "prompt": "{{count}} datasets found. Which one would you like to use?",
+    "promptWithTotal": "{{total}} datasets found in total — showing the first {{shown}}. Which one would you like to use?",
+    "refineHint": "The search returned {{total}} results in total. Please refine your search (exact subject, organisation, file format, year…) to narrow it down.",
     "select": "Select",
     "openSource": "Open source page",
     "clickTitle": "Click to pre-fill the prompt",
-    "prefillPrefix": "Use this data"
+    "prefillPrefix": "Use this data",
+    "selectHint": "To continue, select the dataset you want to work with by clicking \"Select\", or click its title to refine your question."
   },
   "agentActivity": {
     "thinking": "Thinking…",

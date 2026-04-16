@@ -12,8 +12,9 @@ import {
   type DragEvent,
 } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowUp, Paperclip, X, File, Square, Share2, Link2, Layers, Map, Globe, BarChart2, Bot } from 'lucide-react'
+import { ArrowUp, Paperclip, X, File, Square, ChevronUp, Database, Check } from 'lucide-react'
 import type { AgentInfo, Attachment } from '../../types'
+import { AgentIcon } from '../AgentIcon'
 
 interface Props {
   isStreaming: boolean
@@ -38,27 +39,6 @@ function isImageType(type: string): boolean {
   return type.startsWith('image/')
 }
 
-const AGENT_COLORS_MAP: Record<string, string> = {
-  'Neo4j':        'border-[#4ade80] text-[#4ade80] bg-[rgba(74,222,128,0.10)]',
-  'RDF/SPARQL':   'border-[#fb923c] text-[#fb923c] bg-[rgba(251,146,60,0.10)]',
-  'Vector':       'border-[#60a5fa] text-[#60a5fa] bg-[rgba(96,165,250,0.10)]',
-  'PostGIS':      'border-[#38bdf8] text-[#38bdf8] bg-[rgba(56,189,248,0.10)]',
-  'Data.gouv.fr': 'border-[#f43f5e] text-[#f43f5e] bg-[rgba(244,63,94,0.10)]',
-}
-
-function agentActiveClass(label: string): string {
-  return AGENT_COLORS_MAP[label] ?? 'border-white/40 text-white/80 bg-white/5'
-}
-
-const AGENT_ICONS: Record<string, React.ReactElement> = {
-  'Neo4j':        <Share2 size={12} />,
-  'RDF/SPARQL':   <Link2 size={12} />,
-  'Vector':       <Layers size={12} />,
-  'PostGIS':      <Map size={12} />,
-  'Data.gouv.fr': <Globe size={12} />,
-  'DataViz':      <BarChart2 size={12} />,
-}
-
 export function PromptInput({
   isStreaming,
   availableAgents,
@@ -73,8 +53,21 @@ export function PromptInput({
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [isDragging, setIsDragging] = useState(false)
+  const [agentMenuOpen, setAgentMenuOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const agentMenuRef = useRef<HTMLDivElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (agentMenuRef.current && !agentMenuRef.current.contains(e.target as Node)) {
+        setAgentMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   const autoResize = useCallback(() => {
     const el = textareaRef.current
@@ -154,18 +147,6 @@ export function PromptInput({
 
   // ─── Agent selector ─────────────────────────────────────────────────────────
 
-  const toggleAgent = (key: string) => {
-    if (selectedAgents.includes(key)) {
-      if (selectedAgents.length > 1) {
-        onSelectedAgentsChange(selectedAgents.filter((k) => k !== key))
-      }
-    } else {
-      onSelectedAgentsChange([...selectedAgents, key])
-    }
-  }
-
-  const isAgentSelected = (key: string) => selectedAgents.includes(key)
-
   return (
     <div className="shrink-0 px-4 pb-5 pt-3">
       <div
@@ -217,8 +198,8 @@ export function PromptInput({
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-1">
-          {/* Left: attach button + agent toggles */}
-          <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Left: attach button */}
+          <div className="flex items-center gap-1.5">
             {/* Attach button */}
             <button
               type="button"
@@ -237,27 +218,70 @@ export function PromptInput({
               className="hidden"
               onChange={handleFileChange}
             />
-
-            {/* Agent toggles */}
-            {availableAgents.map((agent) => (
-              <button
-                key={agent.key}
-                type="button"
-                onClick={() => toggleAgent(agent.key)}
-                title={isAgentSelected(agent.key) ? t('promptInput.deselectAgent', { agent: agent.label }) : t('promptInput.selectAgent', { agent: agent.label })}
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border transition-colors duration-150 cursor-pointer select-none ${
-                  isAgentSelected(agent.key)
-                    ? agentActiveClass(agent.label)
-                    : 'border-white/15 text-white/30 bg-transparent hover:text-white/50'
-                }`}
-              >
-                {AGENT_ICONS[agent.label] ?? <Bot size={12} />}
-                {agent.label}
-              </button>
-            ))}
           </div>
 
-          {/* Right: send / stop button */}
+          {/* Right: sources dropdown + send / stop button */}
+          <div className="flex items-center gap-1.5">
+            {/* Agent source dropdown */}
+            <div ref={agentMenuRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setAgentMenuOpen((o) => !o)}
+                disabled={isStreaming}
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed select-none"
+              >
+                <Database size={13} />
+                <span>{t('promptInput.sources')}</span>
+                {selectedAgents.length < availableAgents.length && (
+                  <span className="ml-0.5 px-1 py-0 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] font-semibold leading-4">
+                    {selectedAgents.length}
+                  </span>
+                )}
+                <ChevronUp
+                  size={11}
+                  className={`transition-transform duration-150 ${agentMenuOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {agentMenuOpen && (
+                <div className="absolute bottom-full right-0 mb-1.5 w-52 rounded-lg border border-white/10 bg-[#1a1a20] shadow-xl z-50 py-1 overflow-hidden">
+                  <p className="px-3 pt-1.5 pb-1 text-[10px] font-semibold text-white/30 uppercase tracking-wider">
+                    {t('promptInput.sourcesLabel')}
+                  </p>
+                  {availableAgents.map((agent) => {
+                    const selected = selectedAgents.includes(agent.key)
+                    const isLast = selectedAgents.length === 1 && selected
+                    return (
+                      <button
+                        key={agent.key}
+                        type="button"
+                        onClick={() => {
+                          if (selected) {
+                            if (!isLast) onSelectedAgentsChange(selectedAgents.filter((k) => k !== agent.key))
+                          } else {
+                            onSelectedAgentsChange([...selectedAgents, agent.key])
+                          }
+                        }}
+                        disabled={isLast}
+                        className="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs hover:bg-white/5 transition-colors disabled:cursor-not-allowed"
+                      >
+                        <span className={`size-3.5 shrink-0 rounded flex items-center justify-center border transition-colors ${
+                          selected
+                            ? 'bg-cyan-500 border-cyan-500 text-black'
+                            : 'border-white/20 bg-transparent'
+                        }`}>
+                          {selected && <Check size={9} strokeWidth={3} />}
+                        </span>
+                        <AgentIcon agent={agent.label} size={11} />
+                        <span className={selected ? 'text-white/80' : 'text-white/40'}>{agent.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+          {/* Send / stop button */}
           {isStreaming ? (
             <button
               type="button"
@@ -278,6 +302,7 @@ export function PromptInput({
               <ArrowUp size={15} className="text-black" />
             </button>
           )}
+          </div>
         </div>
       </div>
 

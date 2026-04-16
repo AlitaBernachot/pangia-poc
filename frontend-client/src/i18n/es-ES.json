@@ -25,7 +25,9 @@
     "removeAttachment": "Eliminar",
     "hint": "Intro para enviar · Mayús+Intro para nueva línea · Arrastra y suelta archivos para adjuntar",
     "deselectAgent": "Deseleccionar {{agent}}",
-    "selectAgent": "Seleccionar {{agent}}"
+    "selectAgent": "Seleccionar {{agent}}",
+    "sources": "Fuentes",
+    "sourcesLabel": "Fuentes de datos"
   },
   "chatMessage": {
     "routingTo": "Enrutando a",
@@ -33,10 +35,13 @@
   },
   "datasetChoice": {
     "prompt": "{{count}} datasets encontrados. ¿Cuál deseas usar?",
+    "promptWithTotal": "{{total}} datasets encontrados en total — mostrando los primeros {{shown}}. ¿Cuál deseas usar?",
+    "refineHint": "La búsqueda ha devuelto {{total}} resultados en total. Refine su búsqueda (tema exacto, organización, formato, año…) para reducirlos.",
     "select": "Seleccionar",
     "openSource": "Abrir página fuente",
     "clickTitle": "Clic para rellenar el campo de entrada",
-    "prefillPrefix": "Usa estos datos"
+    "prefillPrefix": "Usar estos datos",
+    "selectHint": "Para continuar, seleccione el dataset con el que desea trabajar haciendo clic en \"Seleccionar\", o haga clic en su título para refinar su pregunta."
   },
   "agentActivity": {
     "thinking": "Pensando…",

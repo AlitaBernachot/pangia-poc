@@ -15,7 +15,7 @@ interface Props {
 
 export function AgentActivityPanel({ activity }: Props) {
   const { t } = useTranslation()
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
   const colors = AGENT_COLORS[activity.agent]
 
   // The most recently started running tool (last in list with status 'running')

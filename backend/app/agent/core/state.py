@@ -118,3 +118,7 @@ class AgentState(TypedDict):
     # Each entry is a dict with keys: id, title, description, url, organization.
     # None when no disambiguation is needed or when the agent has not run yet.
     pending_dataset_choice: list[dict] | None
+
+    # Total number of datasets found by the search (may exceed the page shown).
+    # None when no disambiguation is needed.
+    pending_dataset_choice_total: int | None
