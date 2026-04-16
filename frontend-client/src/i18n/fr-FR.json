@@ -149,6 +149,11 @@
     "analyse_movement":              "Analyse mouvement",
     "compute_displacement":          "Calcul déplacement",
     "detect_temporal_pattern":       "Motif temporel",
-    "summarise_time_series":         "Résumé série temporelle"
+    "summarise_time_series":         "Résumé série temporelle",
+    "search_datasets":               "Recherche de datasets",
+    "get_dataset_resources":          "Ressources du dataset",
+    "list_dataset_resources":         "Liste des ressources",
+    "get_resource_info":              "Infos ressource",
+    "query_resource_data":            "Aperçu des données"
   }
 }

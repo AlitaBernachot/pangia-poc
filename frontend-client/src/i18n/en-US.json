@@ -149,6 +149,11 @@
     "analyse_movement":              "Analyse Movement",
     "compute_displacement":          "Compute Displacement",
     "detect_temporal_pattern":       "Temporal Pattern",
-    "summarise_time_series":         "Time Series"
+    "summarise_time_series":         "Time Series",
+    "search_datasets":               "Search Datasets",
+    "get_dataset_resources":          "Dataset Resources",
+    "list_dataset_resources":         "List Resources",
+    "get_resource_info":              "Resource Info",
+    "query_resource_data":            "Preview Data"
   }
 }

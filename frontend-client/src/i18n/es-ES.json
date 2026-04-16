@@ -149,6 +149,11 @@
     "analyse_movement":              "Analizar movimiento",
     "compute_displacement":          "Calcular desplazamiento",
     "detect_temporal_pattern":       "Patrón temporal",
-    "summarise_time_series":         "Resumen serie temporal"
+    "summarise_time_series":         "Resumen de serie temporal",
+    "search_datasets":               "Buscar datasets",
+    "get_dataset_resources":          "Recursos del dataset",
+    "list_dataset_resources":         "Listar recursos",
+    "get_resource_info":              "Info del recurso",
+    "query_resource_data":            "Vista previa de datos"
   }
 }

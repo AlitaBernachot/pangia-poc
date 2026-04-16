@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { type AgentActivity, AGENT_COLORS } from '../../types'
 import { AgentIcon } from '../AgentIcon'
 import { ToolIcon } from '../ToolIcon'
-import { ChevronDown, ChevronRight } from 'lucide-react'
+import { ChevronDown, ChevronRight, CheckCheck, Lightbulb } from 'lucide-react'
 
 interface Props {
   activity: AgentActivity
@@ -54,10 +54,16 @@ export function AgentActivityPanel({ activity }: Props) {
                 </span>
               </span>
             ) : (
-              <span className="thinking-indicator">{t('agentActivity.thinking')}</span>
+              <span className="inline-flex items-center gap-1">
+                <Lightbulb size={10} className="thinking-indicator" />
+                <span className="thinking-indicator">{t('agentActivity.thinking')}</span>
+              </span>
             )
           ) : (
-            t('agentActivity.done')
+            <span className="inline-flex items-center gap-1">
+              <CheckCheck size={10} />
+              {t('agentActivity.done')}
+            </span>
           )}
         </span>
       </button>
