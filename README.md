@@ -36,6 +36,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
     - [Agent ReAct loop iterations](#agent-react-loop-iterations)
     - [Per-agent LLM configuration](#per-agent-llm-configuration)
     - [SSE event types](#sse-event-types)
+    - [Human-in-the-Loop: Dataset Disambiguation](#human-in-the-loop-dataset-disambiguation)
     - [Intent Parser](#intent-parser)
     - [Smart Dispatcher](#smart-dispatcher)
     - [Source Registry](#source-registry)
@@ -50,17 +51,17 @@ A minimal AI agent chat application with a **multi-agent architecture**:
   - [Project structure](#project-structure)
   - [Development (without Docker)](#development-without-docker)
     - [Backend](#backend)
-    - [Frontend](#frontend-1)
+    - [Frontend](#frontend)
   - [Seed themes](#seed-themes)
     - [PostGIS schema isolation](#postgis-schema-isolation)
     - [Switching the theme](#switching-the-theme)
     - [Adding a new theme](#adding-a-new-theme)
   - [Adding a new sub-agent](#adding-a-new-sub-agent)
   - [Geo Agent – Geospatial Analysis](#geo-agent--geospatial-analysis)
+  - [data.gouv.fr Agent](#datagouvfr-agent)
     - [Sub-agent hierarchy](#sub-agent-hierarchy)
     - [Configuration](#configuration-1)
     - [Notes](#notes)
-  - [Local LLM with Ollama](docs/ollama-gemma4-setup.md)
 
 ---
 
@@ -751,6 +752,16 @@ Sub-agents live in `backend/app/agent/`.  To add one:
 ---
 
 ## Geo Agent – Geospatial Analysis
+
+---
+
+## data.gouv.fr Agent
+
+See [`backend/app/agent/connectors/README.md`](backend/app/agent/connectors/README.md).
+
+---
+
+
 
 > ⚠️ **Not operational – needs rework before use.**
 > The Geo Agent is currently broken following the refactoring of utility functions into

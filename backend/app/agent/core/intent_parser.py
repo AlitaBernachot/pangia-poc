@@ -53,8 +53,9 @@ logger = logging.getLogger(__name__)
 
 _GEO_SIGNAL_RE = re.compile(
     r"\b(?:où|where|localise|localiz|geocod|carte|map|coordonnées?|coordinates?"
-    r"|adresse|address|near|près de|autour de|dans un rayon|buffer|zone|région"
-    r"|frontière|boundary|polygon|bbox|buffer|isochrone|itinéraire|route|chemin)\b",
+    r"|adresse|address|near|près de|autour de|dans un rayon|within|radius"
+    r"|buffer|zone|région|frontière|boundary|polygon|bbox|isochrone"
+    r"|itinéraire|route|chemin|\d+\s*km|\d+\s*miles?|\d+\s*kilomètre)",
     re.IGNORECASE,
 )
 
@@ -78,6 +79,8 @@ _COMPARE_SIGNAL_RE = re.compile(
     r"|entre .+ et |between .+ and |plus que|less than|more than)\b",
     re.IGNORECASE,
 )
+
+# TODO: i18n and more robust NLP signals (e.g. via a lightweight classification model)
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
@@ -136,6 +139,35 @@ structured JSON object describing their intent.
 - Never add keys outside the schema.
 - Never refuse to parse — always return a best-effort result with a low confidence.
 - Be concise: return only the JSON object. No explanation, no preamble.
+
+## Special classification rules
+
+### Dataset + filter queries → use "search"
+When a query asks to **list, find, or display items from a thematic dataset**
+(sensors, stations, equipment, infrastructure, records, bornes, capteurs…)
+combined with an **attribute/status condition** (e.g. "en maintenance", "actif",
+"hors service", "en cours", "dont le statut est X"), classify as
+`intent_type = "search"` — even if the query includes a named administrative
+geographic qualifier such as "de la ville d'Orléans" or "dans le département".
+
+**EXCEPTION — proximity/radius constraints → use `"analyze_proximity"` instead.**
+If the geographic qualifier is a **distance or radius** (e.g. "within 2000 km",
+"dans un rayon de 500 km", "less than 300 miles"), this is a geospatial proximity
+query, NOT a dataset filter. Use `indent_type = "analyze_proximity"` in that case.
+
+Do **NOT** use `"locate"` for dataset-filter queries. `"locate"` is strictly for
+geocoding a single address or finding the precise coordinates of a place.
+
+Also include the filter condition verbatim (e.g. `"en maintenance"`) as one
+of the `entities` so downstream agents can use it as a filter criterion.
+
+Example:
+- "Quels capteurs d'ondes électromagnétiques de la ville d'Orléans sont en maintenance ?"
+  → intent_type = "search", entities = ["capteurs d'ondes électromagnétiques", "Orléans", "en maintenance"]
+- "Show all active charging stations in Lyon"
+  → intent_type = "search", entities = ["charging stations", "Lyon", "active"]
+- "Show all pandemic outbreak sites within 2000 km of Paris"
+  → intent_type = "analyze_proximity", geo_zone = {place_name: "Paris", radius_km: 2000}
 """
 
 

@@ -25,6 +25,8 @@ as ``run`` for consistency with other agents.
 """
 from __future__ import annotations
 
+import re
+
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.agent.model_config import build_llm, get_agent_model_config
@@ -145,6 +147,13 @@ def _last_human_message(state: AgentState) -> str:
 
 async def merge_node(state: AgentState) -> dict:
     """Synthesise sub-agent results into a final answer."""
+    # ── Dataset disambiguation pending ────────────────────────────────────────
+    # When data_gouv_agent is waiting for the user to pick a dataset, the
+    # DatasetChoicePanel is the primary UI element.  Skip LLM synthesis so the
+    # text area stays clean (empty message) and the panel is the only thing shown.
+    if state.get("pending_dataset_choice"):
+        return {"messages": [AIMessage(content="")]}
+
     llm = build_llm(get_agent_model_config("merge"), streaming=True)
     query = _last_human_message(state)
 
@@ -154,6 +163,21 @@ async def merge_node(state: AgentState) -> dict:
     if not non_empty:
         return {"messages": [AIMessage(content="No sub-agent results were produced.")]}
 
+    has_dataviz = bool(state.get("dataviz"))
+    has_geojson = bool(state.get("geojson"))
+
+    # When a dataviz table or map is already rendered below the message, strip
+    # any markdown table content from sub_results so the synthesis agent never
+    # repeats sample rows or preview data in the text response.
+    if has_dataviz or has_geojson:
+        cleaned: dict[str, str] = {}
+        for k, v in non_empty.items():
+            # Truncate at the first markdown table row (|---|) or sample/preview header
+            truncated = re.split(r'\n\|[-| ]+\||\n\s*\|\s*__', v)[0].strip()
+            # Also strip trailing lines that just list column headers
+            cleaned[k] = truncated if truncated else v
+        non_empty = cleaned
+
     # Build a structured context block for the synthesiser
     context_parts = []
     for agent_key, result in non_empty.items():
@@ -161,10 +185,18 @@ async def merge_node(state: AgentState) -> dict:
         context_parts.append(f"### {label}\n{result}")
     context = "\n\n".join(context_parts)
 
+    table_instruction = (
+        "\n\nIMPORTANT: A dataviz table and/or interactive map is already displayed "
+        "below this message. Do NOT reproduce any data rows, sample records, or column "
+        "listings in your text. Only provide: dataset title, total record count, "
+        "source URL, and licence. Keep it to 2-3 sentences maximum."
+        if (has_dataviz or has_geojson) else ""
+    )
+
     synthesis_prompt = (
         f"User question:\n{query}\n\n"
         f"Sub-agent answers:\n\n{context}\n\n"
-        "Please synthesise a complete, well-structured answer."
+        f"Please synthesise a complete, well-structured answer.{table_instruction}"
     )
 
     response: AIMessage = await llm.ainvoke(

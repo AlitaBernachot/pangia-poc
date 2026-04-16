@@ -35,7 +35,8 @@
     "prompt": "{{count}} datasets trouvés. Lequel souhaitez-vous utiliser ?",
     "select": "Sélectionner",
     "openSource": "Ouvrir la page source",
-    "clickTitle": "Cliquer pour pré-remplir la saisie avec ce nom de dataset"
+    "clickTitle": "Cliquer pour pré-remplir la saisie",
+    "prefillPrefix": "Utilise ces données"
   },
   "agentActivity": {
     "thinking": "Réflexion en cours…",

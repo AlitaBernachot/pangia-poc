@@ -103,7 +103,7 @@ export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStrea
           <DatasetChoicePanel
             candidates={message.datasetChoice}
             onSelect={(candidate) => onSelectDataset?.(candidate)}
-            onPrefillPrompt={(title) => onPrefillPrompt?.(`use this dataset: ${title}`)}
+            onPrefillPrompt={onPrefillPrompt}
             disabled={isStreaming}
           />
         )}

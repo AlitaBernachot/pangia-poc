@@ -80,12 +80,37 @@ export function MapViewer({ geojson }: Props) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       onEachFeature(feature: any, l: L.Layer) {
         const props = feature.properties ?? {}
-        const name: string = props.name ?? props.display_name ?? ''
-        const popup: string = props.popup_content ?? ''
-        const lines: string[] = []
-        if (name) lines.push(`<strong>${name}</strong>`)
-        if (popup && popup !== name) lines.push(popup)
-        if (lines.length) (l as L.Path).bindPopup(lines.join('<br>'), { maxWidth: 280 })
+        if (!Object.keys(props).length) return
+
+        // Keys to skip from the property table (redundant or internal)
+        const SKIP = new Set(['popup_content', 'latitude', 'longitude', 'lat', 'lon', 'lng'])
+
+        const name: string = props.name ?? props.display_name ?? props.nom_court ?? props.titre ?? ''
+        const prebuiltPopup: string = props.popup_content ?? ''
+
+        let html = ''
+        if (name) html += `<strong>${name}</strong>`
+        if (prebuiltPopup && prebuiltPopup !== name) {
+          html += (html ? '<br>' : '') + prebuiltPopup
+        }
+
+        // Build a compact key/value table for all remaining properties
+        const rows = Object.entries(props)
+          .filter(([k]) => !SKIP.has(k) && k !== 'name' && k !== 'display_name')
+          .map(([k, v]) => {
+            const label = k.replace(/_/g, ' ')
+            const val = v === null || v === undefined ? '' : String(v)
+            if (!val) return ''
+            return `<tr><td style="color:#94a3b8;padding-right:6px;white-space:nowrap">${label}</td><td style="word-break:break-word">${val}</td></tr>`
+          })
+          .filter(Boolean)
+
+        if (rows.length) {
+          html += (html ? '<hr style="border-color:#334155;margin:4px 0">' : '')
+          html += `<table style="font-size:11px;border-collapse:collapse;width:100%">${rows.join('')}</table>`
+        }
+
+        if (html) (l as L.Path).bindPopup(html, { maxWidth: 320 })
       },
     }).addTo(map)
 
