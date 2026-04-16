@@ -5,11 +5,12 @@
 import ReactMarkdown from 'react-markdown'
 import { ExternalLink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { type Message, AGENT_COLORS } from '../../types'
+import { type Message, type DatasetCandidate, AGENT_COLORS } from '../../types'
 import { AgentIcon } from '../AgentIcon'
 import { AgentActivityPanel } from './AgentActivityPanel'
 import { MapViewer } from '../MapViewer'
 import { DataVizViewer } from '../DataViz/DataVizViewer'
+import { DatasetChoicePanel } from './DatasetChoicePanel'
 
 const markdownComponents = {
   a: ({ href, children }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
@@ -27,9 +28,12 @@ const markdownComponents = {
 
 interface Props {
   message: Message
+  onSelectDataset?: (candidate: DatasetCandidate) => void
+  onPrefillPrompt?: (text: string) => void
+  isStreaming?: boolean
 }
 
-export function ChatMessage({ message }: Props) {
+export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStreaming }: Props) {
   const { t } = useTranslation()
   const isUser = message.role === 'user'
 
@@ -93,6 +97,16 @@ export function ChatMessage({ message }: Props) {
 
         {/* DataViz */}
         {message.dataviz && <DataVizViewer dataviz={message.dataviz} />}
+
+        {/* Dataset choice — human-in-the-loop disambiguation */}
+        {message.datasetChoice && message.datasetChoice.length > 0 && (
+          <DatasetChoicePanel
+            candidates={message.datasetChoice}
+            onSelect={(candidate) => onSelectDataset?.(candidate)}
+            onPrefillPrompt={onPrefillPrompt}
+            disabled={isStreaming}
+          />
+        )}
 
         {/* Final answer — always last */}
         {(message.content || message.streaming) && (

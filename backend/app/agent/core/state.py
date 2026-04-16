@@ -112,3 +112,9 @@ class AgentState(TypedDict):
 
     # Structured intent produced by the intent_parser (None when disabled or not yet run).
     parsed_intent: ParsedIntent | None
+
+    # Dataset candidates returned by the datagouv_mcp_agent when multiple datasets match
+    # the user's query and human disambiguation is required before fetching data.
+    # Each entry is a dict with keys: id, title, description, url, organization.
+    # None when no disambiguation is needed or when the agent has not run yet.
+    pending_dataset_choice: list[dict] | None

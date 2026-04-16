@@ -326,7 +326,7 @@ async def _run(state: AgentState) -> dict:
     )
 
     # ── Pre-seed collected results with dataviz tables already built ───────────
-    # When dataviz is pre-populated (e.g. by data_gouv_agent), reuse its tables
+    # When dataviz is pre-populated (e.g. by datagouv_mcp_agent), reuse its tables
     # and only ask the LLM to add charts/KPIs if the data is numeric.
     preseeded_tables: list[dict[str, Any]] = []
     if existing_dataviz and existing_dataviz.get("tables"):

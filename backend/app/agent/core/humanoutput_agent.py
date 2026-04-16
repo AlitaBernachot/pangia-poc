@@ -118,6 +118,12 @@ async def run(state: AgentState) -> dict:
 
 
 async def _run(state: AgentState) -> dict:
+    # ── Dataset disambiguation pending: skip all visualisations ──────────────
+    # mapviz/dataviz have nothing useful to do while waiting for the user to
+    # pick a dataset — skip both to avoid wasted LLM calls.
+    if state.get("pending_dataset_choice"):
+        return {"output_decision": {"needs_map": False, "needs_dataviz": False}}
+
     sub_results: dict[str, str] = state.get("sub_results", {})
     existing_dataviz = state.get("dataviz")
     existing_geojson = state.get("geojson")
@@ -127,7 +133,7 @@ async def _run(state: AgentState) -> dict:
     )
 
     # ── Fast-path: dataviz/geojson already built overrides heuristics ─────────
-    # When dataviz or geojson is pre-populated (e.g. by data_gouv_agent) we know
+    # When dataviz or geojson is pre-populated (e.g. by datagouv_mcp_agent) we know
     # for certain what to render without calling the LLM.
     has_prebuilt_dataviz = existing_dataviz and (
         existing_dataviz.get("tables") or existing_dataviz.get("charts") or existing_dataviz.get("kpis")
@@ -143,6 +149,16 @@ async def _run(state: AgentState) -> dict:
                 "needs_dataviz": bool(has_prebuilt_dataviz),
             }
         }
+
+    # ── Fast-path: data_gouv ran but produced no table/geojson ────────────────
+    # The agent retrieved metadata or an empty file — no point trying to build
+    # a dataviz from its text output.
+    if "data_gouv" in sub_results and not has_prebuilt_dataviz and existing_geojson is None:
+        # Still allow mapviz if there are geographic signals in other agents
+        other_sub = {k: v for k, v in sub_results.items() if k != "data_gouv"}
+        other_text = "\n".join(other_sub.values())
+        needs_map = bool(_COORD_HINT_RE.search(f"{other_text} {user_query}") or _GEO_KEYWORD_RE.search(f"{other_text} {user_query}"))
+        return {"output_decision": {"needs_map": needs_map, "needs_dataviz": False}}
 
     sub_text = "\n\n".join(
         f"[{agent.upper()} RESULTS]:\n{result}"

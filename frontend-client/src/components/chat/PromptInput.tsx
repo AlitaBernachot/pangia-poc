@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   useCallback,
+  useEffect,
   type ChangeEvent,
   type KeyboardEvent,
   type DragEvent,
@@ -21,6 +22,10 @@ interface Props {
   onSelectedAgentsChange: (keys: string[]) => void
   onSubmit: (text: string, attachments: Attachment[]) => void
   onStop?: () => void
+  /** When set, pre-fills the textarea with this text and focuses it. */
+  prefillText?: string
+  /** Called once the prefill has been consumed so the parent can clear the value. */
+  onPrefillConsumed?: () => void
 }
 
 function formatSize(bytes: number): string {
@@ -61,6 +66,8 @@ export function PromptInput({
   onSelectedAgentsChange,
   onSubmit,
   onStop,
+  prefillText,
+  onPrefillConsumed,
 }: Props) {
   const { t } = useTranslation()
   const [draft, setDraft] = useState('')
@@ -75,6 +82,18 @@ export function PromptInput({
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 160) + 'px'
   }, [])
+
+  // When a prefill is requested, set the draft and focus the textarea.
+  useEffect(() => {
+    if (!prefillText) return
+    setDraft(prefillText)
+    // Allow the DOM to update before resizing and focusing
+    requestAnimationFrame(() => {
+      autoResize()
+      textareaRef.current?.focus()
+    })
+    onPrefillConsumed?.()
+  }, [prefillText, autoResize, onPrefillConsumed])
 
   const handleSubmit = () => {
     const text = draft.trim()

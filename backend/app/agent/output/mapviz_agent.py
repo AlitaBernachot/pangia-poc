@@ -411,7 +411,7 @@ async def _run(state: AgentState) -> dict:
         "",
     )
 
-    # ── GeoJSON already computed by a connector (e.g. data_gouv_agent) ────────
+    # ── GeoJSON already computed by a connector (e.g. datagouv_mcp_agent) ────────
     # Return it directly without calling the LLM.
     if state.get("geojson"):
         return {

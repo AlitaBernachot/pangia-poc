@@ -2,15 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
+import { useEffect, useState } from 'react'
 import { usePangiaChat } from '../hooks/usePangiaChat'
 import { MessageList } from '../components/chat/MessageList'
 import { PromptInput } from '../components/chat/PromptInput'
 import type { Attachment } from '../types'
 
 export function ChatPage() {
-  const { t } = useTranslation()
   const {
     messages,
     isStreaming,
@@ -22,6 +20,8 @@ export function ChatPage() {
     clearMessages,
     fetchAgents,
   } = usePangiaChat()
+
+  const [prefillText, setPrefillText] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     fetchAgents()
@@ -37,7 +37,14 @@ export function ChatPage() {
       <div className="shrink-0 border-b border-white/6" />
 
       {/* Messages */}
-      <MessageList messages={messages} onSuggestion={(text) => sendMessage(text)} onClear={clearMessages} isStreaming={isStreaming} />
+      <MessageList
+        messages={messages}
+        onSuggestion={(text) => sendMessage(text)}
+        onSendMessage={(text) => sendMessage(text)}
+        onPrefillPrompt={(text) => setPrefillText(text)}
+        onClear={clearMessages}
+        isStreaming={isStreaming}
+      />
 
       {/* Prompt */}
       <PromptInput
@@ -47,6 +54,8 @@ export function ChatPage() {
         onSelectedAgentsChange={setSelectedAgents}
         onSubmit={handleSubmit}
         onStop={stopStreaming}
+        prefillText={prefillText}
+        onPrefillConsumed={() => setPrefillText(undefined)}
       />
     </div>
   )

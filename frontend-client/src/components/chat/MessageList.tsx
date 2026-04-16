@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Trash2 } from 'lucide-react'
-import { type Message } from '../../types'
+import { type Message, type DatasetCandidate } from '../../types'
 import { ChatMessage } from './ChatMessage'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
@@ -13,6 +13,8 @@ const API_BASE = import.meta.env.VITE_API_URL ?? ''
 interface Props {
   messages: Message[]
   onSuggestion?: (text: string) => void
+  onSendMessage?: (text: string) => void
+  onPrefillPrompt?: (text: string) => void
   onClear?: () => void
   isStreaming?: boolean
 }
@@ -34,7 +36,7 @@ function useSuggestions(): string[] {
   return suggestions
 }
 
-export function MessageList({ messages, onSuggestion, onClear, isStreaming }: Props) {
+export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPrompt, onClear, isStreaming }: Props) {
   const { t } = useTranslation()
   const bottomRef = useRef<HTMLDivElement>(null)
   const suggestions = useSuggestions()
@@ -78,7 +80,17 @@ export function MessageList({ messages, onSuggestion, onClear, isStreaming }: Pr
     <div className="flex-1 overflow-y-auto px-4 py-6">
       <div className="mx-auto max-w-3xl space-y-6">
         {messages.map((msg) => (
-          <ChatMessage key={msg.id} message={msg} />
+          <ChatMessage
+            key={msg.id}
+            message={msg}
+            onSelectDataset={(candidate: DatasetCandidate) =>
+              onSendMessage?.(
+                `Je veux travailler avec le dataset : "${candidate.title}"${candidate.id ? ` (ID: ${candidate.id})` : ''}`,
+              )
+            }
+            onPrefillPrompt={onPrefillPrompt}
+            isStreaming={isStreaming}
+          />
         ))}
         {messages.length > 0 && !isStreaming && onClear && (
           <div className="flex justify-center pt-2">

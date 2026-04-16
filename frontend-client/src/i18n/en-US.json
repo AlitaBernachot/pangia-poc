@@ -31,6 +31,13 @@
     "routingTo": "Routing to",
     "thinking": "Thinking..."
   },
+  "datasetChoice": {
+    "prompt": "{{count}} datasets found. Which one would you like to use?",
+    "select": "Select",
+    "openSource": "Open source page",
+    "clickTitle": "Click to pre-fill the prompt",
+    "prefillPrefix": "Use this data"
+  },
   "agentActivity": {
     "thinking": "Thinking…",
     "done": "Done"

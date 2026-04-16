@@ -14,6 +14,7 @@ A React + Vite + Tailwind CSS frontend for the [PangIA](../README.md) geospatial
   - File attachment support (click or drag & drop) modelled after [AI SDK Elements Attachments](https://elements.ai-sdk.dev/components/attachments)
   - Agent selector toggles to target specific data agents
   - Per-agent activity panels showing intermediate reasoning and tool calls
+  - **Dataset disambiguation (Human-in-the-Loop)** — when data.gouv.fr returns multiple matching datasets the assistant presents interactive selection cards; clicking one automatically sends the selection back to the assistant
   - Markdown rendering for AI responses
   - Animated streaming cursor
 - **FAQ / About page** — accordion FAQ and overview of available agents

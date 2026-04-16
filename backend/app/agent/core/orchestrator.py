@@ -55,7 +55,7 @@ from app.agent.model_config import build_llm, get_agent_model_config
 from app.agent.connectors.neo4j_agent import run as neo4j_run
 from app.agent.connectors.postgis_agent import run as postgis_run
 from app.agent.connectors.rdf_agent import run as rdf_run
-from app.agent.connectors.data_gouv_agent import run as data_gouv_run
+from app.agent.connectors.datagouv_mcp_agent import run as data_gouv_run
 from app.agent.connectors.geonetwork_mcp_agent import make_run as _make_geonetworkmcp_run
 from app.agent.core.geo_orchestrator import run as geo_run
 from app.agent.core.intent_parser import run as intent_parser_run
@@ -98,7 +98,7 @@ _AGENT_NODES: dict[str, tuple[str, Any]] = {
     "rdf": ("rdf_agent", rdf_run),
     "vector_chroma": ("vector_chroma_agent", vector_run),
     "postgis": ("postgis_agent", postgis_run),
-    "data_gouv": ("data_gouv_agent", data_gouv_run),
+    "data_gouv": ("datagouv_mcp_agent", data_gouv_run),
     "geo": ("geo_agent", geo_run),
 }
 
@@ -240,7 +240,7 @@ def dispatch_agents(state: AgentState):
         if is_map_enabled() or is_dataviz_enabled():
             return "post_process_router"
         return "merge"
-    return [Send(f"{a}_agent", state) for a in agents]
+    return [Send(_AGENT_NODES[a][0], state) for a in agents]
 
 
 def post_process_router_node(state: AgentState) -> dict:

@@ -14,14 +14,14 @@ graph TD;
 	rdf_agent(rdf_agent)
 	vector_chroma_agent(vector_chroma_agent)
 	postgis_agent(postgis_agent)
-	data_gouv_agent(data_gouv_agent)
+	datagouv_mcp_agent(datagouv_mcp_agent)
 	geo_agent(geo_agent)
 	geonetworkmcp_agent(geonetworkmcp_agent)
 	smart_dispatcher(smart_dispatcher)
 	intent_parser(intent_parser)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> intent_parser;
-	data_gouv_agent --> post_process_router;
+	datagouv_mcp_agent --> post_process_router;
 	dataviz_agent --> merge;
 	geo_agent --> post_process_router;
 	geonetworkmcp_agent --> post_process_router;
@@ -34,7 +34,7 @@ graph TD;
 	post_process_router --> humanoutput_agent;
 	postgis_agent --> post_process_router;
 	rdf_agent --> post_process_router;
-	smart_dispatcher -.-> data_gouv_agent;
+	smart_dispatcher -.-> datagouv_mcp_agent;
 	smart_dispatcher -.-> geo_agent;
 	smart_dispatcher -.-> geonetworkmcp_agent;
 	smart_dispatcher -.-> merge;

@@ -36,6 +36,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
     - [Agent ReAct loop iterations](#agent-react-loop-iterations)
     - [Per-agent LLM configuration](#per-agent-llm-configuration)
     - [SSE event types](#sse-event-types)
+    - [Human-in-the-Loop: Dataset Disambiguation](#human-in-the-loop-dataset-disambiguation)
     - [Intent Parser](#intent-parser)
     - [Smart Dispatcher](#smart-dispatcher)
     - [Source Registry](#source-registry)
@@ -50,17 +51,17 @@ A minimal AI agent chat application with a **multi-agent architecture**:
   - [Project structure](#project-structure)
   - [Development (without Docker)](#development-without-docker)
     - [Backend](#backend)
-    - [Frontend](#frontend-1)
+    - [Frontend](#frontend)
   - [Seed themes](#seed-themes)
     - [PostGIS schema isolation](#postgis-schema-isolation)
     - [Switching the theme](#switching-the-theme)
     - [Adding a new theme](#adding-a-new-theme)
   - [Adding a new sub-agent](#adding-a-new-sub-agent)
   - [Geo Agent – Geospatial Analysis](#geo-agent--geospatial-analysis)
+  - [data.gouv.fr Agent](#datagouvfr-agent)
     - [Sub-agent hierarchy](#sub-agent-hierarchy)
     - [Configuration](#configuration-1)
     - [Notes](#notes)
-  - [Local LLM with Ollama](docs/ollama-gemma4-setup.md)
 
 ---
 
@@ -162,7 +163,7 @@ into a final streamed answer.
 | `RDF_AGENT_ENABLED` | `true` | RDF/Linked Data connector (SPARQL / GraphDB) |
 | `VECTOR_CHROMA_AGENT_ENABLED` | `true` | Semantic search connector (ChromaDB) |
 | `POSTGIS_AGENT_ENABLED` | `true` | Spatial SQL connector (PostGIS) |
-| `DATA_GOUV_AGENT_ENABLED` | `true` | French open-data connector (data.gouv.fr via MCP) |
+| `DATAGOUV_MCP_AGENT_ENABLED` | `true` | French open-data connector (data.gouv.fr via MCP) |
 | `GEO_AGENT_ENABLED` | `true` | Geospatial analysis orchestrator (geo sub-agents) |
 | `HUMANOUTPUT_AGENT_ENABLED` | `true` | Output decision agent (routes to map/dataviz selectively) |
 | `MAPVIZ_AGENT_ENABLED` | `true` | Geographic visualisation agent (GeoJSON / Leaflet map) |
@@ -199,7 +200,7 @@ The number of iterations is configurable at two levels:
 | `VECTOR_CHROMA_AGENT_MAX_ITERATIONS` | `0` | Vector agent override |
 | `POSTGIS_AGENT_MAX_ITERATIONS` | `0` | PostGIS agent override |
 | `MAPVIZ_AGENT_MAX_ITERATIONS` | `0` | Map agent override |
-| `DATA_GOUV_AGENT_MAX_ITERATIONS` | `0` | data.gouv.fr agent override |
+| `DATAGOUV_MCP_AGENT_MAX_ITERATIONS` | `0` | data.gouv.fr agent override |
 | `DATAVIZ_AGENT_MAX_ITERATIONS` | `0` | DataViz agent override |
 
 Lower the value to reduce latency and cost; raise it for agents that need more
@@ -214,7 +215,7 @@ Every agent (including the router and the merge node) can use a **different LLM 
 | `<AGENT>_MODEL_PROVIDER` | `openai`, `anthropic`, `ollama` | Provider for this agent. Leave empty to use the global provider. |
 | `<AGENT>_MODEL_NAME` | `gpt-4o`, `claude-3-5-sonnet-latest`, `llama3` | Model name for this agent. Leave empty to fall back to `OPENAI_MODEL`. |
 
-Available `<AGENT>` prefixes: `ROUTER`, `INTENT_PARSER_AGENT`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_CHROMA_AGENT`, `POSTGIS_AGENT`, `MAPVIZ_AGENT`, `DATA_GOUV_AGENT`, `DATAVIZ_AGENT`, `MERGE`.
+Available `<AGENT>` prefixes: `ROUTER`, `INTENT_PARSER_AGENT`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_CHROMA_AGENT`, `POSTGIS_AGENT`, `MAPVIZ_AGENT`, `DATAGOUV_MCP_AGENT`, `DATAVIZ_AGENT`, `MERGE`.
 
 Example `.env` — use a powerful model for the router and merge, a cheaper one for sub-agents:
 
@@ -250,8 +251,44 @@ Leave both variables empty (the default) to use the global `OPENAI_MODEL` for ev
 | `tool_end` | A sub-agent tool call completed |
 | `geojson` | GeoJSON FeatureCollection from the Map agent (rendered as interactive Leaflet map) |
 | `dataviz` | Visualisation payload from the DataViz agent (charts, KPI cards, tables) |
+| `dataset_choice` | Human-in-the-loop: list of dataset candidates for user disambiguation (see below) |
 | `error` | An error occurred |
 | `done` | Stream complete |
+
+### Human-in-the-Loop: Dataset Disambiguation
+
+When the `datagouv_mcp_agent` searches for a dataset and finds **multiple results with different titles**, it will not arbitrarily pick one.  Instead it:
+
+1. **Asks the user** to specify which dataset they want to work with (the agent's text response lists the candidates).
+2. **Emits a `dataset_choice` SSE event** containing structured candidate data so the frontend can render interactive selection cards.
+
+**`dataset_choice` event payload:**
+
+```json
+{
+  "type": "dataset_choice",
+  "candidates": [
+    {
+      "id": "abc123",
+      "title": "Capteur d'ondes électromagnétiques — site A",
+      "description": "Mesures journalières des champs électromagnétiques…",
+      "url": "https://www.data.gouv.fr/fr/datasets/abc123/",
+      "organization": "ANFR"
+    }
+  ]
+}
+```
+
+When the user clicks a candidate card, the frontend sends a new message of the form:
+`Je veux travailler avec le dataset : "<title>" (ID: <id>)`
+
+The agent then fetches and displays the selected dataset.  
+The disambiguation step is **only triggered when**:
+- the search returns ≥ 2 distinct datasets, **and**
+- no data file was actually fetched in the same turn.
+
+> **AgentState field:** `pending_dataset_choice: list[dict] | None`  
+> Populated by `datagouv_mcp_agent`; cleared to `None` after successful data retrieval.
 
 ### Intent Parser
 
@@ -515,7 +552,7 @@ pangia-poc/
 │       │   │   ├── rdf_agent.py     # RDF sub-agent (SPARQL / GraphDB)
 │       │   │   ├── vector_chroma_agent.py  # Vector sub-agent (ChromaDB)
 │       │   │   ├── postgis_agent.py # Spatial SQL sub-agent (PostGIS)
-│       │   │   └── data_gouv_agent.py # French open-data sub-agent (data.gouv.fr MCP)
+│       │   │   └── datagouv_mcp_agent.py # French open-data sub-agent (data.gouv.fr MCP)
 │       │   ├── geo/                 # Geospatial processing agents
 │       │   │   ├── l1_primitives/   # Atomic operations
 │       │   │   │   ├── address_agent.py    # Geocoding address ↔ coordinates
@@ -715,6 +752,16 @@ Sub-agents live in `backend/app/agent/`.  To add one:
 ---
 
 ## Geo Agent – Geospatial Analysis
+
+---
+
+## data.gouv.fr Agent
+
+See [`backend/app/agent/connectors/README.md`](backend/app/agent/connectors/README.md).
+
+---
+
+
 
 > ⚠️ **Not operational – needs rework before use.**
 > The Geo Agent is currently broken following the refactoring of utility functions into

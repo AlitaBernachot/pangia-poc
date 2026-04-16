@@ -31,6 +31,13 @@
     "routingTo": "Routage vers",
     "thinking": "Réflexion en cours..."
   },
+  "datasetChoice": {
+    "prompt": "{{count}} datasets trouvés. Lequel souhaitez-vous utiliser ?",
+    "select": "Sélectionner",
+    "openSource": "Ouvrir la page source",
+    "clickTitle": "Cliquer pour pré-remplir la saisie",
+    "prefillPrefix": "Utilise ces données"
+  },
   "agentActivity": {
     "thinking": "Réflexion en cours…",
     "done": "Terminé"

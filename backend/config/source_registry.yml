@@ -152,6 +152,8 @@
     via MCP. Contient des jeux de données officiels : statistiques
     publiques, données administratives, limites territoriales,
     données environnementales et tout ce qui est en open data français.
+    Couvre également les données tabulaires sur des infrastructures,
+    équipements, capteurs, stations et services publics avec leurs attributs.
   topics:
     - open data
     - statistiques
@@ -159,16 +161,30 @@
     - données publiques
     - France
     - officiel
+    - capteurs
+    - équipements
+    - infrastructure
+    - surveillance
+    - services publics
+    - données attributaires
+    - enregistrements
   entity_types:
     - jeu de données
     - ressource
     - organisation
     - thème
+    - capteur
+    - station
+    - équipement
+    - infrastructure
+    - enregistrement
   capabilities:
     - open_data
     - official_statistics
     - government_data
     - french_datasets
+    - entity_search
+    - tabular_query
   geo_scope: france
   example_questions:
     - "Quelles sont les données officielles sur la population de cette commune ?"

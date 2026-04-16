@@ -75,7 +75,7 @@ def get_active_agents() -> list[str]:
     Sub-agents can be disabled individually via environment variables:
     ``NEO4J_AGENT_ENABLED``, ``RDF_AGENT_ENABLED``,
     ``VECTOR_CHROMA_AGENT_ENABLED``, ``POSTGIS_AGENT_ENABLED``, and
-    ``DATA_GOUV_AGENT_ENABLED`` (all default to ``true``).
+    ``DATAGOUV_MCP_AGENT_ENABLED`` (all default to ``true``).
     """
     settings = get_settings()
     flags: dict[str, bool] = {
@@ -83,7 +83,7 @@ def get_active_agents() -> list[str]:
         "rdf": settings.rdf_agent_enabled,
         "vector_chroma": settings.vector_chroma_agent_enabled,
         "postgis": settings.postgis_agent_enabled,
-        "data_gouv": settings.data_gouv_agent_enabled,
+        "data_gouv": settings.datagouv_mcp_agent_enabled,
         "geo": settings.geo_agent_enabled,
     }
 

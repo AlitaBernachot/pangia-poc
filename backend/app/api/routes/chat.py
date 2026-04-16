@@ -24,7 +24,7 @@ _AGENT_LABELS: dict[str, str] = {
     "vector_chroma_agent": "Vector/Chroma",
     "postgis_agent": "PostGIS",
     "mapviz_agent": "Map",
-    "data_gouv_agent": "Data.gouv.fr",
+    "datagouv_mcp_agent": "Data.gouv.fr",
     "dataviz_agent": "DataViz",
     "merge": "Synthesiser",
     "router": "Router",
@@ -85,6 +85,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         "dataviz": None,
         "output_decision": None,
         "parsed_intent": None,
+        "pending_dataset_choice": None,
     }
 
     async def event_stream() -> AsyncGenerator[str, None]:
@@ -112,6 +113,14 @@ async def chat(body: ChatRequest) -> StreamingResponse:
                         agents = output.get("agents_to_call", [])
                         if agents:
                             yield _sse({"type": "routing", "agents": agents})
+
+                # ── Data.gouv dataset-choice (human-in-the-loop) ──────────
+                elif kind == "on_chain_end" and node == "datagouv_mcp_agent":
+                    output = event.get("data", {}).get("output", {})
+                    if isinstance(output, dict):
+                        candidates = output.get("pending_dataset_choice")
+                        if candidates and isinstance(candidates, list):
+                            yield _sse({"type": "dataset_choice", "candidates": candidates})
 
                 # ── Map agent GeoJSON output ───────────────────────────────
                 elif kind == "on_chain_end" and node == "mapviz_agent":
