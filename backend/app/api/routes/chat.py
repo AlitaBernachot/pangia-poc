@@ -24,7 +24,7 @@ _AGENT_LABELS: dict[str, str] = {
     "vector_chroma_agent": "Vector/Chroma",
     "postgis_agent": "PostGIS",
     "mapviz_agent": "Map",
-    "data_gouv_agent": "Data.gouv.fr",
+    "datagouv_mcp_agent": "Data.gouv.fr",
     "dataviz_agent": "DataViz",
     "merge": "Synthesiser",
     "router": "Router",
@@ -115,7 +115,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
                             yield _sse({"type": "routing", "agents": agents})
 
                 # ── Data.gouv dataset-choice (human-in-the-loop) ──────────
-                elif kind == "on_chain_end" and node == "data_gouv_agent":
+                elif kind == "on_chain_end" and node == "datagouv_mcp_agent":
                     output = event.get("data", {}).get("output", {})
                     if isinstance(output, dict):
                         candidates = output.get("pending_dataset_choice")

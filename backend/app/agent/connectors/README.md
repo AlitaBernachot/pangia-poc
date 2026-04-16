@@ -12,7 +12,7 @@ Sub-agents that connect PangIA to external data sources.
 
 ## data.gouv.fr Agent
 
-File: [`data_gouv_agent.py`](data_gouv_agent.py)
+File: [`datagouv_mcp_agent.py`](datagouv_mcp_agent.py)
 
 Queries the French government open-data catalogue ([data.gouv.fr](https://data.gouv.fr)) through its MCP interface.
 
@@ -64,7 +64,7 @@ Use `"equals"` / `"not_equals"` only when the user explicitly quoted an exact ce
 
 ```env
 DATA_GOUV_MCP_URL=https://mcp.data.gouv.fr/mcp    # MCP endpoint
-DATA_GOUV_AGENT_ENABLED=true
-DATA_GOUV_AGENT_MODEL=                             # leave blank to inherit global model
-DATA_GOUV_AGENT_MAX_ITERATIONS=10
+DATAGOUV_MCP_AGENT_ENABLED=true
+DATAGOUV_MCP_AGENT_MODEL=                             # leave blank to inherit global model
+DATAGOUV_MCP_AGENT_MAX_ITERATIONS=10
 ```

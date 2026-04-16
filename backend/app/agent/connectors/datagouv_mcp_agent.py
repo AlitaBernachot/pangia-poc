@@ -108,11 +108,11 @@ Step 2 — Mandatory: fetch the file with filter applied:
 - Call `get_resource_info` to obtain the direct download URL.
 - Call `fetch_resource_file` with the filter parameters:
   - `filter_column`: column name from Step 1 (e.g. `statut`).
-  - `filter_value`: the natural-language value from the user's query (e.g. `en maintenance`).
+  - `filter_value`: the **bare keyword** — strip any leading article or preposition
+    ("en", "hors", "de", "au"…) **before passing**. E.g. user says "en maintenance" →
+    pass `"maintenance"`, not `"en maintenance"`.
   - `filter_op`: choose based on these rules:
-    - Default to `"contains"` / `"not_contains"`. French prepositions like "en ", "hors "
-      are stripped automatically, so `filter_value="en maintenance"` matches a cell whose
-      raw value is "MAINTENANCE".
+    - Default to `"contains"` / `"not_contains"`.
     - Use `"equals"` / `"not_equals"` ONLY if the user explicitly quoted the exact cell
       value (e.g. the user typed `"MAINTENANCE"` with surrounding quotes).
 - **If the dataset also has a GeoJSON resource**, call `fetch_resource_file` a second time
@@ -122,7 +122,7 @@ Step 2 — Mandatory: fetch the file with filter applied:
   the filter applied, source URL and licence.
 
 Examples:
-- "capteurs PAS en maintenance" → filter_op="not_contains", filter_value="en maintenance"
+- "capteurs PAS en maintenance" → filter_op="not_contains", filter_value="maintenance"
 - "capteurs actifs" → filter_op="contains", filter_value="actif"
 - user typed `"MAINTENANCE"` (quoted) → filter_op="equals", filter_value="MAINTENANCE"
 
@@ -396,9 +396,9 @@ async def fetch_resource_file(
 
     Optional filter parameters (applied after download, before returning):
     - filter_column: column name to filter on (case-insensitive).
-    - filter_value: the value to match (case-insensitive). Leading French/English
-      prepositions ("en ", "hors ", "de "…) are stripped automatically for
-      "contains" matching, so "en maintenance" correctly matches "MAINTENANCE".
+    - filter_value: the bare keyword to match (case-insensitive). Strip any leading
+      article or preposition ("en", "hors", "de", "au"…) before passing —
+      e.g. pass "maintenance" not "en maintenance".
     - filter_op: one of "contains", "not_contains", "equals", "not_equals"
       (default: "contains").
       Use "equals" / "not_equals" ONLY when the user quoted the exact cell value.
@@ -406,7 +406,7 @@ async def fetch_resource_file(
     Example: fetch_resource_file(
         url="https://…/data.csv",
         filter_column="statut",
-        filter_value="en maintenance",
+        filter_value="maintenance",
         filter_op="not_contains"
     )
     """
@@ -427,6 +427,7 @@ async def fetch_resource_file(
                 filter_column,
             )
             fv = filter_value.lower()
+            fv_normalized = _normalize_filter_value(fv)
             filtered_features = []
             for feat in raw.get("features", []):
                 props = feat.get("properties") or {}
@@ -435,9 +436,9 @@ async def fetch_resource_file(
                     filtered_features.append(feat)
                 elif filter_op == "not_equals" and cell != fv:
                     filtered_features.append(feat)
-                elif filter_op == "contains" and fv in cell:
+                elif filter_op == "contains" and (fv_normalized in cell or fv in cell):
                     filtered_features.append(feat)
-                elif filter_op == "not_contains" and fv not in cell:
+                elif filter_op == "not_contains" and fv_normalized not in cell and fv not in cell:
                     filtered_features.append(feat)
             raw = {**raw, "features": filtered_features}
 
@@ -447,7 +448,6 @@ async def fetch_resource_file(
         "columns": parsed.columns,
         "rows": rows,
     }
-    # Include raw parsed object for GeoJSON so mapviz_agent can use it directly.
     if parsed.format == "geojson" and raw is not None:
         payload["raw"] = raw
     return json.dumps(payload, ensure_ascii=False, default=str)
@@ -489,7 +489,7 @@ async def _run(state: AgentState) -> dict:
     tools = await mcp_client.get_tools()
     all_tools = [*tools, fetch_resource_file]
 
-    llm = build_llm(get_agent_model_config("data_gouv_agent"), streaming=True).bind_tools(all_tools)
+    llm = build_llm(get_agent_model_config("datagouv_mcp_agent"), streaming=True).bind_tools(all_tools)
 
     tool_map = {t.name: t for t in all_tools}
     messages = [
@@ -504,7 +504,7 @@ async def _run(state: AgentState) -> dict:
     # only inspects responses from those calls, not resource or metadata responses.
     search_call_ids: set[str] = set()
 
-    for _ in range(get_agent_max_iterations("data_gouv_agent")):
+    for _ in range(get_agent_max_iterations("datagouv_mcp_agent")):
         response: AIMessage = await llm.ainvoke(messages)
         messages.append(response)
 

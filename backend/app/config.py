@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     vector_chroma_agent_enabled: bool = True
     postgis_agent_enabled: bool = True
     mapviz_agent_enabled: bool = True
-    data_gouv_agent_enabled: bool = True
+    datagouv_mcp_agent_enabled: bool = True
     geonetworkmcp_agent_enabled: bool = True
     dataviz_agent_enabled: bool = True
     geo_agent_enabled: bool = True
@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     vector_chroma_agent_max_iterations: int = 0
     postgis_agent_max_iterations: int = 0
     mapviz_agent_max_iterations: int = 0
-    data_gouv_agent_max_iterations: int = 0
+    datagouv_mcp_agent_max_iterations: int = 0
     geonetwork_mcp_agent_max_iterations: int = 0
     dataviz_agent_max_iterations: int = 0
     geo_agent_max_iterations: int = 0
@@ -123,8 +123,8 @@ class Settings(BaseSettings):
     postgis_agent_model_name: str = ""
     mapviz_agent_model_provider: str = ""
     mapviz_agent_model_name: str = ""
-    data_gouv_agent_model_provider: str = ""
-    data_gouv_agent_model_name: str = ""
+    datagouv_mcp_agent_model_provider: str = ""
+    datagouv_mcp_agent_model_name: str = ""
     geonetwork_mcp_agent_model_provider: str = ""
     geonetwork_mcp_agent_model_name: str = ""
     dataviz_agent_model_provider: str = ""

@@ -133,7 +133,7 @@ async def _run(state: AgentState) -> dict:
     )
 
     # ── Fast-path: dataviz/geojson already built overrides heuristics ─────────
-    # When dataviz or geojson is pre-populated (e.g. by data_gouv_agent) we know
+    # When dataviz or geojson is pre-populated (e.g. by datagouv_mcp_agent) we know
     # for certain what to render without calling the LLM.
     has_prebuilt_dataviz = existing_dataviz and (
         existing_dataviz.get("tables") or existing_dataviz.get("charts") or existing_dataviz.get("kpis")

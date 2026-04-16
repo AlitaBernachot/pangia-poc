@@ -132,7 +132,7 @@ AGENT_NAMES = [
     "vector_chroma_agent",
     "postgis_agent",
     "mapviz_agent",
-    "data_gouv_agent",
+    "datagouv_mcp_agent",
     "geonetwork_mcp_agent",
     "dataviz_agent",
     "humanoutput_agent",

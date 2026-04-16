@@ -148,7 +148,7 @@ def _last_human_message(state: AgentState) -> str:
 async def merge_node(state: AgentState) -> dict:
     """Synthesise sub-agent results into a final answer."""
     # ── Dataset disambiguation pending ────────────────────────────────────────
-    # When data_gouv_agent is waiting for the user to pick a dataset, the
+    # When datagouv_mcp_agent is waiting for the user to pick a dataset, the
     # DatasetChoicePanel is the primary UI element.  Skip LLM synthesis so the
     # text area stays clean (empty message) and the panel is the only thing shown.
     if state.get("pending_dataset_choice"):

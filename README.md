@@ -163,7 +163,7 @@ into a final streamed answer.
 | `RDF_AGENT_ENABLED` | `true` | RDF/Linked Data connector (SPARQL / GraphDB) |
 | `VECTOR_CHROMA_AGENT_ENABLED` | `true` | Semantic search connector (ChromaDB) |
 | `POSTGIS_AGENT_ENABLED` | `true` | Spatial SQL connector (PostGIS) |
-| `DATA_GOUV_AGENT_ENABLED` | `true` | French open-data connector (data.gouv.fr via MCP) |
+| `DATAGOUV_MCP_AGENT_ENABLED` | `true` | French open-data connector (data.gouv.fr via MCP) |
 | `GEO_AGENT_ENABLED` | `true` | Geospatial analysis orchestrator (geo sub-agents) |
 | `HUMANOUTPUT_AGENT_ENABLED` | `true` | Output decision agent (routes to map/dataviz selectively) |
 | `MAPVIZ_AGENT_ENABLED` | `true` | Geographic visualisation agent (GeoJSON / Leaflet map) |
@@ -200,7 +200,7 @@ The number of iterations is configurable at two levels:
 | `VECTOR_CHROMA_AGENT_MAX_ITERATIONS` | `0` | Vector agent override |
 | `POSTGIS_AGENT_MAX_ITERATIONS` | `0` | PostGIS agent override |
 | `MAPVIZ_AGENT_MAX_ITERATIONS` | `0` | Map agent override |
-| `DATA_GOUV_AGENT_MAX_ITERATIONS` | `0` | data.gouv.fr agent override |
+| `DATAGOUV_MCP_AGENT_MAX_ITERATIONS` | `0` | data.gouv.fr agent override |
 | `DATAVIZ_AGENT_MAX_ITERATIONS` | `0` | DataViz agent override |
 
 Lower the value to reduce latency and cost; raise it for agents that need more
@@ -215,7 +215,7 @@ Every agent (including the router and the merge node) can use a **different LLM 
 | `<AGENT>_MODEL_PROVIDER` | `openai`, `anthropic`, `ollama` | Provider for this agent. Leave empty to use the global provider. |
 | `<AGENT>_MODEL_NAME` | `gpt-4o`, `claude-3-5-sonnet-latest`, `llama3` | Model name for this agent. Leave empty to fall back to `OPENAI_MODEL`. |
 
-Available `<AGENT>` prefixes: `ROUTER`, `INTENT_PARSER_AGENT`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_CHROMA_AGENT`, `POSTGIS_AGENT`, `MAPVIZ_AGENT`, `DATA_GOUV_AGENT`, `DATAVIZ_AGENT`, `MERGE`.
+Available `<AGENT>` prefixes: `ROUTER`, `INTENT_PARSER_AGENT`, `NEO4J_AGENT`, `RDF_AGENT`, `VECTOR_CHROMA_AGENT`, `POSTGIS_AGENT`, `MAPVIZ_AGENT`, `DATAGOUV_MCP_AGENT`, `DATAVIZ_AGENT`, `MERGE`.
 
 Example `.env` — use a powerful model for the router and merge, a cheaper one for sub-agents:
 
@@ -257,7 +257,7 @@ Leave both variables empty (the default) to use the global `OPENAI_MODEL` for ev
 
 ### Human-in-the-Loop: Dataset Disambiguation
 
-When the `data_gouv_agent` searches for a dataset and finds **multiple results with different titles**, it will not arbitrarily pick one.  Instead it:
+When the `datagouv_mcp_agent` searches for a dataset and finds **multiple results with different titles**, it will not arbitrarily pick one.  Instead it:
 
 1. **Asks the user** to specify which dataset they want to work with (the agent's text response lists the candidates).
 2. **Emits a `dataset_choice` SSE event** containing structured candidate data so the frontend can render interactive selection cards.
@@ -288,7 +288,7 @@ The disambiguation step is **only triggered when**:
 - no data file was actually fetched in the same turn.
 
 > **AgentState field:** `pending_dataset_choice: list[dict] | None`  
-> Populated by `data_gouv_agent`; cleared to `None` after successful data retrieval.
+> Populated by `datagouv_mcp_agent`; cleared to `None` after successful data retrieval.
 
 ### Intent Parser
 
@@ -552,7 +552,7 @@ pangia-poc/
 │       │   │   ├── rdf_agent.py     # RDF sub-agent (SPARQL / GraphDB)
 │       │   │   ├── vector_chroma_agent.py  # Vector sub-agent (ChromaDB)
 │       │   │   ├── postgis_agent.py # Spatial SQL sub-agent (PostGIS)
-│       │   │   └── data_gouv_agent.py # French open-data sub-agent (data.gouv.fr MCP)
+│       │   │   └── datagouv_mcp_agent.py # French open-data sub-agent (data.gouv.fr MCP)
 │       │   ├── geo/                 # Geospatial processing agents
 │       │   │   ├── l1_primitives/   # Atomic operations
 │       │   │   │   ├── address_agent.py    # Geocoding address ↔ coordinates

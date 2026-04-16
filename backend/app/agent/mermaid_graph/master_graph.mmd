@@ -19,11 +19,11 @@ graph TD;
 	rdf_agent(rdf_agent)
 	vector_agent(vector_agent)
 	postgis_agent(postgis_agent)
-	data_gouv_agent(data_gouv_agent)
+	datagouv_mcp_agent(datagouv_mcp_agent)
 	geo_agent(geo_agent)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> router;
-	data_gouv_agent --> post_process_router;
+	datagouv_mcp_agent --> post_process_router;
 	dataviz_agent --> merge;
 	geo_agent --> post_process_router;
 	humanoutput_agent -.-> dataviz_agent;
@@ -34,7 +34,7 @@ graph TD;
 	post_process_router --> humanoutput_agent;
 	postgis_agent --> post_process_router;
 	rdf_agent --> post_process_router;
-	router -.-> data_gouv_agent;
+	router -.-> datagouv_mcp_agent;
 	router -.-> geo_agent;
 	router -.-> merge;
 	router -.-> neo4j_agent;
