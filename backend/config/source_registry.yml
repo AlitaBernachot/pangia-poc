@@ -192,7 +192,7 @@
     - "Quelles statistiques environnementales sont disponibles ?"
 
 - id: my-geonetwork
-  label: "My custom geonetwork Label"
+  label: "My custom geonetwork"
   connector: geonetworkmcp
   description: >
     Catalogue de métadonnées GeoNetwork accessible via MCP. Contient des
@@ -222,7 +222,7 @@
     - coordinates
     - geometry
   geo_scope: null
-  mcp_url: "http://localhost:8080/geonetwork/srv/api/mcp"
+  mcp_url: "http://172.19.0.1:3001"
   example_questions:
     - "Quelles données géographiques sont disponibles sur cette zone ?"
     - "Trouvez des métadonnées sur l'occupation du sol."

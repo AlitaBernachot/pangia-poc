@@ -35,6 +35,40 @@ You have access to:
 - A local tool `fetch_resource_file` that downloads and parses the **complete raw file**
   (CSV, JSON, GeoJSON) from a direct URL and returns all rows.
 
+## Search rules
+- Always call `search_datasets` with `page_size=10` (never less) to get enough results.
+- If the first search returns no useful result, retry with broader or translated keywords.
+- **Synonym expansion** — many concepts have several common names in French datasets.
+  When the user's query contains a term that has known synonyms or alternate spellings,
+  **always run one `search_datasets` call per variant** (in parallel when possible), then
+  merge the results before presenting them. Do NOT stop after the first variant.
+
+  Common synonym groups to expand automatically:
+  | User term | Also search |
+  |-----------|-------------|
+  | caméra / caméras | webcam, camera, vidéosurveillance, CCTV |
+  | capteur | sonde, sensor, mesure, monitoring |
+  | station | borne, point de mesure, observatoire |
+  | déchetterie | déchèterie, centre de tri, collecte déchets |
+  | école | établissement scolaire, collège, lycée |
+  | parking | stationnement, parc de stationnement |
+  | vélo | cycliste, piste cyclable, itinéraire vélo, voie verte |
+  | bus | transport en commun, réseau de bus, ligne de bus |
+  | inondation | crue, risque inondation, PPRi, zone inondable |
+  | pollution | qualité de l'air, émissions, polluants |
+
+  If none of the synonyms return better results, fall back to the most generic term.
+
+- The MCP response includes the **total number of matching datasets** (e.g. "Found 2788 dataset(s)").
+  If the total exceeds 50, **do not attempt to browse further pages**. Instead, stop and reply
+  to the user with a message like:
+
+  "Votre recherche a retourné **N datasets** au total — trop pour être affichés en une seule fois.
+  Voici un aperçu des premiers résultats. Pour obtenir des résultats plus pertinents, veuillez
+  préciser votre recherche (ex. : sujet exact, organisation, format de fichier, année)."
+
+  Then list the datasets returned on the first page so the user can pick one directly.
+
 ## Three modes — choose based on the user's intent
 
 ### 0. Disambiguation (PRIORITY RULE — check FIRST before doing anything else)
@@ -143,6 +177,35 @@ When the intent is ambiguous, default to **Strategy B** (full retrieval).
 
 _MAX_DESCRIPTION_LENGTH = 250
 _NUMBERED_ENTRY_RE = re.compile(r'^\s*\d+\.\s+(.+)')
+_SEARCH_TOTAL_RE = re.compile(r'Found\s+(\d+)\s+dataset', re.IGNORECASE)
+
+
+def _extract_search_total(messages, search_tool_call_ids: set[str]) -> int | None:
+    """Extract the total dataset count from MCP search tool responses.
+
+    Looks for the pattern "Found N dataset(s)" in ToolMessage content.
+    Returns the highest total found (in case of multiple searches), or None.
+    """
+    total: int | None = None
+    for msg in messages:
+        if not isinstance(msg, ToolMessage):
+            continue
+        if msg.tool_call_id not in search_tool_call_ids:
+            continue
+        raw = msg.content
+        # Handle list-of-blocks (MCP wrapped format)
+        if isinstance(raw, list):
+            texts = [b.get("text", "") for b in raw if isinstance(b, dict) and b.get("type") == "text"]
+        elif isinstance(raw, str):
+            texts = [raw]
+        else:
+            continue
+        for text in texts:
+            for m in _SEARCH_TOTAL_RE.finditer(text):
+                n = int(m.group(1))
+                if total is None or n > total:
+                    total = n
+    return total
 
 
 def _parse_text_search_results(text: str) -> list[dict]:
@@ -618,11 +681,14 @@ async def _run(state: AgentState) -> dict:
     # the choice panel and discard any data the LLM may have fetched anyway.
     candidates = _extract_dataset_candidates(messages, search_call_ids)
     if len(candidates) > 1 and not _user_identifies_dataset(user_query, candidates):
+        search_total = _extract_search_total(messages, search_call_ids)
         state_update["pending_dataset_choice"] = candidates
+        state_update["pending_dataset_choice_total"] = search_total
         # Discard any data the LLM wrongly fetched — user must choose first.
         return state_update
     else:
         state_update["pending_dataset_choice"] = None
+        state_update["pending_dataset_choice_total"] = None
 
     # ── Populate state["geojson"] from the GeoJSON fetch ──────────────────────
     if geojson_data is not None:

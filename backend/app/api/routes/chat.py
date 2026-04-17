@@ -26,6 +26,7 @@ _AGENT_LABELS: dict[str, str] = {
     "mapviz_agent": "Map",
     "datagouv_mcp_agent": "Data.gouv.fr",
     "dataviz_agent": "DataViz",
+    "geonetworkmcp_agent": "GeoNetwork",
     "merge": "Synthesiser",
     "router": "Router",
 }
@@ -86,6 +87,8 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         "output_decision": None,
         "parsed_intent": None,
         "pending_dataset_choice": None,
+        "pending_dataset_choice_total": None,
+        "ogc_layers": None,
     }
 
     async def event_stream() -> AsyncGenerator[str, None]:
@@ -120,7 +123,16 @@ async def chat(body: ChatRequest) -> StreamingResponse:
                     if isinstance(output, dict):
                         candidates = output.get("pending_dataset_choice")
                         if candidates and isinstance(candidates, list):
-                            yield _sse({"type": "dataset_choice", "candidates": candidates})
+                            total = output.get("pending_dataset_choice_total")
+                            yield _sse({"type": "dataset_choice", "candidates": candidates, "total": total})
+
+                # ── GeoNetwork OGC layer output ────────────────────────────
+                elif kind == "on_chain_end" and node == "geonetworkmcp_agent":
+                    output = event.get("data", {}).get("output", {})
+                    if isinstance(output, dict):
+                        ogc_layers = output.get("ogc_layers")
+                        if ogc_layers and isinstance(ogc_layers, list):
+                            yield _sse({"type": "ogc_layer", "layers": ogc_layers})
 
                 # ── Map agent GeoJSON output ───────────────────────────────
                 elif kind == "on_chain_end" and node == "mapviz_agent":

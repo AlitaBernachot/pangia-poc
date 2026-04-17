@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { useCallback, useRef, useState } from 'react'
-import type { AgentActivity, AgentInfo, DatasetCandidate, DataVizPayload, Message, ToolActivity } from '../types'
+import type { AgentActivity, AgentInfo, DatasetCandidate, DataVizPayload, Message, OgcLayer, ToolActivity } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -160,6 +160,11 @@ export function usePangiaChat() {
                 }
                 return { ...m, agentActivity: activities }
               })
+            } else if (type === 'ogc_layer') {
+              updateAssistant((m) => ({
+                ...m,
+                ogcLayers: event.layers as OgcLayer[],
+              }))
             } else if (type === 'geojson') {
               updateAssistant((m) => ({
                 ...m,
@@ -174,6 +179,7 @@ export function usePangiaChat() {
               updateAssistant((m) => ({
                 ...m,
                 datasetChoice: event.candidates as DatasetCandidate[],
+                datasetChoiceTotal: (event.total as number | null) ?? null,
               }))
             } else if (type === 'done') {
               updateAssistant((m) => {
@@ -211,6 +217,17 @@ export function usePangiaChat() {
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort()
     setIsStreaming(false)
+    // Mark the in-progress assistant message as no longer streaming so
+    // "Thinking…" indicators disappear immediately in the UI.
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.role !== 'assistant' || !m.streaming) return m
+        const activities = (m.agentActivity ?? []).map(
+          (a): AgentActivity => ({ ...a, streaming: false }),
+        )
+        return { ...m, streaming: false, agentActivity: activities }
+      }),
+    )
   }, [])
 
   const clearMessages = useCallback(() => {
