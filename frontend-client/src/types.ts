@@ -59,7 +59,13 @@ export interface DatasetCandidate {
   url: string
   organization: string
 }
+// ─── OGC Layer (GeoNetwork) ──────────────────────────────────────────────────
 
+export interface OgcLayer {
+  url: string
+  name: string
+  title?: string
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface Message {
@@ -73,6 +79,7 @@ export interface Message {
   dataviz?: DataVizPayload | null
   datasetChoice?: DatasetCandidate[] | null
   datasetChoiceTotal?: number | null
+  ogcLayers?: OgcLayer[] | null
   attachments?: Attachment[]
 }
 

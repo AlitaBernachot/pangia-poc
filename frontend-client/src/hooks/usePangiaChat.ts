@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { useCallback, useRef, useState } from 'react'
-import type { AgentActivity, AgentInfo, DatasetCandidate, DataVizPayload, Message, ToolActivity } from '../types'
+import type { AgentActivity, AgentInfo, DatasetCandidate, DataVizPayload, Message, OgcLayer, ToolActivity } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -160,6 +160,11 @@ export function usePangiaChat() {
                 }
                 return { ...m, agentActivity: activities }
               })
+            } else if (type === 'ogc_layer') {
+              updateAssistant((m) => ({
+                ...m,
+                ogcLayers: event.layers as OgcLayer[],
+              }))
             } else if (type === 'geojson') {
               updateAssistant((m) => ({
                 ...m,

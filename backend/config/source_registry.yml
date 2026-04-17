@@ -222,7 +222,7 @@
     - coordinates
     - geometry
   geo_scope: null
-  mcp_url: "http://localhost:8080/geonetwork/srv/api/mcp"
+  mcp_url: "http://172.19.0.1:3001"
   example_questions:
     - "Quelles données géographiques sont disponibles sur cette zone ?"
     - "Trouvez des métadonnées sur l'occupation du sol."

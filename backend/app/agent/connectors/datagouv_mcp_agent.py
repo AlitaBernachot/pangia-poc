@@ -38,6 +38,27 @@ You have access to:
 ## Search rules
 - Always call `search_datasets` with `page_size=10` (never less) to get enough results.
 - If the first search returns no useful result, retry with broader or translated keywords.
+- **Synonym expansion** — many concepts have several common names in French datasets.
+  When the user's query contains a term that has known synonyms or alternate spellings,
+  **always run one `search_datasets` call per variant** (in parallel when possible), then
+  merge the results before presenting them. Do NOT stop after the first variant.
+
+  Common synonym groups to expand automatically:
+  | User term | Also search |
+  |-----------|-------------|
+  | caméra / caméras | webcam, camera, vidéosurveillance, CCTV |
+  | capteur | sonde, sensor, mesure, monitoring |
+  | station | borne, point de mesure, observatoire |
+  | déchetterie | déchèterie, centre de tri, collecte déchets |
+  | école | établissement scolaire, collège, lycée |
+  | parking | stationnement, parc de stationnement |
+  | vélo | cycliste, piste cyclable, itinéraire vélo, voie verte |
+  | bus | transport en commun, réseau de bus, ligne de bus |
+  | inondation | crue, risque inondation, PPRi, zone inondable |
+  | pollution | qualité de l'air, émissions, polluants |
+
+  If none of the synonyms return better results, fall back to the most generic term.
+
 - The MCP response includes the **total number of matching datasets** (e.g. "Found 2788 dataset(s)").
   If the total exceeds 50, **do not attempt to browse further pages**. Instead, stop and reply
   to the user with a message like:

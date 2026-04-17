@@ -92,8 +92,10 @@ export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStrea
           </div>
         )}
 
-        {/* Map */}
-        {message.geojson && <MapViewer geojson={message.geojson} />}
+        {/* Map — GeoJSON and/or OGC API Features layers */}
+        {(message.geojson || message.ogcLayers?.length) && (
+          <MapViewer geojson={message.geojson} ogcLayers={message.ogcLayers} />
+        )}
 
         {/* DataViz */}
         {message.dataviz && <DataVizViewer dataviz={message.dataviz} />}
