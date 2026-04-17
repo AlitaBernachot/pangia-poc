@@ -9,6 +9,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from openinference.instrumentation.langchain import LangChainInstrumentor
+from phoenix.otel import register
 
 from app.agents.calculator_agent import CalculatorAgent
 from app.agents.rag_agent import RAGAgent
@@ -21,6 +23,16 @@ from app.models import ChatRequest, HITLResponse
 from app.orchestrator import Orchestrator
 
 logger = logging.getLogger(__name__)
+
+
+def _setup_phoenix(settings) -> None:
+    """Initialise Arize Phoenix tracing for LangChain agents."""
+    tracer_provider = register(
+        project_name=settings.phoenix_project_name,
+        endpoint=settings.phoenix_collector_endpoint,
+    )
+    LangChainInstrumentor().instrument(tracer_provider=tracer_provider)
+
 
 # Build the agent registry (pre-wired with guardrails)
 _AGENTS = {
@@ -38,6 +50,8 @@ _ORCHESTRATOR = Orchestrator(_AGENTS)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    settings = get_settings()
+    _setup_phoenix(settings)
     yield
     await close_engine()
     await close_redis()

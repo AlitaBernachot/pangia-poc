@@ -40,7 +40,7 @@ services:
       - CORS_ORIGINS=["http://localhost:3000","http://frontend-client"]
       # Arize Phoenix (observability)
       - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
-      - PHOENIX_PROJECT_NAME=${PHOENIX_PROJECT_NAME:-pangia-geoia}
+      - PHOENIX_PROJECT_NAME=${PHOENIX_PROJECT_NAME:-pangia}
       # Ollama (local LLM)
       - OLLAMA_BASE_URL=http://ollama:11434
     volumes:
@@ -216,7 +216,7 @@ services:
       context: ./backend2
       dockerfile: Dockerfile
     ports:
-      - "8085:8085"
+      - "8086:8086"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - MODEL_PROVIDER=${MODEL_PROVIDER:-openai}
@@ -228,11 +228,15 @@ services:
       - HITL_AMBIGUITY_THRESHOLD=${HITL_AMBIGUITY_THRESHOLD:-0.7}
       - OLLAMA_BASE_URL=http://ollama:11434
       - CORS_ORIGINS=["http://localhost:3000","http://localhost:5173","http://frontend-client"]
+
+      # Arize Phoenix (observability)
+      - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
+      - PHOENIX_PROJECT_NAME=${PHOENIX_PROJECT_NAME:-pangia}
     volumes:
       - ./backend2/app:/app/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8085 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8086 --reload
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8085/api/health || exit 1"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8086/api/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10

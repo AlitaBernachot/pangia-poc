@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     # Ollama
     ollama_base_url: str = "http://ollama:11434"
 
+    # Arize Phoenix (agent observability)
+    phoenix_collector_endpoint: str = "http://localhost:6006/v1/traces"
+    phoenix_project_name: str = "pangia"
+
 
 @lru_cache
 def get_settings() -> Settings:

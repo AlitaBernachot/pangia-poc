@@ -64,6 +64,18 @@ A minimal AI agent chat application with a **multi-agent architecture**:
     - [Sub-agent hierarchy](#sub-agent-hierarchy)
     - [Configuration](#configuration-1)
     - [Notes](#notes)
+  - [Backend V2 – Second-Generation Multi-Agent System](#backend-v2--second-generation-multi-agent-system)
+    - [Architecture (`backend2/`)](#architecture-backend2)
+    - [API Endpoints (Backend V2, port 8085)](#api-endpoints-backend-v2-port-8085)
+      - [`POST /api/chat` — Request body](#post-apichat--request-body)
+      - [SSE Event Types (V2)](#sse-event-types-v2)
+      - [`POST /api/hitl/respond` — Request body](#post-apihitlrespond--request-body)
+    - [Environment Variables (Backend V2)](#environment-variables-backend-v2)
+    - [Running Backend V2](#running-backend-v2)
+    - [PostgreSQL Schema](#postgresql-schema)
+    - [Guardrails](#guardrails)
+    - [Human-in-the-Loop (HITL) Flow](#human-in-the-loop-hitl-flow)
+    - [Frontend Changes](#frontend-changes)
 
 ---
 
@@ -506,7 +518,7 @@ Phoenix is registered during FastAPI's lifespan startup (`backend/app/main.py`) 
 | Variable | Default | Description |
 |---|---|---|
 | `PHOENIX_COLLECTOR_ENDPOINT` | `http://phoenix:6006/v1/traces` | OTLP HTTP endpoint (set automatically in Docker) |
-| `PHOENIX_PROJECT_NAME` | `pangia-geoia` | Project name shown in the Phoenix UI |
+| `PHOENIX_PROJECT_NAME` | `pangia` | Project name shown in the Phoenix UI |
 
 Override `PHOENIX_PROJECT_NAME` in `.env` to organise traces across multiple environments.
 
