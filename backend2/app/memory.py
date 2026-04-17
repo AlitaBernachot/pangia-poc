@@ -16,6 +16,8 @@ from app.db import get_session_factory
 
 logger = logging.getLogger(__name__)
 
+_EMBEDDING_DIM = 1536  # text-embedding-3-small output dimension
+
 _redis_pool: aioredis.Redis | None = None
 
 
@@ -119,4 +121,4 @@ class LongTermMemory:
             return resp.data[0].embedding
         except Exception:
             logger.exception("LongTermMemory: embedding failed, using zero vector")
-            return [0.0] * 1536
+            return [0.0] * _EMBEDDING_DIM

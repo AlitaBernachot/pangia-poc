@@ -22,6 +22,9 @@ from app.router import DynamicRouter
 
 logger = logging.getLogger(__name__)
 
+_HITL_TIMEOUT_MSG = "Request timed out waiting for clarification."
+_NO_AGENT_ANSWER_MSG = "No agents produced a valid answer."
+
 
 def _sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
@@ -124,8 +127,8 @@ class Orchestrator:
                 query = clarified
             else:
                 await audit.log(session_id, "hitl_timeout", {"request_id": hitl_req.request_id})
-                yield _sse({"type": "hitl_timeout", "message": "No response received within timeout."})
-                yield _sse({"type": "final_answer", "answer": "Request timed out waiting for clarification."})
+                yield _sse({"type": "hitl_timeout", "message": _HITL_TIMEOUT_MSG})
+                yield _sse({"type": "final_answer", "answer": _HITL_TIMEOUT_MSG})
                 yield _sse({"type": "done"})
                 return
 
@@ -182,7 +185,7 @@ class Orchestrator:
         successful = [o for o in all_outputs if not o.error]
         combined_answer = "\n\n".join(
             f"[{o.agent_name}]: {o.answer}" for o in successful
-        ) if successful else "No agents produced a valid answer."
+        ) if successful else _NO_AGENT_ANSWER_MSG
 
         avg_confidence = (
             sum(o.confidence for o in successful) / len(successful)
