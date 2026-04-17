@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { useCallback, useRef, useState } from 'react'
-import type { AgentActivity, AgentInfo, DatasetCandidate, DataVizPayload, Message, OgcLayer, ToolActivity } from '../types'
+import type { AgentActivity, AgentInfo, DatasetCandidate, DataVizPayload, HITLRequestEvent, Message, OgcLayer, ToolActivity } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -13,6 +13,7 @@ export function usePangiaChat() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [agents, setAgents] = useState<AgentInfo[]>([])
   const [selectedAgents, setSelectedAgents] = useState<string[]>([])
+  const [hitlRequest, setHitlRequest] = useState<HITLRequestEvent | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   // Empty dependency array: fetchAgents only calls the backend and sets local state;
@@ -107,11 +108,29 @@ export function usePangiaChat() {
             } else if (type === 'routing') {
               const agents = event.agents as string[]
               updateAssistant((m) => ({ ...m, routingAgents: agents }))
+            } else if (type === 'routing_plan') {
+              // V2 routing plan event
+              const steps = event.steps as { agent_name: string; parallel_group: number }[]
+              const reasoning = event.reasoning as string
+              updateAssistant((m) => ({
+                ...m,
+                routingAgents: steps.map((s) => s.agent_name),
+                routingPlan: { steps, reasoning },
+              }))
             } else if (type === 'token') {
               updateAssistant((m) => ({
                 ...m,
                 content: m.content + (event.content as string),
               }))
+            } else if (type === 'final_answer') {
+              // V2 final answer — append to content
+              const answer = event.answer as string
+              if (answer) {
+                updateAssistant((m) => ({
+                  ...m,
+                  content: m.content ? m.content + '\n\n' + answer : answer,
+                }))
+              }
             } else if (type === 'agent_token') {
               const agent = event.agent as string
               const token = event.content as string
@@ -126,6 +145,20 @@ export function usePangiaChat() {
                   }
                 } else {
                   activities.push({ agent, content: token, streaming: true, tools: [] })
+                }
+                return { ...m, agentActivity: activities }
+              })
+            } else if (type === 'agent_end') {
+              // V2 agent_end — update activity panel
+              const agent = event.agent as string
+              const answer = (event.answer as string | undefined) ?? ''
+              updateAssistant((m) => {
+                const activities = [...(m.agentActivity ?? [])]
+                const idx = activities.findIndex((a) => a.agent === agent)
+                if (idx >= 0) {
+                  activities[idx] = { ...activities[idx], content: answer || activities[idx].content, streaming: false }
+                } else {
+                  activities.push({ agent, content: answer, streaming: false, tools: [] })
                 }
                 return { ...m, agentActivity: activities }
               })
@@ -181,6 +214,15 @@ export function usePangiaChat() {
                 datasetChoice: event.candidates as DatasetCandidate[],
                 datasetChoiceTotal: (event.total as number | null) ?? null,
               }))
+            } else if (type === 'hitl_request') {
+              // V2 HITL — show modal to the user
+              setHitlRequest({
+                request_id: event.request_id as string,
+                questions: event.questions as string[],
+                original_query: event.original_query as string,
+              })
+            } else if (type === 'hitl_resolved' || type === 'hitl_timeout') {
+              setHitlRequest(null)
             } else if (type === 'done') {
               updateAssistant((m) => {
                 const activities = (m.agentActivity ?? []).map(
@@ -235,6 +277,8 @@ export function usePangiaChat() {
     setSessionId(null)
   }, [])
 
+  const dismissHitl = useCallback(() => setHitlRequest(null), [])
+
   return {
     messages,
     isStreaming,
@@ -246,5 +290,7 @@ export function usePangiaChat() {
     stopStreaming,
     clearMessages,
     fetchAgents,
+    hitlRequest,
+    dismissHitl,
   }
 }

@@ -210,6 +210,59 @@ services:
       retries: 5
     restart: unless-stopped
 
+  # ── Backend V2 (FastAPI second-generation multi-agent) ────────────────────
+  backend2:
+    build:
+      context: ./backend2
+      dockerfile: Dockerfile
+    ports:
+      - "8085:8085"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - MODEL_PROVIDER=${MODEL_PROVIDER:-openai}
+      - MODEL_NAME=${MODEL_NAME:-gpt-4o-mini}
+      - POSTGRES_DSN=postgresql+asyncpg://${POSTGRES2_USER:-pangia2}:${POSTGRES2_PASSWORD:-pangia2-password}@postgres2:5432/${POSTGRES2_DB:-pangia2}
+      - REDIS_URL=redis://redis:6379
+      - SESSION_TTL_SECONDS=${SESSION_TTL_SECONDS:-3600}
+      - HITL_TIMEOUT_SECONDS=${HITL_TIMEOUT_SECONDS:-120}
+      - HITL_AMBIGUITY_THRESHOLD=${HITL_AMBIGUITY_THRESHOLD:-0.7}
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - CORS_ORIGINS=["http://localhost:3000","http://localhost:5173","http://frontend-client"]
+    volumes:
+      - ./backend2/app:/app/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8085 --reload
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8085/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      postgres2:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── PostgreSQL + pgvector (audit logs + long-term memory for backend2) ────
+  postgres2:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5435:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES2_USER:-pangia2}
+      - POSTGRES_PASSWORD=${POSTGRES2_PASSWORD:-pangia2-password}
+      - POSTGRES_DB=${POSTGRES2_DB:-pangia2}
+    volumes:
+      - postgres2_data:/var/lib/postgresql/data
+      - ./backend2/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES2_USER:-pangia2} -d ${POSTGRES2_DB:-pangia2}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
 volumes:
   neo4j_data:
   neo4j_logs:
@@ -218,6 +271,7 @@ volumes:
   postgis_data:
   redis_data:
   phoenix_data:
+  postgres2_data:
   ollama_data:
     external: true  # Declared external so `docker compose down -v` never deletes it.
                     # Create it once manually: docker volume create ollama_data

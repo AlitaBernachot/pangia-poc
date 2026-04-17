@@ -13,12 +13,14 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 | Layer | Technology |
 |---|---|
 | **Frontend** | React 19 + Tailwind CSS v4, Vite, TypeScript (`frontend-client/`) |
-| **Backend** | FastAPI, Server-Sent Events (SSE) |
+| **Backend V1** | FastAPI, SSE, LangChain + LangGraph (`backend/`) |
+| **Backend V2** | FastAPI, SSE, asyncio, guardrails, HITL, pgvector audit (`backend2/`) |
 | **Orchestration** | LangChain + LangGraph (2-stage routing: Intent Parser + Smart Dispatcher + parallel sub-agents) |
 | **Knowledge Graph** | Neo4j (Cypher) |
 | **RDF / Linked Data** | Ontotext GraphDB (SPARQL) |
 | **Vector Search** | ChromaDB (embeddings) |
 | **Spatial SQL** | PostgreSQL + PostGIS |
+| **Long-term Memory** | PostgreSQL + pgvector (Backend V2) |
 | **Sessions** | Redis |
 | **Local LLM** | Ollama (Gemma 4, Llama 3, …) |
 | **Observability** | Arize Phoenix (traces, spans, LLM call inspection) |
@@ -819,3 +821,152 @@ Replace `<SUBAGENT>` with `ADDRESS`, `SPATIAL_PARSER`, `DISTANCE`, `BUFFER`,
   which is free and requires no API key.
 - For precise polygon operations (intersection, area, routing), the PostGIS agent
   (`postgis_agent.py`) with PostGIS SQL remains the recommended approach.
+
+---
+
+## Backend V2 – Second-Generation Multi-Agent System
+
+The second-generation backend (`backend2/`) adds the following capabilities on top of the existing POC:
+
+| Feature | Implementation |
+|---|---|
+| **Guardrails** | Pre- and post-execution hooks on every agent |
+| **Dynamic routing** | LLM-based planner → `ExecutionPlan` with parallel groups |
+| **Parallelism** | `asyncio.gather` per parallel group |
+| **Short-term memory** | Redis (key: `session:{id}:short_memory`, TTL 1 h) |
+| **Long-term memory** | PostgreSQL + pgvector (`long_term_memory` table) |
+| **Audit / traceability** | Tamper-evident SHA-256 hash chain in `audit_logs` |
+| **HITL** | Ambiguity detection → pause → SSE event → human response → resume |
+| **Streaming** | SSE on `POST /api/chat` (same URL pattern as V1) |
+
+### Architecture (`backend2/`)
+
+```
+backend2/
+├── Dockerfile                  Python 3.12-slim, port 8085
+├── requirements.txt
+├── init.sql                    PostgreSQL schema (run on first start)
+└── app/
+    ├── config.py               Pydantic settings (env-driven)
+    ├── models.py               AgentInput/Output, ExecutionPlan, HITL* models
+    ├── db.py                   Async SQLAlchemy engine
+    ├── audit.py                AuditService — async SHA-256 hash chain writer
+    ├── memory.py               ShortTermMemory (Redis) + LongTermMemory (pgvector)
+    ├── guardrails.py           check_toxic_input, check_output_length, check_ambiguous_intent
+    ├── base_agent.py           Abstract BaseAgent with pre/post guardrail hooks
+    ├── router.py               DynamicRouter — LLM → ExecutionPlan
+    ├── hitl.py                 HITLManager — asyncio.Future + Redis + timeout
+    ├── orchestrator.py         Orchestrator — memory → HITL → routing → parallel → SSE
+    ├── main.py                 FastAPI app
+    └── agents/
+        ├── rag_agent.py        RAGAgent (LangChain + OpenAI)
+        └── calculator_agent.py CalculatorAgent (safe AST eval)
+```
+
+### API Endpoints (Backend V2, port 8085)
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/health` | Health check |
+| `POST` | `/api/chat` | Start agent execution; returns SSE stream |
+| `POST` | `/api/hitl/respond` | Submit human clarification for a pending HITL request |
+
+#### `POST /api/chat` — Request body
+
+```json
+{
+  "message": "Your question here",
+  "session_id": "optional-existing-session-id"
+}
+```
+
+#### SSE Event Types (V2)
+
+| Event type | Description |
+|---|---|
+| `session` | Session ID assigned |
+| `status` | Status message |
+| `memory_access` | Facts retrieved from short- or long-term memory |
+| `hitl_request` | Ambiguous query — frontend should show HITL modal |
+| `hitl_resolved` | Human responded — execution resuming |
+| `hitl_timeout` | No response within timeout — fallback returned |
+| `routing_plan` | LLM-generated execution plan (steps + reasoning) |
+| `parallel_group_start` | A group of agents starting in parallel |
+| `agent_end` | One agent finished (answer, confidence, duration_ms) |
+| `final_answer` | Merged answer from all agents |
+| `done` | Stream complete |
+| `error` | Unhandled error |
+
+#### `POST /api/hitl/respond` — Request body
+
+```json
+{
+  "request_id": "uuid-from-hitl_request-event",
+  "clarified_query": "The user's clarified question"
+}
+```
+
+### Environment Variables (Backend V2)
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENAI_API_KEY` | — | Required for LLM calls and embeddings |
+| `MODEL_NAME` | `gpt-4o-mini` | LLM model name |
+| `POSTGRES_DSN` | `postgresql+asyncpg://pangia2:pangia2-password@postgres2:5432/pangia2` | PostgreSQL connection string |
+| `REDIS_URL` | `redis://redis:6379` | Redis connection string (shared with V1) |
+| `SESSION_TTL_SECONDS` | `3600` | Short-term memory TTL |
+| `HITL_TIMEOUT_SECONDS` | `120` | Seconds before HITL request times out |
+| `HITL_AMBIGUITY_THRESHOLD` | `0.7` | Score above which HITL is triggered (0–1) |
+
+### Running Backend V2
+
+```bash
+# Start only the V2 backend and its dependencies
+docker compose up backend2 postgres2 redis
+
+# Or start the full stack (both V1 and V2)
+docker compose up
+```
+
+Backend V2 is available at **http://localhost:8085**.
+
+### PostgreSQL Schema
+
+The schema is applied automatically on first start via `backend2/init.sql`:
+
+- **`audit_logs`** — tamper-evident event log with SHA-256 hash chain.
+- **`long_term_memory`** — vector embeddings for persistent facts (pgvector `vector(1536)`).
+
+### Guardrails
+
+Three built-in guardrails in `backend2/app/guardrails.py`:
+
+| Guardrail | Stage | Description |
+|---|---|---|
+| `check_toxic_input` | Pre | Blocks queries containing toxic keywords |
+| `check_ambiguous_intent` | Pre | Flags very short queries or uncertainty words |
+| `check_output_length` | Post | Flags answers exceeding 10 000 characters |
+
+Guardrail violations appear in the `agent_end` SSE event (`violations` field) and are stored in `audit_logs`.
+
+### Human-in-the-Loop (HITL) Flow
+
+1. Before routing, `AmbiguityDetector` scores the query (0–1).
+2. If score ≥ `HITL_AMBIGUITY_THRESHOLD`, the backend:
+   a. Creates a `HITLRequest` and stores it in Redis.
+   b. Streams `{"type": "hitl_request", "request_id": "...", "questions": [...]}` to the frontend.
+   c. Pauses execution (`asyncio.Future`).
+3. The frontend shows the **HITL Modal** (amber overlay), displays clarifying questions, and lets the user type a response.
+4. The user clicks **Send** → `POST /api/hitl/respond` → backend resumes with the clarified query.
+5. If no response within `HITL_TIMEOUT_SECONDS`, the backend streams `hitl_timeout` and returns a fallback message.
+
+### Frontend Changes
+
+The frontend (`frontend-client/`) was updated to handle V2 events:
+
+- **`usePangiaChat.ts`** — handles `routing_plan`, `final_answer`, `agent_end`, `hitl_request`, `hitl_resolved`, `hitl_timeout`.
+- **`HITLModal.tsx`** — amber overlay modal shown when `hitl_request` is received.
+- **`ChatPage.tsx`** — renders `<HITLModal>` and wires it to `hitlRequest` / `dismissHitl`.
+- **`types.ts`** — added `HITLRequestEvent`, `routingPlan` on `Message`.
+
+The frontend is **backward-compatible** with V1 — all existing event types still work.
