@@ -19,7 +19,6 @@ COPY requirements.txt .
 RUN uv pip install --system -r requirements.txt
 
 COPY app/ ./app/
-COPY libs/ ./libs/
 
 EXPOSE 8086
 

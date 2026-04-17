@@ -66,7 +66,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
     - [Notes](#notes)
   - [Backend V2 – Second-Generation Multi-Agent System](#backend-v2--second-generation-multi-agent-system)
     - [Architecture (`backend2/`)](#architecture-backend2)
-    - [API Endpoints (Backend V2, port 8085)](#api-endpoints-backend-v2-port-8085)
+    - [API Endpoints (Backend V2, port 8086)](#api-endpoints-backend-v2-port-8085)
       - [`POST /api/chat` — Request body](#post-apichat--request-body)
       - [SSE Event Types (V2)](#sse-event-types-v2)
       - [`POST /api/hitl/respond` — Request body](#post-apihitlrespond--request-body)
@@ -857,7 +857,7 @@ The second-generation backend (`backend2/`) adds the following capabilities on t
 
 ```
 backend2/
-├── Dockerfile                  Python 3.12-slim, port 8085
+├── Dockerfile                  Python 3.12-slim, port 8086
 ├── requirements.txt
 ├── init.sql                    PostgreSQL schema (run on first start)
 └── app/
@@ -933,7 +933,7 @@ At startup, `build_graph()` writes Mermaid diagrams to `backend2/app/mermaid_gra
 | `rag_agent_graph.mmd` | RAGAgent subgraph |
 | `calculator_agent_graph.mmd` | CalculatorAgent subgraph |
 
-### API Endpoints (Backend V2, port 8085)
+### API Endpoints (Backend V2, port 8086)
 
 | Method | Path | Description |
 |---|---|---|
@@ -998,7 +998,7 @@ docker compose up backend2 postgres2 redis
 docker compose up
 ```
 
-Backend V2 is available at **http://localhost:8085**.
+Backend V2 is available at **http://localhost:8086**.
 
 ### PostgreSQL Schema
 

@@ -37,6 +37,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_MAX_AGENT_ANSWER_PREVIEW = 500  # chars sent in agent_end SSE event
+
 
 def _sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
@@ -151,7 +153,7 @@ async def stream_graph_events(
                     yield _sse({
                         "type": "agent_end",
                         "agent": agent_name,
-                        "answer": (result.get("answer") or "")[:500],
+                        "answer": (result.get("answer") or "")[:_MAX_AGENT_ANSWER_PREVIEW],
                         "confidence": result.get("confidence", 0.0),
                         "duration_ms": result.get("duration_ms", 0),
                         "violations": result.get("violations", []),
@@ -170,6 +172,7 @@ async def stream_graph_events(
     except Exception as exc:
         logger.exception("Unhandled error in stream_graph_events")
         await audit.log(session_id, "stream_error", {"error": str(exc)})
-        yield _sse({"type": "error", "message": str(exc)})
+        # Return a generic message — never expose internal error details to the client
+        yield _sse({"type": "error", "message": "An internal error occurred. Please try again."})
 
     yield _sse({"type": "done"})

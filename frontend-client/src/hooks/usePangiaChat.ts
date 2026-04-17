@@ -156,7 +156,7 @@ export function usePangiaChat() {
                 const activities = [...(m.agentActivity ?? [])]
                 const idx = activities.findIndex((a) => a.agent === agent)
                 if (idx >= 0) {
-                  activities[idx] = { ...activities[idx], content: answer || activities[idx].content, streaming: false }
+                  activities[idx] = { ...activities[idx], content: answer ?? activities[idx].content, streaming: false }
                 } else {
                   activities.push({ agent, content: answer, streaming: false, tools: [] })
                 }

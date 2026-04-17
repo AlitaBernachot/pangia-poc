@@ -250,10 +250,17 @@ async def merge_node(state: OrchestratorState) -> dict:
         else 0.0
     )
 
-    # Persist to short-term memory (fire-and-forget)
+    # Persist to short-term memory; log and swallow errors to avoid blocking
     stm = ShortTermMemory(state["session_id"])
-    asyncio.create_task(stm.update("last_answer", combined[:2000]))
-    asyncio.create_task(stm.update("last_query", state["query"]))
+
+    async def _save_stm() -> None:
+        try:
+            await stm.update("last_answer", combined[:2000])
+            await stm.update("last_query", state["query"])
+        except Exception:
+            logger.exception("merge_node: failed to save short-term memory")
+
+    asyncio.create_task(_save_stm())
 
     audit = get_audit()
     await audit.log(
