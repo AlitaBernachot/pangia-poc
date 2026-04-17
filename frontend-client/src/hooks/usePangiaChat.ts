@@ -217,6 +217,17 @@ export function usePangiaChat() {
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort()
     setIsStreaming(false)
+    // Mark the in-progress assistant message as no longer streaming so
+    // "Thinking…" indicators disappear immediately in the UI.
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.role !== 'assistant' || !m.streaming) return m
+        const activities = (m.agentActivity ?? []).map(
+          (a): AgentActivity => ({ ...a, streaming: false }),
+        )
+        return { ...m, streaming: false, agentActivity: activities }
+      }),
+    )
   }, [])
 
   const clearMessages = useCallback(() => {
