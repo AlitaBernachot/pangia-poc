@@ -844,12 +844,14 @@ The second-generation backend (`backend2/`) adds the following capabilities on t
 |---|---|
 | **Guardrails** | Pre- and post-execution hooks on every agent |
 | **Dynamic routing** | LLM-based planner → `ExecutionPlan` with parallel groups |
-| **Parallelism** | `asyncio.gather` per parallel group |
+| **Parallelism** | LangGraph `Send` fan-out per parallel group |
 | **Short-term memory** | Redis (key: `session:{id}:short_memory`, TTL 1 h) |
 | **Long-term memory** | PostgreSQL + pgvector (`long_term_memory` table) |
 | **Audit / traceability** | Tamper-evident SHA-256 hash chain in `audit_logs` |
 | **HITL** | Ambiguity detection → pause → SSE event → human response → resume |
-| **Streaming** | SSE on `POST /api/chat` (same URL pattern as V1) |
+| **Streaming** | `astream_events` → SSE on `POST /api/chat` |
+| **LangGraph graph** | Orchestrator compiled `StateGraph`; Mermaid written at startup |
+| **LangGraph subgraphs** | Each agent is a compiled `StateGraph` (pre-guardrail → execute → post-guardrail) |
 
 ### Architecture (`backend2/`)
 
@@ -860,6 +862,7 @@ backend2/
 ├── init.sql                    PostgreSQL schema (run on first start)
 └── app/
     ├── config.py               Pydantic settings (env-driven)
+    ├── state.py                OrchestratorState + SubAgentState TypedDicts
     ├── models.py               AgentInput/Output, ExecutionPlan, HITL* models
     ├── db.py                   Async SQLAlchemy engine
     ├── audit.py                AuditService — async SHA-256 hash chain writer
@@ -868,12 +871,67 @@ backend2/
     ├── base_agent.py           Abstract BaseAgent with pre/post guardrail hooks
     ├── router.py               DynamicRouter — LLM → ExecutionPlan
     ├── hitl.py                 HITLManager — asyncio.Future + Redis + timeout
-    ├── orchestrator.py         Orchestrator — memory → HITL → routing → parallel → SSE
+    ├── graph.py                build_graph() — orchestrator StateGraph + Mermaid output
+    ├── orchestrator.py         stream_graph_events() — SSE layer over astream_events
     ├── main.py                 FastAPI app
+    ├── mermaid_graph/          ← written at startup
+    │   ├── orchestrator_graph.mmd
+    │   ├── rag_agent_graph.mmd
+    │   └── calculator_agent_graph.mmd
     └── agents/
+        ├── subgraph.py         make_subgraph() — per-agent StateGraph factory
         ├── rag_agent.py        RAGAgent (LangChain + OpenAI)
         └── calculator_agent.py CalculatorAgent (safe AST eval)
 ```
+
+### Orchestrator LangGraph topology
+
+```
+__start__
+    │
+    ▼
+memory_node          ← loads LTM + STM, injects into context
+    │
+    ▼
+ambiguity_node       ← LLM scores ambiguity (0–1); sets hitl_* fields
+    │
+    ├──[pending]──► hitl_wait_node  ← creates HITL request, awaits human response
+    │                   │
+    │            [timeout]──► __end__  (final_answer = timeout message)
+    │            [resolved]──► router_node
+    │
+    └──[clear]──► router_node       ← LLM routing → agents_to_call
+                      │
+                [Send fan-out]
+                │            │
+           rag_agent   calculator_agent   …  (compiled subgraphs)
+                │            │
+                └──────┬─────┘
+                       ▼
+                  merge_node   ← collects sub_results → final_answer
+                       │
+                    __end__
+```
+
+### Sub-agent subgraph topology (per agent)
+
+```
+__start__
+    │
+    ▼
+pre_guardrail_node ──[violation?]──► __end__  (sub_results has error)
+                   └──[ok]────────► execute_node ──► post_guardrail_node ──► __end__
+```
+
+### Mermaid diagrams
+
+At startup, `build_graph()` writes Mermaid diagrams to `backend2/app/mermaid_graph/`:
+
+| File | Content |
+|---|---|
+| `orchestrator_graph.mmd` | Full orchestrator topology |
+| `rag_agent_graph.mmd` | RAGAgent subgraph |
+| `calculator_agent_graph.mmd` | CalculatorAgent subgraph |
 
 ### API Endpoints (Backend V2, port 8085)
 
@@ -902,8 +960,8 @@ backend2/
 | `hitl_request` | Ambiguous query — frontend should show HITL modal |
 | `hitl_resolved` | Human responded — execution resuming |
 | `hitl_timeout` | No response within timeout — fallback returned |
-| `routing_plan` | LLM-generated execution plan (steps + reasoning) |
-| `parallel_group_start` | A group of agents starting in parallel |
+| `routing_plan` | LLM-generated execution plan (agents + reasoning) |
+| `agent_start` | A sub-agent subgraph began execution |
 | `agent_end` | One agent finished (answer, confidence, duration_ms) |
 | `final_answer` | Merged answer from all agents |
 | `done` | Stream complete |

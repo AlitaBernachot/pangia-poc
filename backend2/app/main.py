@@ -16,11 +16,13 @@ from app.agents.calculator_agent import CalculatorAgent
 from app.agents.rag_agent import RAGAgent
 from app.config import get_settings
 from app.db import close_engine
+from app.graph import build_graph
 from app.guardrails import check_ambiguous_intent, check_output_length, check_toxic_input
 from app.hitl import get_hitl_manager
 from app.memory import close_redis
 from app.models import ChatRequest, HITLResponse
-from app.orchestrator import Orchestrator
+from app.orchestrator import stream_graph_events
+from app.state import OrchestratorState
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +36,9 @@ def _setup_phoenix(settings) -> None:
     LangChainInstrumentor().instrument(tracer_provider=tracer_provider)
 
 
-# Build the agent registry (pre-wired with guardrails)
+# ── Agent registry ─────────────────────────────────────────────────────────────
+# Each agent is wired with its guardrails here, then compiled into the graph.
+
 _AGENTS = {
     "rag_agent": RAGAgent(
         pre_guardrails=[check_toxic_input, check_ambiguous_intent],
@@ -45,7 +49,9 @@ _AGENTS = {
     ),
 }
 
-_ORCHESTRATOR = Orchestrator(_AGENTS)
+# Build the orchestrator graph at module import time (same pattern as the
+# legacy backend).  This also writes Mermaid diagrams to app/mermaid_graph/.
+_ORCHESTRATOR_GRAPH = build_graph(_AGENTS)
 
 
 @asynccontextmanager
@@ -86,9 +92,28 @@ async def health():
 async def chat(body: ChatRequest) -> StreamingResponse:
     session_id = body.session_id or str(uuid.uuid4())
 
+    initial_state: OrchestratorState = {
+        "query": body.message,
+        "session_id": session_id,
+        "context": {},
+        "agents_to_call": [],
+        "execution_reasoning": "",
+        "sub_results": {},
+        "final_answer": "",
+        "confidence": 0.0,
+        "hitl_request_id": "",
+        "hitl_questions": [],
+        "hitl_status": "",
+    }
+
     async def event_stream():
         yield f"data: {{\"type\": \"session\", \"session_id\": \"{session_id}\"}}\n\n"
-        async for chunk in _ORCHESTRATOR.run(body.message, session_id):
+        async for chunk in stream_graph_events(
+            _ORCHESTRATOR_GRAPH,
+            initial_state,
+            original_query=body.message,
+            session_id=session_id,
+        ):
             yield chunk
 
     return StreamingResponse(
@@ -103,5 +128,8 @@ async def hitl_respond(body: HITLResponse):
     manager = get_hitl_manager()
     ok = await manager.respond(body.request_id, body.clarified_query)
     if not ok:
-        raise HTTPException(status_code=404, detail="HITL request not found or already resolved")
+        raise HTTPException(
+            status_code=404,
+            detail="HITL request not found or already resolved",
+        )
     return {"status": "ok", "request_id": body.request_id}
