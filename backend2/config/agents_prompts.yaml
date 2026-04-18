@@ -11,7 +11,7 @@
 # agent class itself, so partial overrides are safe.
 #
 # This file is loaded once at startup (LRU-cached).  To apply changes without
-# rebuilding the Docker image, restart the backend2 container — prompts.yml is
+# rebuilding the Docker image, restart the backend2 container — agents_prompts.yaml is
 # inside the mounted app volume.
 
 rag_agent: |

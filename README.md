@@ -879,11 +879,18 @@ backend2/
     │   └── calculator_agent_graph.mmd
     └── agents/
         ├── base_agent.py       Abstract BaseAgent: guardrails, prompt loading, as_subgraph()
-        ├── prompts.yml         Configurable system prompts (one key per agent name)
         ├── ambiguity_agent.py  AmbiguityAgent — LLM ambiguity scorer for HITL
         ├── rag_agent.py        RAGAgent (LangChain + OpenAI)
         ├── calculator_agent.py CalculatorAgent (safe AST eval)
         └── summary_agent.py    SummaryAgent — custom 2-node subgraph (enrich → execute)
+```
+
+The `config/` folder at the root of `backend2/` holds environment-independent configuration files:
+
+```
+backend2/
+    config/
+        └── agents_prompts.yaml Configurable system prompts (one key per agent name)
 ```
 
 ### Orchestrator LangGraph topology
@@ -1035,12 +1042,12 @@ The schema is applied automatically on first start via `backend2/init.sql`:
 ### Configurable system prompts
 
 Each agent that makes LLM calls reads its system prompt from
-`backend2/app/agents/prompts.yml` at startup via `BaseAgent.get_prompt()`.
+`backend2/config/agents_prompts.yaml` at startup via `BaseAgent.get_prompt()`.
 The YAML file is loaded once per process (LRU-cached) and falls back to a
 hardcoded `_DEFAULT_PROMPT` class attribute when the key is absent.
 
 ```yaml
-# backend2/app/agents/prompts.yml
+# backend2/config/agents_prompts.yaml
 rag_agent: |
   You are a knowledgeable assistant …
 summary_agent: |
@@ -1049,7 +1056,7 @@ ambiguity_agent: |
   Evaluate if the following query is ambiguous …
 ```
 
-To update a prompt without rebuilding the Docker image, edit `prompts.yml`
+To update a prompt without rebuilding the Docker image, edit `agents_prompts.yaml`
 and restart the `backend2` container (the file lives inside the mounted app
 volume).  In tests, call `load_prompts.cache_clear()` (imported from
 `app.agents.base_agent`) before injecting a custom mapping.

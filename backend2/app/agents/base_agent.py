@@ -19,12 +19,12 @@ from app.state import SubAgentState
 
 logger = logging.getLogger(__name__)
 
-_PROMPTS_FILE = Path(__file__).parent / "prompts.yml"
+_PROMPTS_FILE = Path(__file__).parent.parent.parent / "config" / "agents_prompts.yaml"
 
 
 @lru_cache(maxsize=1)
 def load_prompts() -> dict[str, str]:
-    """Load and cache all agent system prompts from ``agents/prompts.yml``.
+    """Load and cache all agent system prompts from ``config/agents_prompts.yaml``.
 
     Returns an empty dict (and logs a warning) if the file is missing or
     malformed so that agents can fall back to their hardcoded defaults
@@ -63,7 +63,7 @@ class BaseAgent(ABC):
         self.post_guardrails = post_guardrails or []
 
     def get_prompt(self, default: str) -> str:
-        """Return the system prompt for this agent from ``prompts.yml``.
+        """Return the system prompt for this agent from ``config/agents_prompts.yaml``.
 
         Looks up the agent's ``name`` in the YAML file loaded by
         ``load_prompts()``.  Falls back to *default* when the key is absent.
