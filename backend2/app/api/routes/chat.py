@@ -11,38 +11,13 @@ import uuid
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.pangiagent.agents.calculator_agent import CalculatorAgent
-from app.pangiagent.agents.orchestrator_agent import build_graph
-from app.pangiagent.agents.rag_agent import RAGAgent
-from app.pangiagent.agents.summary_agent import SummaryAgent
-from app.pangiagent.guardrails import check_ambiguous_intent, check_output_length, check_toxic_input
+from app.pangiagent.graph import ORCHESTRATOR_GRAPH
 from app.pangiagent.hitl import get_hitl_manager
 from app.pangiagent.sse_stream import drain_queue_to_sse, run_graph_to_queue
 from app.pangiagent.state import OrchestratorState
 from app.models import ChatRequest, HITLResponse
 
 router = APIRouter()
-
-# ── Agent registry ─────────────────────────────────────────────────────────────
-# Each agent is wired with its guardrails here, then compiled into the graph.
-
-_AGENTS = {
-    "rag_agent": RAGAgent(
-        pre_guardrails=[check_toxic_input, check_ambiguous_intent],
-        post_guardrails=[check_output_length],
-    ),
-    "calculator_agent": CalculatorAgent(
-        pre_guardrails=[check_toxic_input],
-    ),
-    "summary_agent": SummaryAgent(
-        pre_guardrails=[check_toxic_input, check_ambiguous_intent],
-        post_guardrails=[check_output_length],
-    ),
-}
-
-# Build the orchestrator graph at module import time.
-# Also writes Mermaid diagrams to app/pangiagent/mermaid_graph/.
-_ORCHESTRATOR_GRAPH = build_graph(_AGENTS)
 
 
 @router.get("/api/health")
@@ -74,7 +49,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
     queue: asyncio.Queue[str | None] = asyncio.Queue()
     asyncio.create_task(
         run_graph_to_queue(
-            _ORCHESTRATOR_GRAPH,
+            ORCHESTRATOR_GRAPH,
             initial_state,
             queue,
             original_query=body.message,
