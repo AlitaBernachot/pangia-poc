@@ -878,8 +878,7 @@ backend2/
     │   ├── rag_agent_graph.mmd
     │   └── calculator_agent_graph.mmd
     └── agents/
-        ├── base_agent.py       Abstract BaseAgent with pre/post guardrail hooks, load_prompts(), get_prompt()
-        ├── subgraph.py         make_subgraph() — per-agent StateGraph factory
+        ├── base_agent.py       Abstract BaseAgent: guardrails, prompt loading, as_subgraph()
         ├── prompts.yml         Configurable system prompts (one key per agent name)
         ├── ambiguity_agent.py  AmbiguityAgent — LLM ambiguity scorer for HITL
         ├── rag_agent.py        RAGAgent (LangChain + OpenAI)

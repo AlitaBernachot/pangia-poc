@@ -4,7 +4,7 @@
 
 """SummaryAgent — demonstrates a custom multi-node subgraph.
 
-Unlike the default single-node subgraph produced by ``make_subgraph()``,
+Unlike the default single-node subgraph produced by ``BaseAgent.as_subgraph()``,
 ``SummaryAgent.as_subgraph()`` compiles a two-node graph:
 
     enrich_node  →  execute_node  →  __end__

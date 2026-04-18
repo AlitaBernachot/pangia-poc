@@ -34,7 +34,7 @@ Topology
                        __end__
 
 Each sub-agent (rag_agent, calculator_agent, …) is a compiled LangGraph
-subgraph built by ``make_subgraph()``.  Mermaid diagrams for the orchestrator
+subgraph built by ``BaseAgent.as_subgraph()``.  Mermaid diagrams for the orchestrator
 and every sub-agent subgraph are written to
 ``app/mermaid_graph/*.mmd`` at module import time.
 """

@@ -9,11 +9,13 @@ import time
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from pathlib import Path
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 
 import yaml
+from langgraph.graph import END, StateGraph
 
 from app.models import AgentInput, AgentOutput
+from app.state import SubAgentState
 
 logger = logging.getLogger(__name__)
 
@@ -127,15 +129,44 @@ class BaseAgent(ABC):
     def as_subgraph(self):
         """Return a compiled LangGraph subgraph for this agent.
 
-        By default wraps the agent in a single-node subgraph via
-        ``make_subgraph()``.  Override in a subclass to define a custom
-        multi-node graph (e.g. retrieve → rerank → generate for RAG agents).
+        Builds a single-node ``StateGraph`` (``execute_node → __end__``) that
+        delegates entirely to ``self.run()``.  The subgraph shares ``query``,
+        ``session_id``, ``context``, and ``sub_results`` with the parent
+        ``OrchestratorState``; only ``sub_results`` is merged back via the
+        ``_merge_dicts`` reducer.
+
+        Override in a subclass to define a custom multi-node graph (e.g.
+        retrieve → rerank → generate for RAG agents).
 
         Returns
         -------
         CompiledStateGraph
             Ready to be added as a node in the orchestrator StateGraph.
         """
-        from app.agents.subgraph import make_subgraph
+        agent_name = self.name
+        agent = self
 
-        return make_subgraph(self)
+        async def execute_node(state: SubAgentState) -> dict:
+            inp = AgentInput(
+                query=state["query"],
+                session_id=state["session_id"],
+                context=state.get("context", {}),  # type: ignore[arg-type]
+            )
+            output = await agent.run(inp)
+            return {
+                "sub_results": {
+                    agent_name: {
+                        "answer": output.answer,
+                        "confidence": output.confidence,
+                        "error": output.error,
+                        "duration_ms": output.state.get("duration_ms", 0),
+                        "violations": output.state.get("post_guardrail_violations", []),
+                    }
+                }
+            }
+
+        workflow = StateGraph(SubAgentState)
+        workflow.add_node("execute_node", execute_node)
+        workflow.set_entry_point("execute_node")
+        workflow.add_edge("execute_node", END)
+        return workflow.compile()
