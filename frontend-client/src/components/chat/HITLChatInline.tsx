@@ -33,12 +33,6 @@ export function HITLChatInline({ request, onSelectQuestion, onDismiss }: Props) 
             </button>
           </div>
 
-          {/* Original query */}
-          <div className="text-xs text-white/50 bg-white/5 rounded-lg px-3 py-2">
-            <span className="text-white/30 mr-1">{t('hitl.original')}</span>
-            {request.original_query}
-          </div>
-
           {/* Clarifying questions — click to send directly to the workflow */}
           {request.questions.length > 0 && (
             <ul className="flex flex-col gap-1.5">
