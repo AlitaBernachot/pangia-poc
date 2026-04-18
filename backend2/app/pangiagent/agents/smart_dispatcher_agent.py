@@ -41,6 +41,9 @@ logger = logging.getLogger(__name__)
 # Sources whose composite score is at or above this threshold are selected.
 DISPATCH_THRESHOLD: float = 2.0
 
+# Score added per keyword (topic or entity_type) matched in the query.
+_KEYWORD_MATCH_SCORE: float = 2.0
+
 
 class SmartDispatcherAgent(BaseAgent):
     """Deterministic + semantic agent dispatcher (no LLM calls).
@@ -125,14 +128,14 @@ class SmartDispatcherAgent(BaseAgent):
 
         def _score(entry) -> float:
             score = 0.0
-            # +2 for each topic that appears as a substring in the query
+            # +_KEYWORD_MATCH_SCORE for each topic that appears as a substring in the query
             for topic in entry.topics:
                 if topic.lower() in query_lower:
-                    score += 2.0
-            # +2 for each entity_type that appears as a substring in the query
+                    score += _KEYWORD_MATCH_SCORE
+            # +_KEYWORD_MATCH_SCORE for each entity_type that appears as a substring in the query
             for entity_type in entry.entity_types:
                 if entity_type.lower() in query_lower:
-                    score += 2.0
+                    score += _KEYWORD_MATCH_SCORE
             # +semantic score (in [0, 1])
             score += semantic_scores.get(entry.id, 0.0)
             return score

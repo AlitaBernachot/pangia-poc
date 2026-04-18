@@ -210,7 +210,8 @@ async def router_node(state: OrchestratorState) -> dict:
     # Keep only agents whose nodes were compiled into the graph
     valid = [a for a in agents_to_call if a in _AGENT_NODE_NAMES]
     if not valid:
-        valid = list(_AGENT_NODE_NAMES)[:1]
+        # Deterministic fallback: use the lexicographically first registered agent
+        valid = sorted(_AGENT_NODE_NAMES)[:1]
 
     return {
         "agents_to_call": valid,

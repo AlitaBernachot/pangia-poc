@@ -93,8 +93,13 @@ SOURCE_REGISTRY: list[SourceEntry] = _load_registry()
 
 # ── ChromaDB client helpers ───────────────────────────────────────────────────
 
-async def _get_chroma_client():  # type: ignore[return]
-    """Return a lazily-initialised async ChromaDB HTTP client."""
+async def _get_chroma_client() -> Any:
+    """Return a lazily-initialised async ChromaDB HTTP client.
+
+    Returns ``chromadb.AsyncClientAPI`` but typed as ``Any`` to avoid a hard
+    import of ``chromadb`` at module load time (ChromaDB is an optional
+    runtime dependency that may fail to import before the container is ready).
+    """
     global _chroma_client
     if _chroma_client is None:
         import chromadb  # noqa: PLC0415 (local import to avoid hard dependency at module load)
