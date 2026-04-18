@@ -861,7 +861,8 @@ backend2/
 ├── requirements.txt
 ├── init.sql                    PostgreSQL schema (run on first start)
 ├── config/
-│   └── agents_prompts.yaml     Configurable system prompts (one key per agent name)
+│   ├── agents_prompts.yaml     Configurable system prompts (one key per agent name)
+│   └── source_registry.yml    Declarative capability manifest for all connector agents
 └── app/
     ├── main.py                 FastAPI app (create_app, lifespan, CORS, router include)
     ├── config.py               Pydantic settings (env-driven)
@@ -876,6 +877,7 @@ backend2/
         ├── memory.py           ShortTermMemory (Redis) + LongTermMemory (pgvector)
         ├── guardrails.py       check_toxic_input, check_output_length, check_ambiguous_intent
         ├── router.py           DynamicRouter — LLM → ExecutionPlan
+        ├── source_registry.py  SourceRegistry loader + ChromaDB bootstrap + semantic_search_sources()
         ├── hitl.py             HITLManager — asyncio.Future + Redis + timeout
         ├── sse_stream.py       run_graph_to_queue / drain_queue_to_sse — SSE layer
         ├── mermaid_graph/      ← written at startup
@@ -886,6 +888,7 @@ backend2/
             ├── base_agent.py           Abstract BaseAgent: guardrails, prompt loading, as_subgraph()
             ├── ambiguity_agent.py      AmbiguityAgent — LLM ambiguity scorer for HITL
             ├── orchestrator_agent.py   build_graph() — orchestrator StateGraph + Mermaid output
+            ├── smart_dispatcher_agent.py SmartDispatcherAgent — keyword + semantic router (no LLM)
             ├── rag_agent.py            RAGAgent (LangChain + OpenAI)
             ├── calculator_agent.py     CalculatorAgent (safe AST eval)
             ├── summary_agent.py        SummaryAgent — custom 2-node subgraph (enrich → execute)
@@ -1032,6 +1035,7 @@ At startup, `build_graph()` writes Mermaid diagrams to `backend2/app/mermaid_gra
 | `GRAPHDB_URL` | `http://graphdb:7200` | Ontotext GraphDB URL |
 | `GRAPHDB_REPOSITORY` | `pangia` | GraphDB repository name |
 | `DATA_GOUV_MCP_URL` | `http://datagouv-mcp:3000` | data.gouv.fr MCP service URL |
+| `SMART_DISPATCHER_ENABLED` | `true` | `true` = SmartDispatcherAgent (keyword + semantic, no LLM); `false` = LLM-based DynamicRouter |
 
 ### Running Backend V2
 
@@ -1052,9 +1056,53 @@ The schema is applied automatically on first start via `backend2/init.sql`:
 - **`audit_logs`** — tamper-evident event log with SHA-256 hash chain.
 - **`long_term_memory`** — vector embeddings for persistent facts (pgvector `vector(1536)`).
 
-### Configurable system prompts
+### Source Registry
 
-Each agent that makes LLM calls reads its system prompt from
+`backend2/config/source_registry.yml` is a declarative YAML manifest that
+describes the capabilities of every connector agent.  Each entry contains:
+
+| Field | Description |
+|---|---|
+| `id` / `connector` | Agent key (matches the key in `AGENTS` registry) |
+| `description` | Rich textual description — used as the document to embed in ChromaDB |
+| `topics` | Keyword list for deterministic (+2 per match) scoring |
+| `entity_types` | Entity / data-type list for deterministic (+2 per match) scoring |
+| `capabilities` | Standardised capability tags (e.g. `spatial_query`, `sparql`, `arithmetic`) |
+| `geo_scope` | Geographic coverage (`null` = global) |
+| `example_questions` | Representative questions the agent can answer |
+
+At startup, `bootstrap_registry_embeddings()` upserts every entry into the
+`pangiagent_source_registry` ChromaDB collection as a single embeddable
+document (description + topics + entity_types + capabilities + example_questions).
+If ChromaDB is unavailable, a warning is logged and the system falls back to
+keyword-only scoring.
+
+### SmartDispatcherAgent
+
+`SmartDispatcherAgent` (`app/pangiagent/agents/smart_dispatcher_agent.py`) is a
+**LLM-free router** that selects which connector agents to invoke by combining:
+
+1. **Keyword scoring** — +2 per topic or entity_type from the registry entry
+   that appears as a case-insensitive substring in the user query.
+2. **Semantic scoring** — cosine similarity from the ChromaDB source-registry
+   collection (score in [0, 1], so max contribution is +1).
+
+Agents with a composite score ≥ `DISPATCH_THRESHOLD` (default `2.0`) are
+selected.  If nothing reaches the threshold, the highest-scoring agent is used
+as a safe fallback.
+
+**Routing strategy toggle** — controlled by `SMART_DISPATCHER_ENABLED`:
+
+| Value | Behaviour |
+|---|---|
+| `true` (default) | `router_node` calls `SmartDispatcherAgent._run()` — no LLM cost |
+| `false` | `router_node` calls `DynamicRouter` — LLM-based plan via `gpt-4o-mini` |
+
+`SmartDispatcherAgent` inherits from `BaseAgent` (guardrails, timing, prompt
+loading) but is called directly inside `router_node` as an internal utility —
+it is **not** fanned out as a subgraph.
+
+### Configurable system prompts
 `backend2/config/agents_prompts.yaml` at startup via `BaseAgent.get_prompt()`.
 The YAML file is loaded once per process (LRU-cached) and falls back to a
 hardcoded `_DEFAULT_PROMPT` class attribute when the key is absent.

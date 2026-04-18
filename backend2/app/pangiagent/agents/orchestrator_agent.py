@@ -53,7 +53,7 @@ from app.pangiagent.audit import get_audit
 from app.config import get_settings
 from app.pangiagent.hitl import get_hitl_manager
 from app.pangiagent.memory import LongTermMemory, ShortTermMemory
-from app.models import HITLRequest
+from app.models import AgentInput, HITLRequest
 from app.pangiagent.router import DynamicRouter
 from app.pangiagent.state import OrchestratorState
 from app.pangiagent.agents.ambiguity_agent import AmbiguityAgent
@@ -172,21 +172,49 @@ async def hitl_wait_node(state: OrchestratorState) -> dict:
 
 
 async def router_node(state: OrchestratorState) -> dict:
-    """LLM-based routing: produce the list of agents to invoke."""
-    router = DynamicRouter(_AGENT_REGISTRY)
-    plan = await router.plan(state["query"])
+    """Route the query to one or more agents.
 
+    When ``settings.smart_dispatcher_enabled`` is ``True`` (default), uses
+    :class:`SmartDispatcherAgent` — a deterministic + semantic scorer that
+    requires no LLM call.  When ``False``, falls back to the LLM-based
+    :class:`DynamicRouter`.
+    """
+    settings = get_settings()
     audit = get_audit()
-    await audit.log(state["session_id"], "routing", {"plan": plan.model_dump()})
+
+    if settings.smart_dispatcher_enabled:
+        from app.pangiagent.agents.smart_dispatcher_agent import SmartDispatcherAgent
+
+        dispatcher = SmartDispatcherAgent()
+        inp = AgentInput(
+            query=state["query"],
+            session_id=state["session_id"],
+            context={"active_agents": list(_AGENT_REGISTRY.keys())},
+        )
+        output = await dispatcher._run(inp)
+        agents_to_call: list[str] = output.state.get("agents_to_call", [])
+        reasoning = f"SmartDispatcher selected: {agents_to_call}"
+
+        await audit.log(
+            state["session_id"],
+            "routing",
+            {"mode": "smart_dispatcher", "agents_to_call": agents_to_call},
+        )
+    else:
+        router = DynamicRouter(_AGENT_REGISTRY)
+        plan = await router.plan(state["query"])
+        await audit.log(state["session_id"], "routing", {"plan": plan.model_dump()})
+        agents_to_call = [s.agent_name for s in plan.steps if s.agent_name in _AGENT_NODE_NAMES]
+        reasoning = plan.reasoning
 
     # Keep only agents whose nodes were compiled into the graph
-    valid = [s.agent_name for s in plan.steps if s.agent_name in _AGENT_NODE_NAMES]
+    valid = [a for a in agents_to_call if a in _AGENT_NODE_NAMES]
     if not valid:
         valid = list(_AGENT_NODE_NAMES)[:1]
 
     return {
         "agents_to_call": valid,
-        "execution_reasoning": plan.reasoning,
+        "execution_reasoning": reasoning,
     }
 
 

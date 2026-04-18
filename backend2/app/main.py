@@ -14,6 +14,7 @@ from app.api.routes.chat import router as chat_router
 from app.config import get_settings
 from app.db import close_engine
 from app.pangiagent.memory import close_redis
+from app.pangiagent.source_registry import bootstrap_registry_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,10 @@ def _setup_phoenix(settings) -> None:
 async def lifespan(app: FastAPI):
     settings = get_settings()
     _setup_phoenix(settings)
+    try:
+        await bootstrap_registry_embeddings()
+    except Exception:
+        logger.warning("lifespan: bootstrap_registry_embeddings failed — continuing without ChromaDB routing", exc_info=True)
     print(
         "\n"
         "██████╗  █████╗ ███╗   ██╗ ██████╗ ██╗  █████╗ \n"

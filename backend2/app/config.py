@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     # data.gouv.fr MCP
     data_gouv_mcp_url: str = "http://datagouv-mcp:3000"
 
+    # Routing strategy
+    # When True, router_node uses SmartDispatcherAgent (keyword + semantic, no LLM).
+    # When False, the LLM-based DynamicRouter is used instead.
+    smart_dispatcher_enabled: bool = True
+
 
 @lru_cache
 def get_settings() -> Settings:
