@@ -33,6 +33,14 @@
     "routingTo": "Routage vers",
     "thinking": "Réflexion en cours..."
   },
+  "hitl": {
+    "clarificationNeeded": "Clarification requise",
+    "dismiss": "Ignorer",
+    "original": "Original :",
+    "awaitingClarification": "En attente de votre clarification…",
+    "hint": "Cliquez sur une suggestion pour continuer, ou saisissez votre clarification dans le champ ci-dessous.",
+    "clickHint": "Cliquer pour envoyer cette réponse"
+  },
   "datasetChoice": {
     "prompt": "{{count}} datasets trouvés. Lequel souhaitez-vous utiliser ?",
     "promptWithTotal": "{{total}} datasets trouvés au total — affichage des {{shown}} premiers. Lequel souhaitez-vous utiliser ?",

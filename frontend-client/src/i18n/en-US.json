@@ -33,6 +33,14 @@
     "routingTo": "Routing to",
     "thinking": "Thinking..."
   },
+  "hitl": {
+    "clarificationNeeded": "Clarification needed",
+    "dismiss": "Dismiss",
+    "original": "Original:",
+    "awaitingClarification": "Awaiting your clarification…",
+    "hint": "Click a suggestion to continue, or type your clarification in the prompt below.",
+    "clickHint": "Click to send this as your clarification"
+  },
   "datasetChoice": {
     "prompt": "{{count}} datasets found. Which one would you like to use?",
     "promptWithTotal": "{{total}} datasets found in total — showing the first {{shown}}. Which one would you like to use?",

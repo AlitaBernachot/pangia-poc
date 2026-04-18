@@ -93,6 +93,7 @@ export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPr
             }
             onPrefillPrompt={onPrefillPrompt}
             isStreaming={isStreaming}
+            awaitingClarification={!!hitlRequest && !!msg.streaming}
           />
         ))}
         {messages.length > 0 && !isStreaming && onClear && (
@@ -113,7 +114,7 @@ export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPr
             request={hitlRequest}
             onSelectQuestion={(q) => {
               onHitlDismiss()
-              onPrefillPrompt?.(q)
+              onSendMessage?.(q)
             }}
             onDismiss={onHitlDismiss}
           />

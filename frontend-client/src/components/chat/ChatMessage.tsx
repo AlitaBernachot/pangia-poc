@@ -31,9 +31,10 @@ interface Props {
   onSelectDataset?: (candidate: DatasetCandidate) => void
   onPrefillPrompt?: (text: string) => void
   isStreaming?: boolean
+  awaitingClarification?: boolean
 }
 
-export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStreaming }: Props) {
+export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStreaming, awaitingClarification }: Props) {
   const { t } = useTranslation()
   const isUser = message.role === 'user'
 
@@ -124,7 +125,7 @@ export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStrea
             ) : (
               message.streaming && (
                 <span className="thinking-indicator">
-                  {t('chatMessage.thinking')}
+                  {awaitingClarification ? t('hitl.awaitingClarification') : t('chatMessage.thinking')}
                 </span>
               )
             )}
