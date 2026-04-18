@@ -1,0 +1,90 @@
+---
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
+description: "Use when creating or modifying agent files in backend2/app/agents/. Covers BaseAgent inheritance, naming conventions, registration, and documentation requirements."
+applyTo: "backend2/app/agents/*.py"
+---
+
+# Backend2 Agent Guidelines
+
+## Inheritance
+
+Every new sub-agent that participates in the orchestrator fan-out **must** inherit from `BaseAgent`:
+
+```python
+from app.agents.base_agent import BaseAgent
+```
+
+`BaseAgent` provides:
+- Pre- and post-guardrail hook execution (via `run()`)
+- Timing (`duration_ms` written to `output.state`)
+- Uniform error handling and logging
+
+**Exception:** Utility agents that are called directly inside a LangGraph node rather than fanned out as independent sub-agents (e.g. `AmbiguityAgent`) do **not** need to inherit from `BaseAgent`. Document this clearly in the module docstring.
+
+## Abstract methods to implement
+
+```python
+def get_capabilities(self) -> str:
+    """Return a one-sentence description of what this agent can do."""
+
+async def _run(self, inp: AgentInput) -> AgentOutput:
+    """Core agent logic — called by BaseAgent.run() after pre-guardrails pass."""
+```
+
+Never override `run()` directly — put all logic in `_run()`.
+
+## Naming conventions
+
+| Artifact | Convention | Example |
+|---|---|---|
+| Class name | `{Name}Agent` (PascalCase) | `SearchAgent` |
+| File name | `{name}_agent.py` (snake_case) | `search_agent.py` |
+| `name` kwarg passed to `super().__init__()` | `"{name}_agent"` (snake_case string) | `"search_agent"` |
+| Registry key in `main.py` `_AGENTS` dict | `"{name}_agent"` | `"search_agent"` |
+
+## Constructor pattern
+
+```python
+class SearchAgent(BaseAgent):
+    def __init__(self, **kwargs) -> None:
+        super().__init__(name="search_agent", **kwargs)
+        # agent-specific initialisation here
+```
+
+Pass `**kwargs` through to `super().__init__()` so that `pre_guardrails` and `post_guardrails` can be injected by the caller.
+
+## Registering the agent
+
+Add the new agent to the `_AGENTS` dict in `backend2/app/main.py`:
+
+```python
+from app.agents.search_agent import SearchAgent
+
+_AGENTS = {
+    ...
+    "search_agent": SearchAgent(
+        pre_guardrails=[check_toxic_input, check_ambiguous_intent],
+        post_guardrails=[check_output_length],
+    ),
+}
+```
+
+The dict key **must** match the `name` attribute passed to `BaseAgent.__init__()`.
+
+## Guardrails
+
+- **Pre-guardrails** receive an `AgentInput` and return `Optional[str]` (a violation message, or `None`).
+- **Post-guardrails** receive an `AgentOutput` and return `Optional[str]`.
+- Available guardrails live in `backend2/app/guardrails.py`.
+- A pre-guardrail violation short-circuits execution and returns an `AgentOutput` with `error` set.
+- A post-guardrail violation lowers `confidence` by 0.2 and records the violation in `output.state["post_guardrail_violations"]`.
+
+## Documentation
+
+Whenever a new agent is added to `backend2/app/agents/`, **always** update `README.md`:
+- Add the file to the architecture tree under `agents/`.
+- Add a row to the relevant table (Mermaid diagram list, capability descriptions, etc.) if applicable.
+- Describe the agent's purpose and any configuration or environment variables it requires.
