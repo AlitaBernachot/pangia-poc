@@ -38,6 +38,25 @@ class Settings(BaseSettings):
     phoenix_collector_endpoint: str = "http://localhost:6006/v1/traces"
     phoenix_project_name: str = "pangia"
 
+    # Neo4j (knowledge graph)
+    neo4j_uri: str = "bolt://neo4j:7687"
+    neo4j_username: str = "neo4j"
+    neo4j_password: str = ""
+
+    # ChromaDB (vector search)
+    chroma_host: str = "chroma"
+    chroma_port: int = 8000
+
+    # PostGIS (spatial SQL — separate from the audit postgres_dsn)
+    postgis_dsn: str = "postgresql+asyncpg://pangia:pangia-password@postgres:5432/pangia"
+
+    # GraphDB / Ontotext (RDF / SPARQL)
+    graphdb_url: str = "http://graphdb:7200"
+    graphdb_repository: str = "pangia"
+
+    # data.gouv.fr MCP
+    data_gouv_mcp_url: str = "http://datagouv-mcp:3000"
+
 
 @lru_cache
 def get_settings() -> Settings:

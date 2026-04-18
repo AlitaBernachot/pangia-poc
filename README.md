@@ -883,12 +883,18 @@ backend2/
         │   ├── rag_agent_graph.mmd
         │   └── calculator_agent_graph.mmd
         └── agents/
-            ├── base_agent.py       Abstract BaseAgent: guardrails, prompt loading, as_subgraph()
-            ├── ambiguity_agent.py  AmbiguityAgent — LLM ambiguity scorer for HITL
-            ├── orchestrator_agent.py build_graph() — orchestrator StateGraph + Mermaid output
-            ├── rag_agent.py        RAGAgent (LangChain + OpenAI)
-            ├── calculator_agent.py CalculatorAgent (safe AST eval)
-            └── summary_agent.py    SummaryAgent — custom 2-node subgraph (enrich → execute)
+            ├── base_agent.py           Abstract BaseAgent: guardrails, prompt loading, as_subgraph()
+            ├── ambiguity_agent.py      AmbiguityAgent — LLM ambiguity scorer for HITL
+            ├── orchestrator_agent.py   build_graph() — orchestrator StateGraph + Mermaid output
+            ├── rag_agent.py            RAGAgent (LangChain + OpenAI)
+            ├── calculator_agent.py     CalculatorAgent (safe AST eval)
+            ├── summary_agent.py        SummaryAgent — custom 2-node subgraph (enrich → execute)
+            ├── neo4j_agent.py          Neo4jAgent — Cypher query generation for Neo4j knowledge graphs
+            ├── postgis_agent.py        PostGISAgent — spatial SQL generation (ST_Contains, ST_Distance, …)
+            ├── rdf_agent.py            RDFAgent — SPARQL query generation for GraphDB/Ontotext
+            ├── vector_chroma_agent.py  VectorChromaAgent — semantic search via ChromaDB embeddings
+            ├── datagouv_mcp_agent.py   DataGouvMCPAgent — French open-data catalogue (data.gouv.fr)
+            └── geonetwork_mcp_agent.py GeoNetworkMCPAgent — GeoNetwork geospatial metadata catalogue
 ```
 
 ### Orchestrator LangGraph topology
@@ -1017,6 +1023,15 @@ At startup, `build_graph()` writes Mermaid diagrams to `backend2/app/mermaid_gra
 | `SESSION_TTL_SECONDS` | `3600` | Short-term memory TTL |
 | `HITL_TIMEOUT_SECONDS` | `120` | Seconds before HITL request times out |
 | `HITL_AMBIGUITY_THRESHOLD` | `0.7` | Score above which HITL is triggered (0–1) |
+| `NEO4J_URI` | `bolt://neo4j:7687` | Neo4j Bolt URI |
+| `NEO4J_USERNAME` | `neo4j` | Neo4j username |
+| `NEO4J_PASSWORD` | — | Neo4j password |
+| `CHROMA_HOST` | `chroma` | ChromaDB hostname |
+| `CHROMA_PORT` | `8000` | ChromaDB port |
+| `POSTGIS_DSN` | `postgresql+asyncpg://pangia:pangia-password@postgres:5432/pangia` | PostGIS connection string (separate from audit DB) |
+| `GRAPHDB_URL` | `http://graphdb:7200` | Ontotext GraphDB URL |
+| `GRAPHDB_REPOSITORY` | `pangia` | GraphDB repository name |
+| `DATA_GOUV_MCP_URL` | `http://datagouv-mcp:3000` | data.gouv.fr MCP service URL |
 
 ### Running Backend V2
 
