@@ -26,6 +26,7 @@ from app.agents.base_agent import BaseAgent
 - Pre- and post-guardrail hook execution (via `run()`)
 - Timing (`duration_ms` written to `output.state`)
 - Uniform error handling and logging
+- System prompt loading from `prompts.yml` (via `get_prompt(default)`)
 
 **Exception:** Utility agents that are called directly inside a LangGraph node rather than fanned out as independent sub-agents (e.g. `AmbiguityAgent`) do **not** need to inherit from `BaseAgent`. Document this clearly in the module docstring.
 
@@ -54,12 +55,23 @@ Never override `run()` directly — put all logic in `_run()`.
 
 ```python
 class SearchAgent(BaseAgent):
+    _DEFAULT_PROMPT = "You are a helpful search assistant."
+
     def __init__(self, **kwargs) -> None:
         super().__init__(name="search_agent", **kwargs)
-        # agent-specific initialisation here
+        self._system_prompt = self.get_prompt(self._DEFAULT_PROMPT)
+        # other agent-specific initialisation here
 ```
 
 Pass `**kwargs` through to `super().__init__()` so that `pre_guardrails` and `post_guardrails` can be injected by the caller.
+
+Always define `_DEFAULT_PROMPT` as a class attribute so the hardcoded fallback is visible in source.  `get_prompt()` looks up the agent's `name` in `agents/prompts.yml` and returns `_DEFAULT_PROMPT` when the key is absent.
+
+## Shared functionality belongs in BaseAgent
+
+If you add a capability that is useful to **every** agent (e.g. LLM client construction helpers, audit logging, retry logic), put it in `BaseAgent` rather than duplicating it across agent files or creating a separate utility module.  `base_agent.py` is the single place where cross-cutting agent concerns live.
+
+Non-`BaseAgent` utility classes (e.g. `AmbiguityAgent`) that need the same helpers may import module-level functions from `base_agent.py` directly.
 
 ## Registering the agent
 

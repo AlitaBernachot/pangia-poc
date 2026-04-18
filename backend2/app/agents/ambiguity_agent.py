@@ -18,7 +18,7 @@ import logging
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
-from app.agents.prompt_loader import get_prompt
+from app.agents.base_agent import load_prompts
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class AmbiguityAgent:
             temperature=0.0,
         )
         self._threshold = settings.hitl_ambiguity_threshold
-        self._system_prompt = get_prompt("ambiguity_agent", self._DEFAULT_PROMPT)
+        self._system_prompt = load_prompts().get("ambiguity_agent", self._DEFAULT_PROMPT)
 
     async def detect(self, query: str) -> tuple[float, list[str]]:
         """Score *query* for ambiguity.

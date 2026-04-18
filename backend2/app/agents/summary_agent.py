@@ -26,7 +26,6 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from app.agents.base_agent import BaseAgent
-from app.agents.prompt_loader import get_prompt
 from app.config import get_settings
 from app.models import AgentInput, AgentOutput
 
@@ -59,7 +58,7 @@ class SummaryAgent(BaseAgent):
             api_key=settings.openai_api_key,
             temperature=settings.openai_temperature,
         )
-        self._system_prompt = get_prompt("summary_agent", self._DEFAULT_PROMPT)
+        self._system_prompt = self.get_prompt(self._DEFAULT_PROMPT)
 
     # ------------------------------------------------------------------
     # BaseAgent contract
