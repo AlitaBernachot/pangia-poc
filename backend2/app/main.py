@@ -2,6 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
+import asyncio
 import logging
 import uuid
 from contextlib import asynccontextmanager
@@ -22,7 +23,7 @@ from app.guardrails import check_ambiguous_intent, check_output_length, check_to
 from app.hitl import get_hitl_manager
 from app.memory import close_redis
 from app.models import ChatRequest, HITLResponse
-from app.sse_stream import stream_graph_events
+from app.sse_stream import drain_queue_to_sse, run_graph_to_queue
 from app.state import OrchestratorState
 
 logger = logging.getLogger(__name__)
@@ -111,14 +112,23 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         "hitl_status": "",
     }
 
-    async def event_stream():
-        yield f"data: {{\"type\": \"session\", \"session_id\": \"{session_id}\"}}\n\n"
-        async for chunk in stream_graph_events(
+    # Run the graph in an independent background Task so that the long
+    # hitl_wait_node pause is NOT cancelled when the HTTP connection's anyio
+    # cancel scope is torn down (e.g. client disconnect / proxy timeout).
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
+    asyncio.create_task(
+        run_graph_to_queue(
             _ORCHESTRATOR_GRAPH,
             initial_state,
+            queue,
             original_query=body.message,
             session_id=session_id,
-        ):
+        )
+    )
+
+    async def event_stream():
+        yield f"data: {{\"type\": \"session\", \"session_id\": \"{session_id}\"}}\n\n"
+        async for chunk in drain_queue_to_sse(queue):
             yield chunk
 
     return StreamingResponse(

@@ -27,7 +27,7 @@ class HITLManager:
             request.model_dump_json(),
             ex=self._settings.hitl_timeout_seconds + 60,
         )
-        self._futures[request.request_id] = asyncio.get_event_loop().create_future()
+        self._futures[request.request_id] = asyncio.get_running_loop().create_future()
 
     async def wait_for_response(self, request_id: str) -> str | None:
         future = self._futures.get(request_id)
