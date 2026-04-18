@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 # Resolves to backend2/config/source_registry.yml
 # Path: backend2/app/pangiagent/source_registry.py
 #   → parent.parent.parent.parent = backend2/
-_REGISTRY_FILE = Path(__file__).parent.parent.parent.parent / "config" / "source_registry.yml"
+_REGISTRY_FILE = Path(__file__).parent.parent.parent / "config" / "source_registry.yml"
 
 _COLLECTION_NAME = "pangiagent_source_registry"
 
