@@ -59,7 +59,7 @@ class AuditService:
                         INSERT INTO audit_logs
                           (timestamp, session_id, event_type, agent_name, data, hash_prev, hash_current)
                         VALUES
-                          (:ts, :session_id, :event_type, :agent_name, :data::jsonb, :hash_prev, :hash_current)
+                          (:ts, :session_id, :event_type, :agent_name, CAST(:data AS jsonb), :hash_prev, :hash_current)
                         """
                     ),
                     {
