@@ -15,9 +15,10 @@ from __future__ import annotations
 import json
 import logging
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
+from app.agents.prompt_loader import get_prompt
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,12 @@ class AmbiguityAgent:
     the query is considered ambiguous.
     """
 
+    _DEFAULT_PROMPT = (
+        "Evaluate if the following query is ambiguous "
+        "(score 0=clear, 1=very ambiguous).\n"
+        'Return JSON only: {"score": 0.0, "questions": ["clarifying question 1", ...]}'
+    )
+
     def __init__(self) -> None:
         settings = get_settings()
         self._llm = ChatOpenAI(
@@ -38,6 +45,7 @@ class AmbiguityAgent:
             temperature=0.0,
         )
         self._threshold = settings.hitl_ambiguity_threshold
+        self._system_prompt = get_prompt("ambiguity_agent", self._DEFAULT_PROMPT)
 
     async def detect(self, query: str) -> tuple[float, list[str]]:
         """Score *query* for ambiguity.
@@ -49,14 +57,12 @@ class AmbiguityAgent:
             (0 = clear, 1 = very ambiguous).  *clarifying_questions* is
             empty when the score is below the threshold or on parse error.
         """
-        prompt = (
-            "Evaluate if the following query is ambiguous "
-            "(score 0=clear, 1=very ambiguous).\n"
-            'Return JSON: {"score": 0.0, "questions": ["clarifying question 1", ...]}\n\n'
-            f"Query: {query}\n\nReturn ONLY the JSON."
-        )
         try:
-            response = await self._llm.ainvoke([HumanMessage(content=prompt)])
+            messages = [
+                SystemMessage(content=self._system_prompt),
+                HumanMessage(content=f"Query: {query}\n\nReturn ONLY the JSON."),
+            ]
+            response = await self._llm.ainvoke(messages)
             content = str(response.content).strip()
             if content.startswith("```"):
                 content = content.split("```")[1]

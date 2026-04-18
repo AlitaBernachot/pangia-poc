@@ -22,10 +22,11 @@ from __future__ import annotations
 
 import logging
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from app.agents.base_agent import BaseAgent
+from app.agents.prompt_loader import get_prompt
 from app.config import get_settings
 from app.models import AgentInput, AgentOutput
 
@@ -45,6 +46,11 @@ class SummaryAgent(BaseAgent):
     instruction before the LLM is invoked.
     """
 
+    _DEFAULT_PROMPT = (
+        "You are a summarisation assistant. Produce a brief summary of the "
+        "input and then give a direct, concise answer."
+    )
+
     def __init__(self, **kwargs) -> None:
         super().__init__(name="summary_agent", **kwargs)
         settings = get_settings()
@@ -53,6 +59,7 @@ class SummaryAgent(BaseAgent):
             api_key=settings.openai_api_key,
             temperature=settings.openai_temperature,
         )
+        self._system_prompt = get_prompt("summary_agent", self._DEFAULT_PROMPT)
 
     # ------------------------------------------------------------------
     # BaseAgent contract
@@ -65,7 +72,11 @@ class SummaryAgent(BaseAgent):
         )
 
     async def _run(self, inp: AgentInput) -> AgentOutput:
-        response = await self._llm.ainvoke([HumanMessage(content=inp.query)])
+        messages = [
+            SystemMessage(content=self._system_prompt),
+            HumanMessage(content=inp.query),
+        ]
+        response = await self._llm.ainvoke(messages)
         return AgentOutput(
             agent_name=self.name,
             answer=str(response.content),

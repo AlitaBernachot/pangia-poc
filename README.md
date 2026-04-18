@@ -880,6 +880,8 @@ backend2/
     └── agents/
         ├── base_agent.py       Abstract BaseAgent with pre/post guardrail hooks
         ├── subgraph.py         make_subgraph() — per-agent StateGraph factory
+        ├── prompt_loader.py    load_prompts() + get_prompt() — YAML-backed system prompts
+        ├── prompts.yml         Configurable system prompts (one key per agent name)
         ├── ambiguity_agent.py  AmbiguityAgent — LLM ambiguity scorer for HITL
         ├── rag_agent.py        RAGAgent (LangChain + OpenAI)
         ├── calculator_agent.py CalculatorAgent (safe AST eval)
@@ -1031,6 +1033,28 @@ The schema is applied automatically on first start via `backend2/init.sql`:
 
 - **`audit_logs`** — tamper-evident event log with SHA-256 hash chain.
 - **`long_term_memory`** — vector embeddings for persistent facts (pgvector `vector(1536)`).
+
+### Configurable system prompts
+
+Each agent that makes LLM calls reads its system prompt from
+`backend2/app/agents/prompts.yml` at startup via `prompt_loader.get_prompt()`.
+The YAML file is loaded once per process (LRU-cached) and falls back to a
+hardcoded `_DEFAULT_PROMPT` class attribute when the key is absent.
+
+```yaml
+# backend2/app/agents/prompts.yml
+rag_agent: |
+  You are a knowledgeable assistant …
+summary_agent: |
+  You are a summarisation assistant …
+ambiguity_agent: |
+  Evaluate if the following query is ambiguous …
+```
+
+To update a prompt without rebuilding the Docker image, edit `prompts.yml`
+and restart the `backend2` container (the file lives inside the mounted app
+volume).  In tests, call `load_prompts.cache_clear()` before injecting a
+custom mapping.
 
 ### Guardrails
 

@@ -6,10 +6,11 @@ from __future__ import annotations
 
 import logging
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from app.agents.base_agent import BaseAgent
+from app.agents.prompt_loader import get_prompt
 from app.config import get_settings
 from app.models import AgentInput, AgentOutput
 
@@ -17,6 +18,11 @@ logger = logging.getLogger(__name__)
 
 
 class RAGAgent(BaseAgent):
+    _DEFAULT_PROMPT = (
+        "You are a knowledgeable assistant. Answer questions using the provided "
+        "context when available. Be concise and accurate."
+    )
+
     def __init__(self, **kwargs) -> None:
         super().__init__(name="rag_agent", **kwargs)
         settings = get_settings()
@@ -25,6 +31,7 @@ class RAGAgent(BaseAgent):
             api_key=settings.openai_api_key,
             temperature=settings.openai_temperature,
         )
+        self._system_prompt = get_prompt("rag_agent", self._DEFAULT_PROMPT)
 
     def get_capabilities(self) -> str:
         return (
@@ -36,12 +43,16 @@ class RAGAgent(BaseAgent):
         context_str = "\n".join(
             f"- {fact['fact']}" for fact in inp.context.get("long_term_facts", [])
         )
-        prompt = (
+        user_content = (
             f"Context:\n{context_str}\n\nQuestion: {inp.query}\n\nAnswer concisely."
             if context_str
             else f"Question: {inp.query}\n\nAnswer concisely."
         )
-        response = await self._llm.ainvoke([HumanMessage(content=prompt)])
+        messages = [
+            SystemMessage(content=self._system_prompt),
+            HumanMessage(content=user_content),
+        ]
+        response = await self._llm.ainvoke(messages)
         return AgentOutput(
             agent_name=self.name,
             answer=str(response.content),

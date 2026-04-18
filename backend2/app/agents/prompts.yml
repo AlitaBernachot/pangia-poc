@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
+# Agent system prompts for backend2.
+#
+# Each top-level key is the agent name (must match the `name` kwarg passed to
+# BaseAgent.__init__).  The value is the system prompt string.
+#
+# Keys missing from this file fall back to the _DEFAULT_PROMPT defined in the
+# agent class itself, so partial overrides are safe.
+#
+# This file is loaded once at startup (LRU-cached).  To apply changes without
+# rebuilding the Docker image, restart the backend2 container — prompts.yml is
+# inside the mounted app volume.
+
+rag_agent: |
+  You are a knowledgeable assistant that answers questions using the provided
+  context. When context is available, ground your answer in it. If the context
+  does not contain enough information, say so clearly. Always be concise.
+
+summary_agent: |
+  You are a summarisation assistant. First produce a two-to-three sentence
+  summary of the input, then give a direct, concise answer to the underlying
+  question.
+
+ambiguity_agent: |
+  Evaluate if the following query is ambiguous (score 0=clear, 1=very ambiguous).
+  Return JSON only: {"score": 0.0, "questions": ["clarifying question 1", ...]}
