@@ -8,8 +8,6 @@ import { MessageList } from '../components/chat/MessageList'
 import { PromptInput } from '../components/chat/PromptInput'
 import type { Attachment } from '../types'
 
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
-
 export function ChatPage() {
   const {
     messages,
@@ -49,11 +47,6 @@ export function ChatPage() {
         onClear={clearMessages}
         isStreaming={isStreaming}
         hitlRequest={hitlRequest}
-        hitlApiBase={API_BASE}
-        onHitlResolved={(clarifiedQuery) => {
-          dismissHitl()
-          sendMessage(clarifiedQuery)
-        }}
         onHitlDismiss={dismissHitl}
       />
 

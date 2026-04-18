@@ -19,8 +19,6 @@ interface Props {
   onClear?: () => void
   isStreaming?: boolean
   hitlRequest?: HITLRequestEvent | null
-  hitlApiBase?: string
-  onHitlResolved?: (clarifiedQuery: string) => void
   onHitlDismiss?: () => void
 }
 
@@ -41,7 +39,7 @@ function useSuggestions(): string[] {
   return suggestions
 }
 
-export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPrompt, onClear, isStreaming, hitlRequest, hitlApiBase = '', onHitlResolved, onHitlDismiss }: Props) {
+export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPrompt, onClear, isStreaming, hitlRequest, onHitlDismiss }: Props) {
   const { t } = useTranslation()
   const bottomRef = useRef<HTMLDivElement>(null)
   const suggestions = useSuggestions()
@@ -110,11 +108,13 @@ export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPr
             </button>
           </div>
         )}
-        {hitlRequest && onHitlResolved && onHitlDismiss && (
+        {hitlRequest && onHitlDismiss && (
           <HITLChatInline
             request={hitlRequest}
-            apiBase={hitlApiBase}
-            onResolved={onHitlResolved}
+            onSelectQuestion={(q) => {
+              onHitlDismiss()
+              onPrefillPrompt?.(q)
+            }}
             onDismiss={onHitlDismiss}
           />
         )}
