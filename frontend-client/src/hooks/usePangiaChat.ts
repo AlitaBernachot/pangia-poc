@@ -109,13 +109,13 @@ export function usePangiaChat() {
               const agents = event.agents as string[]
               updateAssistant((m) => ({ ...m, routingAgents: agents }))
             } else if (type === 'routing_plan') {
-              // V2 routing plan event
-              const steps = event.steps as { agent_name: string; parallel_group: number }[]
-              const reasoning = event.reasoning as string
+              // V2 routing plan — backend emits `agents` (flat array) + `reasoning`
+              const agents = (event.agents as string[] | undefined) ?? []
+              const reasoning = (event.reasoning as string | undefined) ?? ''
               updateAssistant((m) => ({
                 ...m,
-                routingAgents: steps.map((s) => s.agent_name),
-                routingPlan: { steps, reasoning },
+                routingAgents: agents,
+                routingPlan: { steps: agents.map((a, i) => ({ agent_name: a, parallel_group: i })), reasoning },
               }))
             } else if (type === 'token') {
               updateAssistant((m) => ({
@@ -279,6 +279,25 @@ export function usePangiaChat() {
 
   const dismissHitl = useCallback(() => setHitlRequest(null), [])
 
+  const submitHitlResponse = useCallback(
+    async (question: string) => {
+      if (!hitlRequest) return
+      const requestId = hitlRequest.request_id
+      // Clear the modal immediately so the UI stops waiting
+      setHitlRequest(null)
+      try {
+        await fetch(`${API_BASE}/api/hitl/respond`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ request_id: requestId, clarified_query: question }),
+        })
+      } catch {
+        // Non-fatal — the backend will timeout gracefully
+      }
+    },
+    [hitlRequest],
+  )
+
   return {
     messages,
     isStreaming,
@@ -292,5 +311,6 @@ export function usePangiaChat() {
     fetchAgents,
     hitlRequest,
     dismissHitl,
+    submitHitlResponse,
   }
 }

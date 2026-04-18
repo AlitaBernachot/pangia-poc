@@ -20,6 +20,7 @@ interface Props {
   isStreaming?: boolean
   hitlRequest?: HITLRequestEvent | null
   onHitlDismiss?: () => void
+  onHitlSubmit?: (question: string) => void
 }
 
 function useSuggestions(): string[] {
@@ -39,7 +40,7 @@ function useSuggestions(): string[] {
   return suggestions
 }
 
-export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPrompt, onClear, isStreaming, hitlRequest, onHitlDismiss }: Props) {
+export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPrompt, onClear, isStreaming, hitlRequest, onHitlDismiss, onHitlSubmit }: Props) {
   const { t } = useTranslation()
   const bottomRef = useRef<HTMLDivElement>(null)
   const suggestions = useSuggestions()
@@ -112,10 +113,7 @@ export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPr
         {hitlRequest && onHitlDismiss && (
           <HITLChatInline
             request={hitlRequest}
-            onSelectQuestion={(q) => {
-              onHitlDismiss()
-              onSendMessage?.(q)
-            }}
+            onSelectQuestion={(q) => onHitlSubmit ? onHitlSubmit(q) : onSendMessage?.(q)}
             onDismiss={onHitlDismiss}
           />
         )}

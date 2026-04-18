@@ -119,6 +119,19 @@ async def ambiguity_node(state: OrchestratorState) -> dict:
             "hitl_ambiguity_detected",
             {"score": score, "request_id": request_id},
         )
+        # Register the future BEFORE returning so it exists when the SSE
+        # fires to the frontend.  If the user responds before hitl_wait_node
+        # runs, respond() will find the future and resolve it immediately.
+        hitl_manager = get_hitl_manager()
+        await hitl_manager.create_request(
+            HITLRequest(
+                request_id=request_id,
+                session_id=state["session_id"],
+                original_query=state["query"],
+                context=state.get("context", {}),  # type: ignore[arg-type]
+                clarifying_questions=questions,
+            )
+        )
         return {
             "hitl_request_id": request_id,
             "hitl_questions": questions,
@@ -128,26 +141,12 @@ async def ambiguity_node(state: OrchestratorState) -> dict:
 
 
 async def hitl_wait_node(state: OrchestratorState) -> dict:
-    """Create the HITL Redis entry and wait for the human's clarification.
+    """Wait for the human's clarification response.
 
-    The SSE streaming layer (orchestrator.py) emits the ``hitl_request``
-    event to the frontend as soon as ``ambiguity_node`` ends (before this
-    node starts), so the frontend can show the modal while this node waits.
-
-    Returns:
-        ``hitl_status = "resolved"`` + updated ``query`` on success.
-        ``hitl_status = "timeout"`` + ``final_answer`` on timeout.
+    The future was already registered by ``ambiguity_node`` before the
+    ``hitl_request`` SSE fired, so this node only needs to await it.
     """
     hitl_manager = get_hitl_manager()
-    hitl_req = HITLRequest(
-        request_id=state["hitl_request_id"],
-        session_id=state["session_id"],
-        original_query=state["query"],
-        context=state.get("context", {}),  # type: ignore[arg-type]
-        clarifying_questions=state["hitl_questions"],
-    )
-    await hitl_manager.create_request(hitl_req)
-
     clarified = await hitl_manager.wait_for_response(state["hitl_request_id"])
     audit = get_audit()
 
@@ -246,7 +245,17 @@ def _dispatch_agents(state: OrchestratorState):
     agents = [a for a in (state.get("agents_to_call") or []) if a in _AGENT_NODE_NAMES]
     if not agents:
         return "merge_node"
-    return [Send(a, state) for a in agents]
+    # Pass only the keys SubAgentState needs — avoids InvalidUpdateError when
+    # multiple agents run in parallel and LangGraph merges their outputs back
+    # into OrchestratorState (plain keys like `query` can only be written once
+    # per step without a reducer).
+    subgraph_input = {
+        "query": state["query"],
+        "session_id": state["session_id"],
+        "context": state.get("context", {}),
+        "sub_results": {},
+    }
+    return [Send(a, subgraph_input) for a in agents]
 
 
 # ── Mermaid helper ─────────────────────────────────────────────────────────────

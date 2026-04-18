@@ -21,6 +21,7 @@ export function ChatPage() {
     fetchAgents,
     hitlRequest,
     dismissHitl,
+    submitHitlResponse,
   } = usePangiaChat()
 
   const [prefillText, setPrefillText] = useState<string | undefined>(undefined)
@@ -48,6 +49,7 @@ export function ChatPage() {
         isStreaming={isStreaming}
         hitlRequest={hitlRequest}
         onHitlDismiss={dismissHitl}
+        onHitlSubmit={submitHitlResponse}
       />
 
       {/* Prompt */}

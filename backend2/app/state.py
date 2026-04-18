@@ -31,6 +31,11 @@ def _merge_dicts(left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
     return {**left, **right}
 
 
+def _keep_last(left: Any, right: Any) -> Any:
+    """Reducer: keep the most recent value (used for keys written by parallel subgraphs)."""
+    return right
+
+
 class SubAgentState(TypedDict):
     """State for each sub-agent subgraph.
 
@@ -57,9 +62,13 @@ class OrchestratorState(TypedDict):
     """
 
     # ── core request ──────────────────────────────────────────────────────────
-    query: str
-    session_id: str
-    context: dict[str, Any]
+    # Annotated with _keep_last so that parallel sub-agent subgraphs (fan-out
+    # via Send) can each write these shared keys back without raising
+    # InvalidUpdateError.  The value never actually changes during fan-out —
+    # the reducer just allows concurrent writes.
+    query: Annotated[str, _keep_last]
+    session_id: Annotated[str, _keep_last]
+    context: Annotated[dict[str, Any], _keep_last]
 
     # ── routing ───────────────────────────────────────────────────────────────
     agents_to_call: list[str]
