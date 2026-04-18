@@ -8,13 +8,11 @@ LangGraph state schemas for the V2 multi-agent backend.
 Two state types are defined:
 
 SubAgentState
-    Used by each agent's compiled subgraph
-    (pre_guardrail_node → execute_node → post_guardrail_node).
+    Used by each agent's compiled subgraph (a single execute_node).
     Keys shared with OrchestratorState (``query``, ``session_id``,
     ``context``, ``sub_results``) are mapped in automatically by LangGraph
     when the subgraph is invoked as a node.  After the subgraph completes,
-    only the shared keys are merged back into the parent state.  The
-    ``agent_*`` keys are internal to the subgraph and are never propagated.
+    only the shared keys are merged back into the parent state.
 
 OrchestratorState
     Used by the main orchestrator StateGraph.
@@ -37,8 +35,9 @@ class SubAgentState(TypedDict):
     """State for each sub-agent subgraph.
 
     Shared keys (query, session_id, context, sub_results) come from the
-    parent OrchestratorState.  Internal ``agent_*`` keys are not present in
-    the parent and therefore are never merged back after the subgraph ends.
+    parent OrchestratorState.  The subgraph consists of a single
+    execute_node that calls ``agent.run()`` and writes the result to
+    ``sub_results``, which is then merged back into the parent state.
     """
 
     # ── shared with OrchestratorState (passed in by LangGraph) ───────────────
@@ -47,14 +46,6 @@ class SubAgentState(TypedDict):
     context: dict[str, Any]
     # ── shared output key (merged back into parent via _merge_dicts) ─────────
     sub_results: Annotated[dict[str, Any], _merge_dicts]
-
-    # ── internal subgraph fields (never merged back to parent) ───────────────
-    agent_answer: str
-    agent_confidence: float
-    agent_error: str | None
-    agent_duration_ms: int
-    agent_pre_violation: str | None
-    agent_post_violations: list[str]
 
 
 class OrchestratorState(TypedDict):
