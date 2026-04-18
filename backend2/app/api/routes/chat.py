@@ -13,6 +13,7 @@ from fastapi.responses import StreamingResponse
 
 from app.pangiagent.graph import ORCHESTRATOR_GRAPH
 from app.pangiagent.hitl import get_hitl_manager
+from app.pangiagent.source_registry import get_registry
 from app.pangiagent.sse_stream import drain_queue_to_sse, run_graph_to_queue
 from app.pangiagent.state import OrchestratorState
 from app.models import ChatRequest, HITLResponse
@@ -23,6 +24,25 @@ router = APIRouter()
 @router.get("/api/health")
 async def health():
     return {"status": "ok", "service": "pangia-v2"}
+
+
+@router.get("/api/sources")
+async def list_sources():
+    """Return the list of available agent sources from the source registry."""
+    entries = get_registry()
+    return {
+        "sources": [
+            {
+                "id": entry.id,
+                "connector": entry.connector,
+                "description": entry.description,
+                "topics": entry.topics,
+                "capabilities": entry.capabilities,
+                "geo_scope": entry.geo_scope,
+            }
+            for entry in entries
+        ]
+    }
 
 
 @router.post("/api/chat")

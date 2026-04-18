@@ -7,6 +7,28 @@ import type { AgentActivity, AgentInfo, DatasetCandidate, DataVizPayload, HITLRe
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
+const SOURCE_LABELS: Record<string, string> = {
+  neo4j_agent: 'Neo4j',
+  postgis_agent: 'PostGIS',
+  rdf_agent: 'RDF / SPARQL',
+  vector_chroma_agent: 'Vector (Chroma)',
+  datagouv_mcp_agent: 'Data.gouv.fr',
+  geonetwork_mcp_agent: 'GeoNetwork',
+  rag_agent: 'RAG',
+  calculator_agent: 'Calculator',
+  summary_agent: 'Summary',
+}
+
+function formatSourceLabel(id: string): string {
+  return (
+    SOURCE_LABELS[id] ??
+    id
+      .replace(/_agent$/, '')
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+  )
+}
+
 export function usePangiaChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
@@ -20,10 +42,13 @@ export function usePangiaChat() {
   // it doesn't capture any reactive values that would change over time.
   const fetchAgents = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/agents`)
+      const res = await fetch(`${API_BASE}/api/sources`)
       if (!res.ok) return
       const data = await res.json()
-      const list: AgentInfo[] = data.agents ?? []
+      const list: AgentInfo[] = (data.sources ?? []).map((s: { id: string }) => ({
+        key: s.id,
+        label: formatSourceLabel(s.id),
+      }))
       setAgents(list)
       setSelectedAgents(list.map((a) => a.key))
     } catch {
