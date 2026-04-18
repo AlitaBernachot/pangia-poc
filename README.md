@@ -868,7 +868,6 @@ backend2/
     ├── audit.py                AuditService — async SHA-256 hash chain writer
     ├── memory.py               ShortTermMemory (Redis) + LongTermMemory (pgvector)
     ├── guardrails.py           check_toxic_input, check_output_length, check_ambiguous_intent
-    ├── base_agent.py           Abstract BaseAgent with pre/post guardrail hooks
     ├── router.py               DynamicRouter — LLM → ExecutionPlan
     ├── hitl.py                 HITLManager — asyncio.Future + Redis + timeout
     ├── orchestrator_agent.py   build_graph() — orchestrator StateGraph + Mermaid output
@@ -879,6 +878,7 @@ backend2/
     │   ├── rag_agent_graph.mmd
     │   └── calculator_agent_graph.mmd
     └── agents/
+        ├── base_agent.py       Abstract BaseAgent with pre/post guardrail hooks
         ├── subgraph.py         make_subgraph() — per-agent StateGraph factory
         ├── rag_agent.py        RAGAgent (LangChain + OpenAI)
         └── calculator_agent.py CalculatorAgent (safe AST eval)

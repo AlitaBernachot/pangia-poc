@@ -61,7 +61,7 @@ from app.router import DynamicRouter
 from app.state import OrchestratorState
 
 if TYPE_CHECKING:
-    from app.base_agent import BaseAgent
+    from app.agents.base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
 

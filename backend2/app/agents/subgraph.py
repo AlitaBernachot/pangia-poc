@@ -29,7 +29,7 @@ from app.models import AgentInput, AgentOutput
 from app.state import SubAgentState
 
 if TYPE_CHECKING:
-    from app.base_agent import BaseAgent
+    from app.agents.base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
 

@@ -8,7 +8,7 @@ import ast
 import logging
 import operator
 
-from app.base_agent import BaseAgent
+from app.agents.base_agent import BaseAgent
 from app.models import AgentInput, AgentOutput
 
 logger = logging.getLogger(__name__)

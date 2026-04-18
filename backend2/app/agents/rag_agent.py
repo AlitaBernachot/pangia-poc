@@ -9,7 +9,7 @@ import logging
 from langchain_core.messages import HumanMessage
 from langchain_openai import ChatOpenAI
 
-from app.base_agent import BaseAgent
+from app.agents.base_agent import BaseAgent
 from app.config import get_settings
 from app.models import AgentInput, AgentOutput
 
