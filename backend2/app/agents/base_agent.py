@@ -73,3 +73,19 @@ class BaseAgent(ABC):
             output.state["post_guardrail_violations"] = violations
 
         return output
+
+    def as_subgraph(self):
+        """Return a compiled LangGraph subgraph for this agent.
+
+        By default wraps the agent in a single-node subgraph via
+        ``make_subgraph()``.  Override in a subclass to define a custom
+        multi-node graph (e.g. retrieve → rerank → generate for RAG agents).
+
+        Returns
+        -------
+        CompiledStateGraph
+            Ready to be added as a node in the orchestrator StateGraph.
+        """
+        from app.agents.subgraph import make_subgraph
+
+        return make_subgraph(self)

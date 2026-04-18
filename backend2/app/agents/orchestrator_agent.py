@@ -284,8 +284,6 @@ def build_graph(agents: "dict[str, BaseAgent]"):
     CompiledStateGraph
         The compiled orchestrator graph.
     """
-    from app.agents.subgraph import make_subgraph
-
     global _AGENT_REGISTRY, _AGENT_NODE_NAMES
     _AGENT_REGISTRY = agents
     _AGENT_NODE_NAMES.clear()
@@ -302,7 +300,7 @@ def build_graph(agents: "dict[str, BaseAgent]"):
     # ── Sub-agent subgraphs ────────────────────────────────────────────────
     subgraphs: dict[str, Any] = {}
     for agent_name, agent in agents.items():
-        subgraph = make_subgraph(agent)
+        subgraph = agent.as_subgraph()
         workflow.add_node(agent_name, subgraph)
         workflow.add_edge(agent_name, "merge_node")
         subgraphs[agent_name] = subgraph
