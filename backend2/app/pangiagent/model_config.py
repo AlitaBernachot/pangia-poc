@@ -137,7 +137,20 @@ def build_llm(config: AgentModelConfig) -> BaseChatModel:
     return cls(**kwargs)  # type: ignore[return-value]
 
 
-def get_agent_model_config(agent_name: str) -> AgentModelConfig:
+def get_agent_max_iterations(agent_key: str) -> int:
+    """Return the maximum ReAct loop iterations for *agent_key*.
+
+    Looks up ``<agent_key>_max_iterations`` from application settings.
+    A value of 0 (the default) means "use the global ``agent_max_iterations``".
+
+    Parameters
+    ----------
+    agent_key:
+        Snake-case agent name, e.g. ``"neo4j_agent"``.
+    """
+    settings = get_settings()
+    per_agent: int = getattr(settings, f"{agent_key}_max_iterations", 0)
+    return per_agent if per_agent > 0 else settings.agent_max_iterations
     """Build an :class:`AgentModelConfig` for *agent_name* from settings.
 
     Resolution order for each field:

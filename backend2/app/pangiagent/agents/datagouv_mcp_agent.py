@@ -29,9 +29,6 @@ from libs.datagouv import (
 
 logger = logging.getLogger(__name__)
 
-# Maximum ReAct iterations (no per-agent override yet in backend2)
-_MAX_ITERATIONS = 10
-
 # ─── System prompt ────────────────────────────────────────────────────────────
 
 _DEFAULT_PROMPT = """You are the data.gouv.fr Open-Data Agent of the PangIA GeoIA platform.
@@ -264,7 +261,7 @@ class DataGouvMCPAgent(BaseAgent):
         _confirmed_urls: set[str] = set()
 
         try:
-            for _ in range(_MAX_ITERATIONS):
+            for _ in range(self.max_iterations):
                 response: AIMessage = await llm.ainvoke(messages)
                 messages.append(response)
 

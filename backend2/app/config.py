@@ -64,6 +64,21 @@ class Settings(BaseSettings):
     # When False, the LLM-based DynamicRouter is used instead.
     smart_dispatcher_enabled: bool = True
 
+    # ReAct loop iteration limits
+    # Global fallback used when a per-agent override is 0 (the default).
+    agent_max_iterations: int = 10
+
+    # Per-agent overrides — set to 0 to inherit the global value above.
+    neo4j_agent_max_iterations: int = 0
+    postgis_agent_max_iterations: int = 0
+    rdf_agent_max_iterations: int = 0
+    vector_chroma_agent_max_iterations: int = 0
+    datagouv_mcp_agent_max_iterations: int = 0
+    geonetwork_mcp_agent_max_iterations: int = 0
+    rag_agent_max_iterations: int = 0
+    calculator_agent_max_iterations: int = 0
+    summary_agent_max_iterations: int = 0
+
 
 @lru_cache
 def get_settings() -> Settings:

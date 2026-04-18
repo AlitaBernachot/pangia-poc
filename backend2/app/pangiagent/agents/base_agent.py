@@ -15,6 +15,7 @@ import yaml
 from langgraph.graph import END, StateGraph
 
 from app.models import AgentInput, AgentOutput
+from app.pangiagent.model_config import get_agent_max_iterations
 from app.pangiagent.state import SubAgentState
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,7 @@ class BaseAgent(ABC):
         self.name = name
         self.pre_guardrails = pre_guardrails or []
         self.post_guardrails = post_guardrails or []
+        self.max_iterations: int = get_agent_max_iterations(name)
 
     def get_prompt(self, default: str) -> str:
         """Return the system prompt for this agent from ``config/agents_prompts.yaml``.
