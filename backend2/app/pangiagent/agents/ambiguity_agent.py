@@ -16,9 +16,9 @@ import json
 import logging
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 
 from app.pangiagent.agents.base_agent import load_prompts
+from app.pangiagent.model_config import build_llm, get_agent_model_config
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -39,11 +39,7 @@ class AmbiguityAgent:
 
     def __init__(self) -> None:
         settings = get_settings()
-        self._llm = ChatOpenAI(
-            model=settings.model_name,
-            api_key=settings.openai_api_key,
-            temperature=0.0,
-        )
+        self._llm = build_llm(get_agent_model_config("ambiguity_agent"))
         self._threshold = settings.hitl_ambiguity_threshold
         self._system_prompt = load_prompts().get("ambiguity_agent", self._DEFAULT_PROMPT)
 

@@ -14,11 +14,13 @@ class Settings(BaseSettings):
     app_version: str = "2.0.0"
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173", "http://frontend-client"]
 
-    # LLM
+    # LLM — global defaults (can be overridden per-agent via {agent_name}_model_*)
     model_provider: str = "openai"
     model_name: str = "gpt-4o-mini"
     openai_api_key: str = ""
     openai_temperature: float = 0.0
+    anthropic_api_key: str = ""
+    mistral_api_key: str = ""
 
     # PostgreSQL (audit + long-term memory)
     postgres_dsn: str = "postgresql+asyncpg://pangia2:pangia2-password@postgres2:5432/pangia2"

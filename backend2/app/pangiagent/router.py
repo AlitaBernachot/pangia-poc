@@ -8,9 +8,8 @@ import json
 import logging
 
 from langchain_core.messages import HumanMessage
-from langchain_openai import ChatOpenAI
 
-from app.config import get_settings
+from app.pangiagent.model_config import build_llm, get_agent_model_config
 from app.models import ExecutionPlan, ExecutionStep
 
 logger = logging.getLogger(__name__)
@@ -19,12 +18,7 @@ logger = logging.getLogger(__name__)
 class DynamicRouter:
     def __init__(self, agents: dict[str, "BaseAgent"]) -> None:  # noqa: F821
         self._agents = agents
-        settings = get_settings()
-        self._llm = ChatOpenAI(
-            model=settings.model_name,
-            api_key=settings.openai_api_key,
-            temperature=0.0,
-        )
+        self._llm = build_llm(get_agent_model_config("router"))
 
     async def plan(self, query: str) -> ExecutionPlan:
         capabilities = "\n".join(
