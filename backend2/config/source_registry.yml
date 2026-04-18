@@ -23,6 +23,7 @@ sources:
 
   - id: neo4j_agent
     connector: neo4j_agent
+    label: Neo4j
     description: >
       Neo4j knowledge graph agent. Answers questions about geographic entities,
       their spatial relationships, administrative hierarchies, and co-occurrences
@@ -64,6 +65,7 @@ sources:
 
   - id: postgis_agent
     connector: postgis_agent
+    label: PostGIS
     description: >
       PostGIS spatial SQL agent. Answers geographic questions using PostgreSQL
       with PostGIS extension. Generates SQL queries with spatial functions such
@@ -111,6 +113,7 @@ sources:
 
   - id: rdf_agent
     connector: rdf_agent
+    label: RDF / SPARQL
     description: >
       RDF / SPARQL agent for Ontotext GraphDB. Answers Semantic Web questions
       by generating SPARQL queries against a triplestore containing geographic
@@ -154,6 +157,7 @@ sources:
 
   - id: vector_chroma_agent
     connector: vector_chroma_agent
+    label: Vector (Chroma)
     description: >
       ChromaDB vector search agent. Retrieves and synthesises answers using
       embedding-based semantic similarity search over a document collection
@@ -189,6 +193,7 @@ sources:
 
   - id: datagouv_mcp_agent
     connector: datagouv_mcp_agent
+    label: Data.gouv.fr
     description: >
       data.gouv.fr MCP agent. Discovers and describes French open government
       datasets published on data.gouv.fr, the official French open-data portal.
@@ -230,6 +235,7 @@ sources:
 
   - id: geonetwork_mcp_agent
     connector: geonetwork_mcp_agent
+    label: GeoNetwork
     description: >
       GeoNetwork MCP agent. Searches and describes geospatial metadata catalogues
       using GeoNetwork, an open-source catalogue for geographic datasets and
@@ -272,6 +278,7 @@ sources:
 
   - id: rag_agent
     connector: rag_agent
+    label: RAG
     description: >
       Retrieval-Augmented Generation agent. Answers general knowledge questions
       by combining retrieved context documents with LLM reasoning. Provides
@@ -307,6 +314,7 @@ sources:
 
   - id: calculator_agent
     connector: calculator_agent
+    label: Calculator
     description: >
       Calculator agent. Evaluates arithmetic and mathematical expressions
       safely using AST-based evaluation. Handles basic arithmetic (+, -, *, /),
@@ -340,6 +348,7 @@ sources:
 
   - id: summary_agent
     connector: summary_agent
+    label: Summary
     description: >
       Summarisation agent. Rewrites queries with an explicit summarisation
       instruction and produces concise two-to-three sentence summaries followed

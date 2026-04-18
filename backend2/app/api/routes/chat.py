@@ -34,11 +34,8 @@ async def list_sources():
         "sources": [
             {
                 "id": entry.id,
-                "connector": entry.connector,
+                "label": entry.label,
                 "description": entry.description,
-                "topics": entry.topics,
-                "capabilities": entry.capabilities,
-                "geo_scope": entry.geo_scope,
             }
             for entry in entries
         ]

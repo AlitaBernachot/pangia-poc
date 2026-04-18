@@ -52,6 +52,7 @@ class SourceEntry(BaseModel):
 
     id: str
     connector: str
+    label: str
     description: str
     topics: list[str] = Field(default_factory=list)
     entity_types: list[str] = Field(default_factory=list)
