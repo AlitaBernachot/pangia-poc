@@ -53,6 +53,7 @@ class HITLResponse(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
+    selected_sources: list[str] | None = None
 
 
 class StreamEvent(BaseModel):

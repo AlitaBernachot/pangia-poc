@@ -155,15 +155,22 @@ class BaseAgent(ABC):
                 context=state.get("context", {}),  # type: ignore[arg-type]
             )
             output = await agent.run(inp)
+            entry: dict = {
+                "answer": output.answer,
+                "confidence": output.confidence,
+                "error": output.error,
+                "duration_ms": output.state.get("duration_ms", 0),
+                "violations": output.state.get("post_guardrail_violations", []),
+            }
+            # Forward any rich-data extras produced by the agent
+            # (dataviz, geojson, pending_dataset_choice, etc.) so the SSE
+            # layer can emit the appropriate frontend events.
+            for key in ("dataviz", "geojson", "pending_dataset_choice", "pending_dataset_choice_total"):
+                if key in output.state:
+                    entry[key] = output.state[key]
             return {
                 "sub_results": {
-                    agent_name: {
-                        "answer": output.answer,
-                        "confidence": output.confidence,
-                        "error": output.error,
-                        "duration_ms": output.state.get("duration_ms", 0),
-                        "violations": output.state.get("post_guardrail_violations", []),
-                    }
+                    agent_name: entry
                 }
             }
 

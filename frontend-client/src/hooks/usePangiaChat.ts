@@ -12,7 +12,7 @@ export function usePangiaChat() {
   const [isStreaming, setIsStreaming] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [agents, setAgents] = useState<AgentInfo[]>([])
-  const [selectedAgents, setSelectedAgents] = useState<string[]>([])
+  const [selectedSources, setSelectedSources] = useState<string[]>([])
   const [hitlRequest, setHitlRequest] = useState<HITLRequestEvent | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
@@ -28,7 +28,7 @@ export function usePangiaChat() {
         label: s.label,
       }))
       setAgents(list)
-      setSelectedAgents(list.map((a) => a.key))
+      setSelectedSources(list.map((a) => a.key))
     } catch {
       // backend not available yet — no-op
     }
@@ -68,7 +68,7 @@ export function usePangiaChat() {
           body: JSON.stringify({
             message: text.trim(),
             session_id: sessionId,
-            selected_agents: selectedAgents.length > 0 ? selectedAgents : undefined,
+            selected_sources: selectedSources.length > 0 ? selectedSources : undefined,
           }),
           signal: ctrl.signal,
         })
@@ -256,7 +256,7 @@ export function usePangiaChat() {
         abortRef.current = null
       }
     },
-    [isStreaming, sessionId, selectedAgents],
+    [isStreaming, sessionId, selectedSources],
   )
 
   const stopStreaming = useCallback(() => {
@@ -306,8 +306,8 @@ export function usePangiaChat() {
     isStreaming,
     sessionId,
     agents,
-    selectedAgents,
-    setSelectedAgents,
+    selectedSources,
+    setSelectedSources,
     sendMessage,
     stopStreaming,
     clearMessages,

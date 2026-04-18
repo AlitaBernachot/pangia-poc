@@ -257,7 +257,7 @@ services:
       - GRAPHDB_REPOSITORY=${GRAPHDB_REPOSITORY:-pangia}
 
       # ── data.gouv.fr MCP agent ──────────────────────────────────────────────
-      - DATA_GOUV_MCP_URL=${DATA_GOUV_MCP_URL:-http://datagouv-mcp:3000}
+      - DATA_GOUV_MCP_URL=${DATA_GOUV_MCP_URL:-https://mcp.data.gouv.fr/mcp}
 
       # ── Misc ────────────────────────────────────────────────────────────────
       - CORS_ORIGINS=["http://localhost:3000","http://localhost:5173","http://frontend-client"]
@@ -270,7 +270,8 @@ services:
     volumes:
       - ./backend2/app:/backend2/app
       - ./backend2/config:/backend2/config
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8086 --reload --reload-dir /backend2/app
+      - ./backend2/libs:/backend2/libs
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8086 --reload --reload-dir /backend2/app --reload-dir /backend2/libs
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8086/api/health || exit 1"]
       interval: 10s

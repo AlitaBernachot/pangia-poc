@@ -66,13 +66,20 @@ A minimal AI agent chat application with a **multi-agent architecture**:
     - [Notes](#notes)
   - [Backend V2 – Second-Generation Multi-Agent System](#backend-v2--second-generation-multi-agent-system)
     - [Architecture (`backend2/`)](#architecture-backend2)
-    - [API Endpoints (Backend V2, port 8086)](#api-endpoints-backend-v2-port-8085)
+    - [Orchestrator LangGraph topology](#orchestrator-langgraph-topology)
+    - [Sub-agent subgraph topology (default)](#sub-agent-subgraph-topology-default)
+    - [Custom subgraph topology (SummaryAgent)](#custom-subgraph-topology-summaryagent)
+    - [Mermaid diagrams](#mermaid-diagrams)
+    - [API Endpoints (Backend V2, port 8086)](#api-endpoints-backend-v2-port-8086)
       - [`POST /api/chat` — Request body](#post-apichat--request-body)
       - [SSE Event Types (V2)](#sse-event-types-v2)
       - [`POST /api/hitl/respond` — Request body](#post-apihitlrespond--request-body)
     - [Environment Variables (Backend V2)](#environment-variables-backend-v2)
     - [Running Backend V2](#running-backend-v2)
     - [PostgreSQL Schema](#postgresql-schema)
+    - [Source Registry](#source-registry-1)
+    - [SmartDispatcherAgent](#smartdispatcheragent)
+    - [Configurable system prompts](#configurable-system-prompts)
     - [Guardrails](#guardrails)
     - [Human-in-the-Loop (HITL) Flow](#human-in-the-loop-hitl-flow)
     - [Frontend Changes](#frontend-changes)
@@ -1034,7 +1041,7 @@ At startup, `build_graph()` writes Mermaid diagrams to `backend2/app/mermaid_gra
 | `POSTGIS_DSN` | `postgresql+asyncpg://pangia:pangia-password@postgres:5432/pangia` | PostGIS connection string (separate from audit DB) |
 | `GRAPHDB_URL` | `http://graphdb:7200` | Ontotext GraphDB URL |
 | `GRAPHDB_REPOSITORY` | `pangia` | GraphDB repository name |
-| `DATA_GOUV_MCP_URL` | `http://datagouv-mcp:3000` | data.gouv.fr MCP service URL |
+| `DATA_GOUV_MCP_URL` | `https://mcp.data.gouv.fr/mcp` | data.gouv.fr MCP service URL |
 | `SMART_DISPATCHER_ENABLED` | `true` | `true` = SmartDispatcherAgent (keyword + semantic, no LLM); `false` = LLM-based DynamicRouter |
 
 ### Running Backend V2

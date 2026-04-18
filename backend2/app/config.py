@@ -31,7 +31,7 @@ class Settings(BaseSettings):
 
     # HITL
     hitl_timeout_seconds: int = 120
-    hitl_ambiguity_threshold: float = 0.7
+    hitl_ambiguity_threshold: float = 0.8
 
     # Ollama
     ollama_base_url: str = "http://ollama:11434"
@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     graphdb_repository: str = "pangia"
 
     # data.gouv.fr MCP
-    data_gouv_mcp_url: str = "http://datagouv-mcp:3000"
+    data_gouv_mcp_url: str = "https://mcp.data.gouv.fr/mcp"
 
     # Routing strategy
     # When True, router_node uses SmartDispatcherAgent (keyword + semantic, no LLM).

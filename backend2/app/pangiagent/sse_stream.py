@@ -153,6 +153,17 @@ async def run_graph_to_queue(
                         "violations": result.get("violations", []),
                         "error": result.get("error"),
                     }))
+                    # ── Rich-data extras forwarded from AgentOutput.state ──────
+                    if "dataviz" in result:
+                        await queue.put(_sse({"type": "dataviz", "data": result["dataviz"]}))
+                    if "geojson" in result:
+                        await queue.put(_sse({"type": "geojson", "data": result["geojson"]}))
+                    if "pending_dataset_choice" in result and result["pending_dataset_choice"]:
+                        await queue.put(_sse({
+                            "type": "dataset_choice",
+                            "candidates": result["pending_dataset_choice"],
+                            "total": result.get("pending_dataset_choice_total"),
+                        }))
 
             # ── merge_node end → final_answer ─────────────────────────────────
             elif kind == "on_chain_end" and node == "merge_node":

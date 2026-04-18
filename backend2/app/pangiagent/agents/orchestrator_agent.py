@@ -186,10 +186,16 @@ async def router_node(state: OrchestratorState) -> dict:
         from app.pangiagent.agents.smart_dispatcher_agent import SmartDispatcherAgent
 
         dispatcher = SmartDispatcherAgent()
+        user_selected: list[str] = state.get("selected_sources") or []
+        active = (
+            [k for k in _AGENT_REGISTRY if k in user_selected]
+            if user_selected
+            else list(_AGENT_REGISTRY.keys())
+        )
         inp = AgentInput(
             query=state["query"],
             session_id=state["session_id"],
-            context={"active_agents": list(_AGENT_REGISTRY.keys())},
+            context={"active_agents": active},
         )
         output = await dispatcher._run(inp)
         agents_to_call: list[str] = output.state.get("agents_to_call", [])

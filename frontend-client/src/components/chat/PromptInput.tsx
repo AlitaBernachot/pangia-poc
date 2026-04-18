@@ -19,7 +19,7 @@ import { AgentIcon } from '../AgentIcon'
 interface Props {
   isStreaming: boolean
   availableAgents: AgentInfo[]
-  selectedAgents: string[]
+  selectedSources: string[]
   onSelectedAgentsChange: (keys: string[]) => void
   onSubmit: (text: string, attachments: Attachment[]) => void
   onStop?: () => void
@@ -42,7 +42,7 @@ function isImageType(type: string): boolean {
 export function PromptInput({
   isStreaming,
   availableAgents,
-  selectedAgents,
+  selectedSources,
   onSelectedAgentsChange,
   onSubmit,
   onStop,
@@ -232,9 +232,9 @@ export function PromptInput({
               >
                 <Database size={13} />
                 <span>{t('promptInput.sources')}</span>
-                {selectedAgents.length < availableAgents.length && (
+                {selectedSources.length < availableAgents.length && (
                   <span className="ml-0.5 px-1 py-0 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] font-semibold leading-4">
-                    {selectedAgents.length}
+                    {selectedSources.length}
                   </span>
                 )}
                 <ChevronUp
@@ -249,17 +249,17 @@ export function PromptInput({
                     {t('promptInput.sourcesLabel')}
                   </p>
                   {availableAgents.map((agent) => {
-                    const selected = selectedAgents.includes(agent.key)
-                    const isLast = selectedAgents.length === 1 && selected
+                    const selected = selectedSources.includes(agent.key)
+                    const isLast = selectedSources.length === 1 && selected
                     return (
                       <button
                         key={agent.key}
                         type="button"
                         onClick={() => {
                           if (selected) {
-                            if (!isLast) onSelectedAgentsChange(selectedAgents.filter((k) => k !== agent.key))
+                            if (!isLast) onSelectedAgentsChange(selectedSources.filter((k) => k !== agent.key))
                           } else {
-                            onSelectedAgentsChange([...selectedAgents, agent.key])
+                            onSelectedAgentsChange([...selectedSources, agent.key])
                           }
                         }}
                         disabled={isLast}

@@ -50,6 +50,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         "query": body.message,
         "session_id": session_id,
         "context": {},
+        "selected_sources": body.selected_sources or [],
         "agents_to_call": [],
         "execution_reasoning": "",
         "sub_results": {},

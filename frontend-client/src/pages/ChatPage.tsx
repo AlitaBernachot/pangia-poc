@@ -13,8 +13,8 @@ export function ChatPage() {
     messages,
     isStreaming,
     agents,
-    selectedAgents,
-    setSelectedAgents,
+    selectedSources,
+    setSelectedSources,
     sendMessage,
     stopStreaming,
     clearMessages,
@@ -56,8 +56,8 @@ export function ChatPage() {
       <PromptInput
         isStreaming={isStreaming}
         availableAgents={agents}
-        selectedAgents={selectedAgents}
-        onSelectedAgentsChange={setSelectedAgents}
+        selectedSources={selectedSources}
+        onSelectedAgentsChange={setSelectedSources}
         onSubmit={handleSubmit}
         onStop={stopStreaming}
         prefillText={prefillText}

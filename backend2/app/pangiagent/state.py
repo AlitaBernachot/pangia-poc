@@ -71,6 +71,7 @@ class OrchestratorState(TypedDict):
     context: Annotated[dict[str, Any], _keep_last]
 
     # ── routing ───────────────────────────────────────────────────────────────
+    selected_sources: Annotated[list[str], _keep_last]
     agents_to_call: list[str]
     execution_reasoning: str
 
