@@ -5,8 +5,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Trash2 } from 'lucide-react'
-import { type Message, type DatasetCandidate } from '../../types'
+import { type Message, type DatasetCandidate, type HITLRequestEvent } from '../../types'
 import { ChatMessage } from './ChatMessage'
+import { HITLChatInline } from './HITLChatInline'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -17,6 +18,10 @@ interface Props {
   onPrefillPrompt?: (text: string) => void
   onClear?: () => void
   isStreaming?: boolean
+  hitlRequest?: HITLRequestEvent | null
+  hitlApiBase?: string
+  onHitlResolved?: (clarifiedQuery: string) => void
+  onHitlDismiss?: () => void
 }
 
 function useSuggestions(): string[] {
@@ -36,7 +41,7 @@ function useSuggestions(): string[] {
   return suggestions
 }
 
-export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPrompt, onClear, isStreaming }: Props) {
+export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPrompt, onClear, isStreaming, hitlRequest, hitlApiBase = '', onHitlResolved, onHitlDismiss }: Props) {
   const { t } = useTranslation()
   const bottomRef = useRef<HTMLDivElement>(null)
   const suggestions = useSuggestions()
@@ -104,6 +109,14 @@ export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPr
               {t('chat.clear')}
             </button>
           </div>
+        )}
+        {hitlRequest && onHitlResolved && onHitlDismiss && (
+          <HITLChatInline
+            request={hitlRequest}
+            apiBase={hitlApiBase}
+            onResolved={onHitlResolved}
+            onDismiss={onHitlDismiss}
+          />
         )}
         <div ref={bottomRef} />
       </div>

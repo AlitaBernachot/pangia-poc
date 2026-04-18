@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react'
 import { usePangiaChat } from '../hooks/usePangiaChat'
 import { MessageList } from '../components/chat/MessageList'
 import { PromptInput } from '../components/chat/PromptInput'
-import { HITLModal } from '../components/chat/HITLModal'
 import type { Attachment } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
@@ -49,6 +48,13 @@ export function ChatPage() {
         onPrefillPrompt={(text) => setPrefillText(text)}
         onClear={clearMessages}
         isStreaming={isStreaming}
+        hitlRequest={hitlRequest}
+        hitlApiBase={API_BASE}
+        onHitlResolved={(clarifiedQuery) => {
+          dismissHitl()
+          sendMessage(clarifiedQuery)
+        }}
+        onHitlDismiss={dismissHitl}
       />
 
       {/* Prompt */}
@@ -62,19 +68,6 @@ export function ChatPage() {
         prefillText={prefillText}
         onPrefillConsumed={() => setPrefillText(undefined)}
       />
-
-      {/* HITL Modal — rendered when backend V2 requests clarification */}
-      {hitlRequest && (
-        <HITLModal
-          request={hitlRequest}
-          apiBase={API_BASE}
-          onResolved={(clarifiedQuery) => {
-            dismissHitl()
-            sendMessage(clarifiedQuery)
-          }}
-          onDismiss={dismissHitl}
-        />
-      )}
     </div>
   )
 }
