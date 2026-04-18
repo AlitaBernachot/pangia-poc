@@ -14,6 +14,7 @@ from phoenix.otel import register
 
 from app.agents.calculator_agent import CalculatorAgent
 from app.agents.rag_agent import RAGAgent
+from app.agents.summary_agent import SummaryAgent
 from app.config import get_settings
 from app.db import close_engine
 from app.agents.orchestrator_agent import build_graph
@@ -46,6 +47,10 @@ _AGENTS = {
     ),
     "calculator_agent": CalculatorAgent(
         pre_guardrails=[check_toxic_input],
+    ),
+    "summary_agent": SummaryAgent(
+        pre_guardrails=[check_toxic_input, check_ambiguous_intent],
+        post_guardrails=[check_output_length],
     ),
 }
 

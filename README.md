@@ -882,7 +882,8 @@ backend2/
         ├── subgraph.py         make_subgraph() — per-agent StateGraph factory
         ├── ambiguity_agent.py  AmbiguityAgent — LLM ambiguity scorer for HITL
         ├── rag_agent.py        RAGAgent (LangChain + OpenAI)
-        └── calculator_agent.py CalculatorAgent (safe AST eval)
+        ├── calculator_agent.py CalculatorAgent (safe AST eval)
+        └── summary_agent.py    SummaryAgent — custom 2-node subgraph (enrich → execute)
 ```
 
 ### Orchestrator LangGraph topology
@@ -914,7 +915,7 @@ ambiguity_node       ← LLM scores ambiguity (0–1); sets hitl_* fields
                     __end__
 ```
 
-### Sub-agent subgraph topology (per agent)
+### Sub-agent subgraph topology (default)
 
 ```
 __start__
@@ -925,6 +926,27 @@ execute_node   ← calls agent.run() which handles guardrails + timing
  __end__
 ```
 
+### Custom subgraph topology (SummaryAgent)
+
+Agents that override `as_subgraph()` can define a multi-node graph.
+`SummaryAgent` uses a two-node topology:
+
+```
+__start__
+    │
+    ▼
+enrich_node   ← prepends summarisation instruction to the query
+    │
+    ▼
+execute_node  ← calls agent.run(), writes sub_results
+    │
+ __end__
+```
+
+This pattern applies to any agent that needs to transform or augment state
+before (or after) the main LLM call — for example a RAG agent that would do
+retrieve → rerank → generate.
+
 ### Mermaid diagrams
 
 At startup, `build_graph()` writes Mermaid diagrams to `backend2/app/mermaid_graph/`:
@@ -934,6 +956,7 @@ At startup, `build_graph()` writes Mermaid diagrams to `backend2/app/mermaid_gra
 | `orchestrator_graph.mmd` | Full orchestrator topology |
 | `rag_agent_graph.mmd` | RAGAgent subgraph |
 | `calculator_agent_graph.mmd` | CalculatorAgent subgraph |
+| `summary_agent_graph.mmd` | SummaryAgent custom 2-node subgraph |
 
 ### API Endpoints (Backend V2, port 8086)
 
