@@ -3,15 +3,15 @@
 #
 # SPDX-License-Identifier: MIT
 
-description: "Use when creating or modifying agent files in backend2/app/agents/. Covers file location, BaseAgent inheritance, naming conventions, registration, and documentation requirements."
-applyTo: "backend2/app/agents/*.py"
+description: "Use when creating or modifying agent files in backend2/app/pangiagent/agents/. Covers file location, BaseAgent inheritance, naming conventions, registration, and documentation requirements."
+applyTo: "backend2/app/pangiagent/agents/*.py"
 ---
 
 # Backend2 Agent Guidelines
 
 ## File location
 
-Every agent file **must** be placed in `backend2/app/agents/`.
+Every agent file **must** be placed in `backend2/app/pangiagent/agents/`.
 Do not add agent files directly under `backend2/app/` or any other directory.
 
 ## Inheritance
@@ -19,14 +19,14 @@ Do not add agent files directly under `backend2/app/` or any other directory.
 Every new sub-agent that participates in the orchestrator fan-out **must** inherit from `BaseAgent`:
 
 ```python
-from app.agents.base_agent import BaseAgent
+from app.pangiagent.agents.base_agent import BaseAgent
 ```
 
 `BaseAgent` provides:
 - Pre- and post-guardrail hook execution (via `run()`)
 - Timing (`duration_ms` written to `output.state`)
 - Uniform error handling and logging
-- System prompt loading from `prompts.yml` (via `get_prompt(default)`)
+- System prompt loading from `config/agents_prompts.yaml` (via `get_prompt(default)`)
 
 **Exception:** Utility agents that are called directly inside a LangGraph node rather than fanned out as independent sub-agents (e.g. `AmbiguityAgent`) do **not** need to inherit from `BaseAgent`. Document this clearly in the module docstring.
 
@@ -49,7 +49,7 @@ Never override `run()` directly — put all logic in `_run()`.
 | Class name | `{Name}Agent` (PascalCase) | `SearchAgent` |
 | File name | `{name}_agent.py` (snake_case) | `search_agent.py` |
 | `name` kwarg passed to `super().__init__()` | `"{name}_agent"` (snake_case string) | `"search_agent"` |
-| Registry key in `main.py` `_AGENTS` dict | `"{name}_agent"` | `"search_agent"` |
+| Registry key in `app/api/routes/chat.py` `_AGENTS` dict | `"{name}_agent"` | `"search_agent"` |
 
 ## Constructor pattern
 
@@ -65,7 +65,7 @@ class SearchAgent(BaseAgent):
 
 Pass `**kwargs` through to `super().__init__()` so that `pre_guardrails` and `post_guardrails` can be injected by the caller.
 
-Always define `_DEFAULT_PROMPT` as a class attribute so the hardcoded fallback is visible in source.  `get_prompt()` looks up the agent's `name` in `agents/prompts.yml` and returns `_DEFAULT_PROMPT` when the key is absent.
+Always define `_DEFAULT_PROMPT` as a class attribute so the hardcoded fallback is visible in source.  `get_prompt()` looks up the agent's `name` in `config/agents_prompts.yaml` and returns `_DEFAULT_PROMPT` when the key is absent.
 
 ## Shared functionality belongs in BaseAgent
 
@@ -75,10 +75,10 @@ Non-`BaseAgent` utility classes (e.g. `AmbiguityAgent`) that need the same helpe
 
 ## Registering the agent
 
-Add the new agent to the `_AGENTS` dict in `backend2/app/main.py`:
+Add the new agent to the `_AGENTS` dict in `backend2/app/api/routes/chat.py`:
 
 ```python
-from app.agents.search_agent import SearchAgent
+from app.pangiagent.agents.search_agent import SearchAgent
 
 _AGENTS = {
     ...
@@ -95,13 +95,13 @@ The dict key **must** match the `name` attribute passed to `BaseAgent.__init__()
 
 - **Pre-guardrails** receive an `AgentInput` and return `Optional[str]` (a violation message, or `None`).
 - **Post-guardrails** receive an `AgentOutput` and return `Optional[str]`.
-- Available guardrails live in `backend2/app/guardrails.py`.
+- Available guardrails live in `backend2/app/pangiagent/guardrails.py`.
 - A pre-guardrail violation short-circuits execution and returns an `AgentOutput` with `error` set.
 - A post-guardrail violation lowers `confidence` by 0.2 and records the violation in `output.state["post_guardrail_violations"]`.
 
 ## Documentation
 
-Whenever a new agent is added to `backend2/app/agents/`, **always** update `README.md`:
+Whenever a new agent is added to `backend2/app/pangiagent/agents/`, **always** update `README.md`:
 - Add the file to the architecture tree under `agents/`.
 - Add a row to the relevant table (Mermaid diagram list, capability descriptions, etc.) if applicable.
 - Describe the agent's purpose and any configuration or environment variables it requires.

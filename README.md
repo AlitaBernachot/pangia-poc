@@ -1057,11 +1057,11 @@ ambiguity_agent: |
 To update a prompt without rebuilding the Docker image, edit `agents_prompts.yaml`
 and restart the `backend2` container (the file lives inside the mounted app
 volume).  In tests, call `load_prompts.cache_clear()` (imported from
-`app.agents.base_agent`) before injecting a custom mapping.
+`app.pangiagent.agents.base_agent`) before injecting a custom mapping.
 
 ### Guardrails
 
-Three built-in guardrails in `backend2/app/guardrails.py`:
+Three built-in guardrails in `backend2/app/pangiagent/guardrails.py`:
 
 | Guardrail | Stage | Description |
 |---|---|---|
