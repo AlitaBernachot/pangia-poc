@@ -871,8 +871,8 @@ backend2/
     ├── base_agent.py           Abstract BaseAgent with pre/post guardrail hooks
     ├── router.py               DynamicRouter — LLM → ExecutionPlan
     ├── hitl.py                 HITLManager — asyncio.Future + Redis + timeout
-    ├── graph.py                build_graph() — orchestrator StateGraph + Mermaid output
-    ├── orchestrator.py         stream_graph_events() — SSE layer over astream_events
+    ├── orchestrator_agent.py   build_graph() — orchestrator StateGraph + Mermaid output
+    ├── sse_stream.py           stream_graph_events() — SSE layer over astream_events
     ├── main.py                 FastAPI app
     ├── mermaid_graph/          ← written at startup
     │   ├── orchestrator_graph.mmd

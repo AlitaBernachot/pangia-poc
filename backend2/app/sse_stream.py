@@ -29,7 +29,7 @@ import logging
 from typing import TYPE_CHECKING, Any, AsyncGenerator
 
 from app.audit import get_audit
-from app.graph import _AGENT_NODE_NAMES
+from app.orchestrator_agent import _AGENT_NODE_NAMES
 from app.state import OrchestratorState
 
 if TYPE_CHECKING:
