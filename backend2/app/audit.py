@@ -47,8 +47,9 @@ class AuditService:
         try:
             async with _lock:
                 hash_prev = _last_hash.get(session_id, _ZERO_HASH)
-                ts = datetime.now(timezone.utc).isoformat()
-                hash_current = _compute_hash(hash_prev, ts, event_type, data)
+                now = datetime.now(timezone.utc)
+                ts_str = now.isoformat()
+                hash_current = _compute_hash(hash_prev, ts_str, event_type, data)
                 _last_hash[session_id] = hash_current
 
             factory = get_session_factory()
@@ -63,7 +64,7 @@ class AuditService:
                         """
                     ),
                     {
-                        "ts": ts,
+                        "ts": now,
                         "session_id": session_id,
                         "event_type": event_type,
                         "agent_name": agent_name,

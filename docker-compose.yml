@@ -233,8 +233,8 @@ services:
       - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
       - PHOENIX_PROJECT_NAME=${PHOENIX_PROJECT_NAME:-pangia}
     volumes:
-      - ./backend2/app:/app/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8086 --reload
+      - ./backend2/app:/backend2/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8086 --reload --reload-dir /backend2/app
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8086/api/health || exit 1"]
       interval: 10s

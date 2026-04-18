@@ -77,7 +77,7 @@ class LongTermMemory:
                 text(
                     """
                     INSERT INTO long_term_memory (session_id, fact_text, embedding, metadata)
-                    VALUES (:session_id, :fact_text, :embedding::vector, :metadata::jsonb)
+                    VALUES (:session_id, :fact_text, CAST(:embedding AS vector), CAST(:metadata AS jsonb))
                     """
                 ),
                 {
@@ -96,9 +96,9 @@ class LongTermMemory:
             result = await session.execute(
                 text(
                     """
-                    SELECT fact_text, metadata, 1 - (embedding <=> :embedding::vector) AS score
+                    SELECT fact_text, metadata, 1 - (embedding <=> CAST(:embedding AS vector)) AS score
                     FROM long_term_memory
-                    ORDER BY embedding <=> :embedding::vector
+                    ORDER BY embedding <=> CAST(:embedding AS vector)
                     LIMIT :top_k
                     """
                 ),
