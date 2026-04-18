@@ -16,7 +16,7 @@ from app.agents.calculator_agent import CalculatorAgent
 from app.agents.rag_agent import RAGAgent
 from app.config import get_settings
 from app.db import close_engine
-from app.orchestrator_agent import build_graph
+from app.agents.orchestrator_agent import build_graph
 from app.guardrails import check_ambiguous_intent, check_output_length, check_toxic_input
 from app.hitl import get_hitl_manager
 from app.memory import close_redis

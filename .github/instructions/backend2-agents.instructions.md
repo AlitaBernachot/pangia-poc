@@ -3,11 +3,16 @@
 #
 # SPDX-License-Identifier: MIT
 
-description: "Use when creating or modifying agent files in backend2/app/agents/. Covers BaseAgent inheritance, naming conventions, registration, and documentation requirements."
+description: "Use when creating or modifying agent files in backend2/app/agents/. Covers file location, BaseAgent inheritance, naming conventions, registration, and documentation requirements."
 applyTo: "backend2/app/agents/*.py"
 ---
 
 # Backend2 Agent Guidelines
+
+## File location
+
+Every agent file **must** be placed in `backend2/app/agents/`.
+Do not add agent files directly under `backend2/app/` or any other directory.
 
 ## Inheritance
 
