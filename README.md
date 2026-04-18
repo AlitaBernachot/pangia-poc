@@ -880,6 +880,7 @@ backend2/
     └── agents/
         ├── base_agent.py       Abstract BaseAgent with pre/post guardrail hooks
         ├── subgraph.py         make_subgraph() — per-agent StateGraph factory
+        ├── ambiguity_agent.py  AmbiguityAgent — LLM ambiguity scorer for HITL
         ├── rag_agent.py        RAGAgent (LangChain + OpenAI)
         └── calculator_agent.py CalculatorAgent (safe AST eval)
 ```
@@ -919,8 +920,9 @@ ambiguity_node       ← LLM scores ambiguity (0–1); sets hitl_* fields
 __start__
     │
     ▼
-pre_guardrail_node ──[violation?]──► __end__  (sub_results has error)
-                   └──[ok]────────► execute_node ──► post_guardrail_node ──► __end__
+execute_node   ← calls agent.run() which handles guardrails + timing
+    │
+ __end__
 ```
 
 ### Mermaid diagrams
@@ -1014,14 +1016,14 @@ Three built-in guardrails in `backend2/app/guardrails.py`:
 | Guardrail | Stage | Description |
 |---|---|---|
 | `check_toxic_input` | Pre | Blocks queries containing toxic keywords |
-| `check_ambiguous_intent` | Pre | Flags very short queries or uncertainty words |
+| `check_ambiguous_intent` | Pre | Blocks queries shorter than 5 characters |
 | `check_output_length` | Post | Flags answers exceeding 10 000 characters |
 
-Guardrail violations appear in the `agent_end` SSE event (`violations` field) and are stored in `audit_logs`.
+Uncertainty-word detection (e.g. "maybe", "unclear") is intentionally *not* part of `check_ambiguous_intent` — that responsibility belongs to the LLM-based `AmbiguityAgent` in `ambiguity_node`, which triggers HITL when needed.  Having both mechanisms active would cause conflicts (a query passing the guardrail could still trigger HITL, or vice versa).
 
 ### Human-in-the-Loop (HITL) Flow
 
-1. Before routing, `AmbiguityDetector` scores the query (0–1).
+1. Before routing, `AmbiguityAgent` (in `agents/ambiguity_agent.py`) scores the query (0–1).
 2. If score ≥ `HITL_AMBIGUITY_THRESHOLD`, the backend:
    a. Creates a `HITLRequest` and stores it in Redis.
    b. Streams `{"type": "hitl_request", "request_id": "...", "questions": [...]}` to the frontend.

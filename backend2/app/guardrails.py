@@ -9,7 +9,6 @@ from typing import Optional
 from app.models import AgentInput, AgentOutput
 
 _TOXIC_WORDS = frozenset(["kill", "murder", "hack", "exploit", "porn", "bomb"])
-_AMBIGUITY_WORDS = frozenset(["maybe", "perhaps", "or", "not sure", "don't know", "unclear"])
 
 
 def check_toxic_input(inp: AgentInput) -> Optional[str]:
@@ -21,12 +20,14 @@ def check_toxic_input(inp: AgentInput) -> Optional[str]:
 
 
 def check_ambiguous_intent(inp: AgentInput) -> Optional[str]:
-    query_lower = inp.query.lower()
+    """Block queries that are too short to be meaningful.
+
+    Uncertainty-word detection is intentionally omitted here — that
+    responsibility belongs to the LLM-based ``AmbiguityAgent`` in the
+    orchestrator graph, which triggers HITL when needed.
+    """
     if len(inp.query.strip()) < 5:
         return "Guardrail violation: query is too short and ambiguous."
-    for word in _AMBIGUITY_WORDS:
-        if word in query_lower:
-            return f"Guardrail (ambiguity): query contains uncertainty word '{word}'. Consider HITL."
     return None
 
 

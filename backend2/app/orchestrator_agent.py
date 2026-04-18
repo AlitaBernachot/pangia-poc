@@ -41,14 +41,11 @@ and every sub-agent subgraph are written to
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.messages import HumanMessage
-from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 from langgraph.types import Send
 
@@ -59,6 +56,7 @@ from app.memory import LongTermMemory, ShortTermMemory
 from app.models import HITLRequest
 from app.router import DynamicRouter
 from app.state import OrchestratorState
+from app.agents.ambiguity_agent import AmbiguityAgent
 
 if TYPE_CHECKING:
     from app.agents.base_agent import BaseAgent
@@ -76,45 +74,6 @@ _MERMAID_DIR.mkdir(exist_ok=True)
 # These are referenced by router_node and _dispatch_agents at request time.
 _AGENT_REGISTRY: dict[str, Any] = {}
 _AGENT_NODE_NAMES: set[str] = set()
-
-
-# ── AmbiguityDetector ─────────────────────────────────────────────────────────
-
-class AmbiguityDetector:
-    """LLM-based ambiguity scorer for HITL triggering."""
-
-    def __init__(self) -> None:
-        settings = get_settings()
-        self._llm = ChatOpenAI(
-            model=settings.model_name,
-            api_key=settings.openai_api_key,
-            temperature=0.0,
-        )
-        self._threshold = settings.hitl_ambiguity_threshold
-
-    async def detect(self, query: str) -> tuple[float, list[str]]:
-        prompt = (
-            "Evaluate if the following query is ambiguous "
-            "(score 0=clear, 1=very ambiguous).\n"
-            'Return JSON: {"score": 0.0, "questions": ["clarifying question 1", ...]}\n\n'
-            f"Query: {query}\n\nReturn ONLY the JSON."
-        )
-        try:
-            response = await self._llm.ainvoke([HumanMessage(content=prompt)])
-            content = str(response.content).strip()
-            if content.startswith("```"):
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
-            data = json.loads(content)
-            return float(data.get("score", 0.0)), list(data.get("questions", []))
-        except Exception:
-            logger.exception("AmbiguityDetector: failed to parse response")
-            return 0.0, []
-
-    @property
-    def threshold(self) -> float:
-        return self._threshold
 
 
 # ── Orchestrator node functions ────────────────────────────────────────────────
@@ -148,7 +107,7 @@ async def ambiguity_node(state: OrchestratorState) -> dict:
     when the ambiguity score exceeds the configured threshold; otherwise
     clears those fields.
     """
-    detector = AmbiguityDetector()
+    detector = AmbiguityAgent()
     score, questions = await detector.detect(state["query"])
     settings = get_settings()
     audit = get_audit()
@@ -308,8 +267,8 @@ def build_graph(agents: "dict[str, BaseAgent]"):
     """Build and compile the orchestrator StateGraph.
 
     For each agent in *agents*:
-      1. A sub-agent subgraph (pre_guardrail → execute → post_guardrail) is
-         compiled and added as a node in the orchestrator graph.
+      1. A sub-agent subgraph (single ``execute_node``) is compiled and added
+         as a node in the orchestrator graph.
       2. A Mermaid diagram ``app/mermaid_graph/<agent>_graph.mmd`` is written.
 
     The orchestrator Mermaid diagram is written to
