@@ -9,7 +9,7 @@ import json
 import logging
 
 from app.config import get_settings
-from app.memory import get_redis
+from app.pangiagent.memory import get_redis
 from app.models import HITLRequest
 
 logger = logging.getLogger(__name__)

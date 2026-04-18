@@ -18,7 +18,7 @@ import logging
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
-from app.agents.base_agent import load_prompts
+from app.pangiagent.agents.base_agent import load_prompts
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)

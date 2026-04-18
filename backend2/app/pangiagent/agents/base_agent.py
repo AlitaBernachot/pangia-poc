@@ -15,11 +15,13 @@ import yaml
 from langgraph.graph import END, StateGraph
 
 from app.models import AgentInput, AgentOutput
-from app.state import SubAgentState
+from app.pangiagent.state import SubAgentState
 
 logger = logging.getLogger(__name__)
 
-_PROMPTS_FILE = Path(__file__).parent.parent.parent / "config" / "agents_prompts.yaml"
+# Resolve path: backend2/app/pangiagent/agents/base_agent.py
+#   → parent.parent.parent.parent = backend2/
+_PROMPTS_FILE = Path(__file__).parent.parent.parent.parent / "config" / "agents_prompts.yaml"
 
 
 @lru_cache(maxsize=1)

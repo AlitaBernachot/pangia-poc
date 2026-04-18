@@ -860,37 +860,35 @@ backend2/
 ├── Dockerfile                  Python 3.12-slim, port 8086
 ├── requirements.txt
 ├── init.sql                    PostgreSQL schema (run on first start)
+├── config/
+│   └── agents_prompts.yaml     Configurable system prompts (one key per agent name)
 └── app/
+    ├── main.py                 FastAPI app (create_app, lifespan, CORS, router include)
     ├── config.py               Pydantic settings (env-driven)
-    ├── state.py                OrchestratorState + SubAgentState TypedDicts
-    ├── models.py               AgentInput/Output, ExecutionPlan, HITL* models
     ├── db.py                   Async SQLAlchemy engine
-    ├── audit.py                AuditService — async SHA-256 hash chain writer
-    ├── memory.py               ShortTermMemory (Redis) + LongTermMemory (pgvector)
-    ├── guardrails.py           check_toxic_input, check_output_length, check_ambiguous_intent
-    ├── router.py               DynamicRouter — LLM → ExecutionPlan
-    ├── hitl.py                 HITLManager — asyncio.Future + Redis + timeout
-    ├── orchestrator_agent.py   build_graph() — orchestrator StateGraph + Mermaid output
-    ├── sse_stream.py           stream_graph_events() — SSE layer over astream_events
-    ├── main.py                 FastAPI app
-    ├── mermaid_graph/          ← written at startup
-    │   ├── orchestrator_graph.mmd
-    │   ├── rag_agent_graph.mmd
-    │   └── calculator_agent_graph.mmd
-    └── agents/
-        ├── base_agent.py       Abstract BaseAgent: guardrails, prompt loading, as_subgraph()
-        ├── ambiguity_agent.py  AmbiguityAgent — LLM ambiguity scorer for HITL
-        ├── rag_agent.py        RAGAgent (LangChain + OpenAI)
-        ├── calculator_agent.py CalculatorAgent (safe AST eval)
-        └── summary_agent.py    SummaryAgent — custom 2-node subgraph (enrich → execute)
-```
-
-The `config/` folder at the root of `backend2/` holds environment-independent configuration files:
-
-```
-backend2/
-    config/
-        └── agents_prompts.yaml Configurable system prompts (one key per agent name)
+    ├── models.py               AgentInput/Output, ExecutionPlan, HITL* models
+    ├── api/
+    │   └── routes/
+    │       └── chat.py         POST /api/chat, POST /api/hitl/respond, GET /api/health
+    └── pangiagent/             ← AI sub-system package
+        ├── state.py            OrchestratorState + SubAgentState TypedDicts
+        ├── audit.py            AuditService — async SHA-256 hash chain writer
+        ├── memory.py           ShortTermMemory (Redis) + LongTermMemory (pgvector)
+        ├── guardrails.py       check_toxic_input, check_output_length, check_ambiguous_intent
+        ├── router.py           DynamicRouter — LLM → ExecutionPlan
+        ├── hitl.py             HITLManager — asyncio.Future + Redis + timeout
+        ├── sse_stream.py       run_graph_to_queue / drain_queue_to_sse — SSE layer
+        ├── mermaid_graph/      ← written at startup
+        │   ├── orchestrator_graph.mmd
+        │   ├── rag_agent_graph.mmd
+        │   └── calculator_agent_graph.mmd
+        └── agents/
+            ├── base_agent.py       Abstract BaseAgent: guardrails, prompt loading, as_subgraph()
+            ├── ambiguity_agent.py  AmbiguityAgent — LLM ambiguity scorer for HITL
+            ├── orchestrator_agent.py build_graph() — orchestrator StateGraph + Mermaid output
+            ├── rag_agent.py        RAGAgent (LangChain + OpenAI)
+            ├── calculator_agent.py CalculatorAgent (safe AST eval)
+            └── summary_agent.py    SummaryAgent — custom 2-node subgraph (enrich → execute)
 ```
 
 ### Orchestrator LangGraph topology

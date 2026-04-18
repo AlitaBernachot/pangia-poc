@@ -25,7 +25,7 @@ import logging
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
-from app.agents.base_agent import BaseAgent
+from app.pangiagent.agents.base_agent import BaseAgent
 from app.config import get_settings
 from app.models import AgentInput, AgentOutput
 
@@ -109,7 +109,7 @@ class SummaryAgent(BaseAgent):
         from langgraph.graph import END, StateGraph
 
         from app.models import AgentInput
-        from app.state import SubAgentState
+        from app.pangiagent.state import SubAgentState
 
         agent = self  # capture for closures
         agent_name = self.name

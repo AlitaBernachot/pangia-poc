@@ -36,7 +36,7 @@ Topology
 Each sub-agent (rag_agent, calculator_agent, …) is a compiled LangGraph
 subgraph built by ``BaseAgent.as_subgraph()``.  Mermaid diagrams for the orchestrator
 and every sub-agent subgraph are written to
-``app/mermaid_graph/*.mmd`` at module import time.
+``app/pangiagent/mermaid_graph/*.mmd`` at module import time.
 """
 from __future__ import annotations
 
@@ -49,17 +49,17 @@ from typing import TYPE_CHECKING, Any
 from langgraph.graph import END, StateGraph
 from langgraph.types import Send
 
-from app.audit import get_audit
+from app.pangiagent.audit import get_audit
 from app.config import get_settings
-from app.hitl import get_hitl_manager
-from app.memory import LongTermMemory, ShortTermMemory
+from app.pangiagent.hitl import get_hitl_manager
+from app.pangiagent.memory import LongTermMemory, ShortTermMemory
 from app.models import HITLRequest
-from app.router import DynamicRouter
-from app.state import OrchestratorState
-from app.agents.ambiguity_agent import AmbiguityAgent
+from app.pangiagent.router import DynamicRouter
+from app.pangiagent.state import OrchestratorState
+from app.pangiagent.agents.ambiguity_agent import AmbiguityAgent
 
 if TYPE_CHECKING:
-    from app.agents.base_agent import BaseAgent
+    from app.pangiagent.agents.base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,7 @@ _HITL_TIMEOUT_MSG = "Request timed out waiting for clarification."
 _NO_AGENT_ANSWER_MSG = "No agents produced a valid answer."
 
 # ── Mermaid output directory ───────────────────────────────────────────────────
+# Resolves to backend2/app/pangiagent/mermaid_graph/
 _MERMAID_DIR = Path(__file__).parent.parent / "mermaid_graph"
 _MERMAID_DIR.mkdir(exist_ok=True)
 
@@ -278,10 +279,11 @@ def build_graph(agents: "dict[str, BaseAgent]"):
     For each agent in *agents*:
       1. A sub-agent subgraph (single ``execute_node``) is compiled and added
          as a node in the orchestrator graph.
-      2. A Mermaid diagram ``app/mermaid_graph/<agent>_graph.mmd`` is written.
+      2. A Mermaid diagram ``app/pangiagent/mermaid_graph/<agent>_graph.mmd``
+         is written.
 
     The orchestrator Mermaid diagram is written to
-    ``app/mermaid_graph/orchestrator_graph.mmd``.
+    ``app/pangiagent/mermaid_graph/orchestrator_graph.mmd``.
 
     Parameters
     ----------
