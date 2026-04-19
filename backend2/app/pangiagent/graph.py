@@ -16,7 +16,10 @@ from __future__ import annotations
 
 from app.pangiagent.agents.calculator_agent import CalculatorAgent
 from app.pangiagent.agents.datagouv_mcp_agent import DataGouvMCPAgent
+from app.pangiagent.agents.dataviz_agent import DataVizAgent
 from app.pangiagent.agents.geonetwork_mcp_agent import GeoNetworkMCPAgent
+from app.pangiagent.agents.humanoutput_agent import HumanOutputAgent
+from app.pangiagent.agents.mapviz_agent import MapVizAgent
 from app.pangiagent.agents.neo4j_agent import Neo4jAgent
 from app.pangiagent.agents.orchestrator_agent import build_graph
 from app.pangiagent.agents.postgis_agent import PostGISAgent
@@ -67,8 +70,19 @@ AGENTS = {
     ),
 }
 
+# ── Output agent registry ──────────────────────────────────────────────────────
+# Post-processing agents run **after** the fan-out merge, in sequential order:
+#   humanoutput_agent → dataviz_agent (conditional) → mapviz_agent (conditional)
+# They are NOT dispatched by the router and are NOT in AGENTS.
+
+OUTPUT_AGENTS = {
+    "humanoutput_agent": HumanOutputAgent(),
+    "dataviz_agent": DataVizAgent(),
+    "mapviz_agent": MapVizAgent(),
+}
+
 # ── Compiled orchestrator graph ────────────────────────────────────────────────
 # Built at module import time; also writes Mermaid diagrams to
 # app/pangiagent/mermaid_graph/.
 
-ORCHESTRATOR_GRAPH = build_graph(AGENTS)
+ORCHESTRATOR_GRAPH = build_graph(AGENTS, output_agents=OUTPUT_AGENTS)

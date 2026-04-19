@@ -294,6 +294,22 @@ def _dispatch_agents(state: OrchestratorState):
     return [Send(a, subgraph_input) for a in agents]
 
 
+def _after_humanoutput(state: OrchestratorState) -> str:
+    """Route after humanoutput_node based on output_decision."""
+    decision = state.get("output_decision") or {}
+    if decision.get("needs_dataviz"):
+        return "dataviz_node"
+    if decision.get("needs_map"):
+        return "mapviz_node"
+    return END
+
+
+def _after_dataviz(state: OrchestratorState) -> str:
+    """Route after dataviz_node: run mapviz if needed, else end."""
+    decision = state.get("output_decision") or {}
+    return "mapviz_node" if decision.get("needs_map") else END
+
+
 # ── Mermaid helper ─────────────────────────────────────────────────────────────
 
 def _write_mermaid(graph, filename: str) -> None:
@@ -306,9 +322,106 @@ def _write_mermaid(graph, filename: str) -> None:
         logger.exception("Failed to write Mermaid diagram for %s", filename)
 
 
+# ── Post-processing node factory ───────────────────────────────────────────────
+
+def _make_humanoutput_node(agent: "BaseAgent"):
+    """Return an async node function that runs *agent* with the full sub_results context."""
+    async def humanoutput_node(state: OrchestratorState) -> dict:
+        dataviz: Any = None
+        geojson: Any = None
+        for result in (state.get("sub_results") or {}).values():
+            if isinstance(result, dict):
+                if result.get("dataviz") and dataviz is None:
+                    dataviz = result["dataviz"]
+                if result.get("geojson") and geojson is None:
+                    geojson = result["geojson"]
+
+        sub_text: dict[str, str] = {
+            k: (v.get("answer") or "") if isinstance(v, dict) else str(v)
+            for k, v in (state.get("sub_results") or {}).items()
+        }
+        inp = AgentInput(
+            query=state["query"],
+            session_id=state["session_id"],
+            context={"sub_results": sub_text, "dataviz": dataviz, "geojson": geojson},
+        )
+        try:
+            output = await agent.run(inp)
+            decision = output.state.get("output_decision", {"needs_map": True, "needs_dataviz": True})
+        except Exception:
+            logger.exception("humanoutput_node: agent raised")
+            decision = {"needs_map": True, "needs_dataviz": True}
+
+        update: dict = {"output_decision": decision}
+        if dataviz is not None:
+            update["dataviz"] = dataviz
+        if geojson is not None:
+            update["geojson"] = geojson
+        return update
+
+    return humanoutput_node
+
+
+def _make_dataviz_node(agent: "BaseAgent"):
+    """Return an async node function that runs *agent* for dataviz generation."""
+    async def dataviz_node(state: OrchestratorState) -> dict:
+        sub_text: dict[str, str] = {
+            k: (v.get("answer") or "") if isinstance(v, dict) else str(v)
+            for k, v in (state.get("sub_results") or {}).items()
+        }
+        inp = AgentInput(
+            query=state["query"],
+            session_id=state["session_id"],
+            context={
+                "sub_results": sub_text,
+                "dataviz": state.get("dataviz"),
+                "geojson": state.get("geojson"),
+            },
+        )
+        try:
+            output = await agent.run(inp)
+            dv = output.state.get("dataviz")
+        except Exception:
+            logger.exception("dataviz_node: agent raised")
+            dv = None
+        return {"dataviz": dv} if dv is not None else {}
+
+    return dataviz_node
+
+
+def _make_mapviz_node(agent: "BaseAgent"):
+    """Return an async node function that runs *agent* for GeoJSON generation."""
+    async def mapviz_node(state: OrchestratorState) -> dict:
+        sub_text: dict[str, str] = {
+            k: (v.get("answer") or "") if isinstance(v, dict) else str(v)
+            for k, v in (state.get("sub_results") or {}).items()
+        }
+        inp = AgentInput(
+            query=state["query"],
+            session_id=state["session_id"],
+            context={
+                "sub_results": sub_text,
+                "dataviz": state.get("dataviz"),
+                "geojson": state.get("geojson"),
+            },
+        )
+        try:
+            output = await agent.run(inp)
+            gj = output.state.get("geojson")
+        except Exception:
+            logger.exception("mapviz_node: agent raised")
+            gj = None
+        return {"geojson": gj} if gj is not None else {}
+
+    return mapviz_node
+
+
 # ── Graph construction ─────────────────────────────────────────────────────────
 
-def build_graph(agents: "dict[str, BaseAgent]"):
+def build_graph(
+    agents: "dict[str, BaseAgent]",
+    output_agents: "dict[str, BaseAgent] | None" = None,
+):
     """Build and compile the orchestrator StateGraph.
 
     For each agent in *agents*:
@@ -317,6 +430,20 @@ def build_graph(agents: "dict[str, BaseAgent]"):
       2. A Mermaid diagram ``app/pangiagent/mermaid_graph/<agent>_graph.mmd``
          is written.
 
+    When *output_agents* is provided (keys: ``"humanoutput_agent"``,
+    ``"dataviz_agent"``, ``"mapviz_agent"``), three sequential post-processing
+    nodes are added **after** ``merge_node``:
+
+    .. code-block:: text
+
+        merge_node
+            → humanoutput_node
+                → dataviz_node  (if needs_dataviz)
+                    → mapviz_node  (if needs_map)  → END
+                    → END  (needs_map is False)
+                → mapviz_node  (if needs_map, needs_dataviz is False)  → END
+                → END  (neither)
+
     The orchestrator Mermaid diagram is written to
     ``app/pangiagent/mermaid_graph/orchestrator_graph.mmd``.
 
@@ -324,6 +451,9 @@ def build_graph(agents: "dict[str, BaseAgent]"):
     ----------
     agents:
         Registry of ``BaseAgent`` instances keyed by agent node name.
+    output_agents:
+        Optional registry of post-processing agents
+        (``humanoutput_agent``, ``dataviz_agent``, ``mapviz_agent``).
 
     Returns
     -------
@@ -370,7 +500,46 @@ def build_graph(agents: "dict[str, BaseAgent]"):
     fan_out_targets = list(_AGENT_NODE_NAMES) + ["merge_node"]
     workflow.add_conditional_edges("router_node", _dispatch_agents, fan_out_targets)
 
-    workflow.add_edge("merge_node", END)
+    # ── Post-processing phase (optional) ──────────────────────────────────
+    if output_agents:
+        humanoutput = output_agents.get("humanoutput_agent")
+        dataviz = output_agents.get("dataviz_agent")
+        mapviz = output_agents.get("mapviz_agent")
+
+        if humanoutput:
+            workflow.add_node("humanoutput_node", _make_humanoutput_node(humanoutput))
+            workflow.add_edge("merge_node", "humanoutput_node")
+
+            after_humanoutput_targets: dict[str, str] = {END: END}
+            if dataviz:
+                workflow.add_node("dataviz_node", _make_dataviz_node(dataviz))
+                after_humanoutput_targets["dataviz_node"] = "dataviz_node"
+            if mapviz:
+                workflow.add_node("mapviz_node", _make_mapviz_node(mapviz))
+                after_humanoutput_targets["mapviz_node"] = "mapviz_node"
+
+            workflow.add_conditional_edges(
+                "humanoutput_node",
+                _after_humanoutput,
+                after_humanoutput_targets,
+            )
+
+            if dataviz:
+                after_dataviz_targets: dict[str, str] = {END: END}
+                if mapviz:
+                    after_dataviz_targets["mapviz_node"] = "mapviz_node"
+                workflow.add_conditional_edges(
+                    "dataviz_node",
+                    _after_dataviz,
+                    after_dataviz_targets,
+                )
+
+            if mapviz:
+                workflow.add_edge("mapviz_node", END)
+        else:
+            workflow.add_edge("merge_node", END)
+    else:
+        workflow.add_edge("merge_node", END)
 
     orchestrator_graph = workflow.compile()
 
@@ -380,8 +549,9 @@ def build_graph(agents: "dict[str, BaseAgent]"):
         _write_mermaid(subgraph, f"{agent_name}_graph.mmd")
 
     logger.info(
-        "Orchestrator graph compiled | agents: %s",
+        "Orchestrator graph compiled | agents: %s | output_agents: %s",
         ", ".join(agents.keys()),
+        ", ".join((output_agents or {}).keys()),
     )
 
     return orchestrator_graph

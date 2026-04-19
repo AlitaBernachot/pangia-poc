@@ -28,6 +28,7 @@ import csv
 import io
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
@@ -230,3 +231,116 @@ def _parse_geojson(obj: dict, *, max_rows: int | None = None) -> ParsedFile:
         total_rows=total,
         columns=sorted(columns),
     )
+
+
+# ─── Coordinate column detection & CSV → GeoJSON conversion ──────────────────
+
+# Candidate column name patterns for latitude / longitude
+_LAT_NAMES = {
+    "lat", "latitude", "y", "geo_lat", "lat_wgs84", "coordonnees_geo_lat",
+    "coord_lat", "latitude_wgs84", "ycoord", "y_coord", "latitude_dd",
+    "lat_dd", "wgs84_lat",
+}
+_LON_NAMES = {
+    "lon", "long", "lng", "longitude", "x", "geo_lon", "lon_wgs84",
+    "coordonnees_geo_lon", "coord_lon", "longitude_wgs84", "xcoord", "x_coord",
+    "longitude_dd", "lon_dd", "wgs84_lon",
+}
+_LAT_SUBSTRINGS = ["latitude", "_lat", "lat_", "coord_y"]
+_LON_SUBSTRINGS = ["longitude", "_lon", "lon_", "_lng", "coord_x"]
+_COMBINED_COORD_NAMES = {
+    "geo_point_2d", "coordonnees_gps", "coordonnees_geo", "geolocalisation",
+    "geo_point", "coordinates", "coordonnees", "geoloc", "position", "localisation",
+}
+_COMBINED_SUBSTRINGS = ["geo_point", "coord", "geoloc", "gps"]
+_LATLON_CELL_RE = re.compile(r"(-?\d{1,3}\.\d+)[,\s]+(-?\d{1,3}\.\d+)")
+
+
+def _find_coord_columns(columns: list[str]) -> tuple[str | None, str | None]:
+    """Return ``(lat_col, lon_col)`` by matching column names case-insensitively.
+
+    Tries exact set matches first, then substring matching.
+    """
+    cols_lower = {c.lower().strip(): c for c in columns}
+    lat_col = next((cols_lower[k] for k in _LAT_NAMES if k in cols_lower), None)
+    lon_col = next((cols_lower[k] for k in _LON_NAMES if k in cols_lower), None)
+    if lat_col and lon_col:
+        return lat_col, lon_col
+    if not lat_col:
+        lat_col = next(
+            (orig for lower, orig in cols_lower.items() if any(s in lower for s in _LAT_SUBSTRINGS)),
+            None,
+        )
+    if not lon_col:
+        lon_col = next(
+            (orig for lower, orig in cols_lower.items()
+             if any(s in lower for s in _LON_SUBSTRINGS) and orig != lat_col),
+            None,
+        )
+    return lat_col, lon_col
+
+
+def _find_combined_coord_column(columns: list[str]) -> str | None:
+    """Find a single column that holds combined ``'lat,lon'`` values (e.g. geo_point_2d)."""
+    cols_lower = {c.lower().strip(): c for c in columns}
+    match = next((cols_lower[k] for k in _COMBINED_COORD_NAMES if k in cols_lower), None)
+    if match:
+        return match
+    return next(
+        (orig for lower, orig in cols_lower.items() if any(s in lower for s in _COMBINED_SUBSTRINGS)),
+        None,
+    )
+
+
+def rows_to_geojson(
+    rows: list[dict[str, Any]],
+    columns: list[str],
+) -> dict[str, Any] | None:
+    """Convert a list of row-dicts to a GeoJSON FeatureCollection.
+
+    Detection order:
+    1. Separate lat + lon columns (heuristic name matching).
+    2. Combined ``'lat,lon'`` column (e.g. ``geo_point_2d`` from French open data).
+
+    Returns ``None`` if no coordinate data can be extracted.
+    """
+    features: list[dict[str, Any]] = []
+    lat_col, lon_col = _find_coord_columns(columns)
+    if lat_col and lon_col:
+        for row in rows:
+            try:
+                lat = float(str(row.get(lat_col, "")).replace(",", "."))
+                lon = float(str(row.get(lon_col, "")).replace(",", "."))
+            except (ValueError, TypeError):
+                continue
+            if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                continue
+            props = {k: v for k, v in row.items() if k not in (lat_col, lon_col)}
+            features.append({
+                "type": "Feature",
+                "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                "properties": props,
+            })
+    else:
+        combined_col = _find_combined_coord_column(columns)
+        if combined_col:
+            for row in rows:
+                cell = str(row.get(combined_col, "")).strip()
+                m = _LATLON_CELL_RE.search(cell)
+                if not m:
+                    continue
+                try:
+                    lat, lon = float(m.group(1)), float(m.group(2))
+                except ValueError:
+                    continue
+                if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                    continue
+                props = {k: v for k, v in row.items() if k != combined_col}
+                features.append({
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                    "properties": props,
+                })
+    if not features:
+        return None
+    return {"type": "FeatureCollection", "features": features}

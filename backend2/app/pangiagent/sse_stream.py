@@ -26,6 +26,9 @@ SSE event types emitted:
     agent_start     – a sub-agent subgraph began
     agent_end       – a sub-agent subgraph completed (answer, confidence, …)
     final_answer    – merged answer from all agents
+    output_decision – humanoutput decision: {needs_map, needs_dataviz}
+    dataviz         – chart / KPI / table payload from dataviz_node
+    geojson         – GeoJSON FeatureCollection from mapviz_node
     done            – stream complete
     error           – unhandled exception
 """
@@ -173,6 +176,27 @@ async def run_graph_to_queue(
                     "answer": out.get("final_answer", ""),
                     "confidence": out.get("confidence", 0.0),
                 }))
+
+            # ── humanoutput_node end → output_decision ────────────────────────
+            elif kind == "on_chain_end" and node == "humanoutput_node":
+                out = _output(event)
+                decision = out.get("output_decision")
+                if decision:
+                    await queue.put(_sse({"type": "output_decision", "data": decision}))
+
+            # ── dataviz_node end → dataviz ────────────────────────────────────
+            elif kind == "on_chain_end" and node == "dataviz_node":
+                out = _output(event)
+                dv = out.get("dataviz")
+                if dv is not None:
+                    await queue.put(_sse({"type": "dataviz", "data": dv}))
+
+            # ── mapviz_node end → geojson ─────────────────────────────────────
+            elif kind == "on_chain_end" and node == "mapviz_node":
+                out = _output(event)
+                gj = out.get("geojson")
+                if gj is not None:
+                    await queue.put(_sse({"type": "geojson", "data": gj}))
 
     except Exception as exc:
         logger.exception("Unhandled error in run_graph_to_queue")

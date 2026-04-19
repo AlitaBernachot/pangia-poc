@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     rag_agent_max_iterations: int = 0
     calculator_agent_max_iterations: int = 0
     summary_agent_max_iterations: int = 0
+    humanoutput_agent_max_iterations: int = 0
+    dataviz_agent_max_iterations: int = 0
+    mapviz_agent_max_iterations: int = 0
 
 
 @lru_cache

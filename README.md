@@ -904,7 +904,10 @@ backend2/
             ├── rdf_agent.py            RDFAgent — SPARQL query generation for GraphDB/Ontotext
             ├── vector_chroma_agent.py  VectorChromaAgent — semantic search via ChromaDB embeddings
             ├── datagouv_mcp_agent.py   DataGouvMCPAgent — French open-data catalogue (data.gouv.fr)
-            └── geonetwork_mcp_agent.py GeoNetworkMCPAgent — GeoNetwork geospatial metadata catalogue
+            ├── geonetwork_mcp_agent.py GeoNetworkMCPAgent — GeoNetwork geospatial metadata catalogue
+            ├── humanoutput_agent.py    HumanOutputAgent — post-processing: decides needs_map / needs_dataviz
+            ├── dataviz_agent.py        DataVizAgent — post-processing: produces chart / KPI / table structures
+            └── mapviz_agent.py         MapVizAgent — post-processing: extracts GeoJSON from sub-results
 ```
 
 ### Orchestrator LangGraph topology
@@ -933,6 +936,15 @@ ambiguity_node       ← LLM scores ambiguity (0–1); sets hitl_* fields
                        ▼
                   merge_node   ← collects sub_results → final_answer
                        │
+                       ▼
+             humanoutput_node  ← decides needs_map / needs_dataviz
+                       │
+            ┌──────────┴──────────┐
+            │                     │
+       dataviz_node          mapviz_node   (conditional on output_decision)
+            │                     │
+            └──────────┬──────────┘
+                       ▼
                     __end__
 ```
 

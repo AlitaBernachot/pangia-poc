@@ -86,3 +86,8 @@ class OrchestratorState(TypedDict):
     hitl_request_id: str
     hitl_questions: list[str]
     hitl_status: str  # "" | "pending" | "resolved" | "timeout"
+
+    # ── Post-processing output (humanoutput / dataviz / mapviz nodes) ─────────
+    output_decision: dict[str, Any]   # {"needs_map": bool, "needs_dataviz": bool}
+    dataviz: dict[str, Any]           # chart / KPI / table payload for frontend
+    geojson: dict[str, Any]           # GeoJSON FeatureCollection for frontend
