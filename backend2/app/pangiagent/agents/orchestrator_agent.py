@@ -226,7 +226,13 @@ async def router_node(state: OrchestratorState) -> dict:
 
 
 async def merge_node(state: OrchestratorState) -> dict:
-    """Merge parallel sub-agent results into a single final answer."""
+    """Merge parallel sub-agent results into a single final answer.
+
+    Produces a raw ``final_answer`` (``[agent]: …`` concatenation) used as
+    internal context by ``synthesis_node``.  The synthesis agent then rewrites
+    it into a clean user-facing response.  When no synthesis agent is wired,
+    ``final_answer`` is surfaced directly.
+    """
     sub_results: dict[str, Any] = state.get("sub_results") or {}
     successful = [
         (name, r)
@@ -329,6 +335,7 @@ def _write_mermaid(graph, filename: str) -> None:
 def build_graph(
     agents: "dict[str, BaseAgent]",
     output_agents: "dict[str, BaseAgent] | None" = None,
+    synthesis_agent: "BaseAgent | None" = None,
 ):
     """Build and compile the orchestrator StateGraph.
 
@@ -340,17 +347,20 @@ def build_graph(
 
     When *output_agents* is provided (keys: ``"humanoutput_agent"``,
     ``"dataviz_agent"``, ``"mapviz_agent"``), three sequential post-processing
-    nodes are added **after** ``merge_node``:
+    nodes are added **after** ``merge_node``.
+
+    When *synthesis_agent* is provided, a ``synthesis_node`` is appended as the
+    **very last node** before END.  It synthesises all sub-agent results into a
+    single concise user-facing answer, replacing the raw ``[agent]: …`` text.
 
     .. code-block:: text
 
         merge_node
             → humanoutput_node
                 → dataviz_node  (if needs_dataviz)
-                    → mapviz_node  (if needs_map)  → END
-                    → END  (needs_map is False)
-                → mapviz_node  (if needs_map, needs_dataviz is False)  → END
-                → END  (neither)
+                    → mapviz_node?  → synthesis_node → END
+                → mapviz_node?  → synthesis_node → END
+                → synthesis_node → END
 
     The orchestrator Mermaid diagram is written to
     ``app/pangiagent/mermaid_graph/orchestrator_graph.mmd``.
@@ -362,6 +372,9 @@ def build_graph(
     output_agents:
         Optional registry of post-processing agents
         (``humanoutput_agent``, ``dataviz_agent``, ``mapviz_agent``).
+    synthesis_agent:
+        Optional agent that synthesises all results into the final user-facing
+        answer (``SynthesisAgent``).  When provided it becomes the last node.
 
     Returns
     -------
@@ -380,6 +393,13 @@ def build_graph(
     workflow.add_node("hitl_wait_node", hitl_wait_node)
     workflow.add_node("router_node", router_node)
     workflow.add_node("merge_node", merge_node)
+
+    # ── Synthesis node (final step, optional) ─────────────────────────────
+    _end_target = END
+    if synthesis_agent is not None:
+        workflow.add_node("synthesis_node", synthesis_agent.make_node())
+        workflow.add_edge("synthesis_node", END)
+        _end_target = "synthesis_node"
 
     # ── Sub-agent subgraphs ────────────────────────────────────────────────
     subgraphs: dict[str, Any] = {}
@@ -418,7 +438,7 @@ def build_graph(
             workflow.add_node("humanoutput_node", humanoutput.make_node())
             workflow.add_edge("merge_node", "humanoutput_node")
 
-            after_humanoutput_targets: dict[str, str] = {END: END}
+            after_humanoutput_targets: dict[str, str] = {END: _end_target}
             if dataviz:
                 workflow.add_node("dataviz_node", dataviz.make_node())
                 after_humanoutput_targets["dataviz_node"] = "dataviz_node"
@@ -433,7 +453,7 @@ def build_graph(
             )
 
             if dataviz:
-                after_dataviz_targets: dict[str, str] = {END: END}
+                after_dataviz_targets: dict[str, str] = {END: _end_target}
                 if mapviz:
                     after_dataviz_targets["mapviz_node"] = "mapviz_node"
                 workflow.add_conditional_edges(
@@ -443,11 +463,11 @@ def build_graph(
                 )
 
             if mapviz:
-                workflow.add_edge("mapviz_node", END)
+                workflow.add_edge("mapviz_node", _end_target)
         else:
-            workflow.add_edge("merge_node", END)
+            workflow.add_edge("merge_node", _end_target)
     else:
-        workflow.add_edge("merge_node", END)
+        workflow.add_edge("merge_node", _end_target)
 
     orchestrator_graph = workflow.compile()
 
@@ -457,9 +477,10 @@ def build_graph(
         _write_mermaid(subgraph, f"{agent_name}_graph.mmd")
 
     logger.info(
-        "Orchestrator graph compiled | agents: %s | output_agents: %s",
+        "Orchestrator graph compiled | agents: %s | output_agents: %s | synthesis: %s",
         ", ".join(agents.keys()),
         ", ".join((output_agents or {}).keys()),
+        synthesis_agent.name if synthesis_agent else "none",
     )
 
     return orchestrator_graph

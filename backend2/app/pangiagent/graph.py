@@ -26,6 +26,7 @@ from app.pangiagent.agents.postgis_agent import PostGISAgent
 from app.pangiagent.agents.rag_agent import RAGAgent
 from app.pangiagent.agents.rdf_agent import RDFAgent
 from app.pangiagent.agents.summary_agent import SummaryAgent
+from app.pangiagent.agents.synthesis_agent import SynthesisAgent
 from app.pangiagent.agents.vector_chroma_agent import VectorChromaAgent
 from app.pangiagent.guardrails import check_ambiguous_intent, check_output_length, check_toxic_input
 
@@ -81,8 +82,10 @@ OUTPUT_AGENTS = {
     "mapviz_agent": MapVizAgent(),
 }
 
+SYNTHESIS_AGENT = SynthesisAgent()
+
 # ── Compiled orchestrator graph ────────────────────────────────────────────────
 # Built at module import time; also writes Mermaid diagrams to
 # app/pangiagent/mermaid_graph/.
 
-ORCHESTRATOR_GRAPH = build_graph(AGENTS, output_agents=OUTPUT_AGENTS)
+ORCHESTRATOR_GRAPH = build_graph(AGENTS, output_agents=OUTPUT_AGENTS, synthesis_agent=SYNTHESIS_AGENT)

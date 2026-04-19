@@ -168,14 +168,30 @@ async def run_graph_to_queue(
                             "total": result.get("pending_dataset_choice_total"),
                         }))
 
-            # ── merge_node end → final_answer ─────────────────────────────────
+            # ── merge_node end → final_answer (fallback when no synthesis node) ──
+            # When a synthesis_node is wired, it will emit the real final_answer
+            # later.  We still emit here so single-agent / no-output-agents setups
+            # work without a synthesis step (synthesis_node will overwrite it).
             elif kind == "on_chain_end" and node == "merge_node":
                 out = _output(event)
-                await queue.put(_sse({
-                    "type": "final_answer",
-                    "answer": out.get("final_answer", ""),
-                    "confidence": out.get("confidence", 0.0),
-                }))
+                answer = out.get("final_answer", "")
+                if answer:
+                    await queue.put(_sse({
+                        "type": "final_answer",
+                        "answer": answer,
+                        "confidence": out.get("confidence", 0.0),
+                    }))
+
+            # ── synthesis_node end → final_answer (replaces merge_node answer) ─
+            elif kind == "on_chain_end" and node == "synthesis_node":
+                out = _output(event)
+                answer = out.get("final_answer", "")
+                if answer:
+                    await queue.put(_sse({
+                        "type": "final_answer",
+                        "answer": answer,
+                        "confidence": 0.9,
+                    }))
 
             # ── humanoutput_node end → output_decision ────────────────────────
             elif kind == "on_chain_end" and node == "humanoutput_node":

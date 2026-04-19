@@ -126,13 +126,11 @@ export function usePangiaChat() {
                 content: m.content + (event.content as string),
               }))
             } else if (type === 'final_answer') {
-              // V2 final answer — append to content
+              // Replace content — synthesis_node may emit a second final_answer
+              // that supersedes the raw merge_node answer.
               const answer = event.answer as string
               if (answer) {
-                updateAssistant((m) => ({
-                  ...m,
-                  content: m.content ? m.content + '\n\n' + answer : answer,
-                }))
+                updateAssistant((m) => ({ ...m, content: answer }))
               }
             } else if (type === 'agent_token') {
               const agent = event.agent as string

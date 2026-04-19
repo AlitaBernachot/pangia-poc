@@ -481,6 +481,25 @@ The DataViz agent can be **disabled without affecting any other agent** by setti
 
 ---
 
+### Synthesis Agent
+
+The **Synthesis Agent** (`synthesis_agent`) is the **final node** in the orchestrator graph.
+It runs after all sub-agents and post-processing nodes (humanoutput → dataviz → mapviz) have
+completed, and synthesises their raw outputs into a single concise, user-friendly Markdown
+answer.
+
+**Key behaviours:**
+- Never reproduces the raw `[agent_name]: …` concatenation in the user-facing response.
+- When a map or table/chart is displayed, refers to it briefly ("les données sont affichées dans
+  le tableau ci-dessus") instead of repeating values.
+- Skips synthesis when a dataset-choice HITL panel is pending, keeping the UI clean.
+- Falls back to the raw merged answer if the LLM call fails.
+
+**File:** `backend2/app/pangiagent/agents/synthesis_agent.py`  
+**Prompt:** `backend2/config/prompts/synthesis_agent.yaml`
+
+---
+
 ## Quick Start
 
 ### 1. Configure environment
