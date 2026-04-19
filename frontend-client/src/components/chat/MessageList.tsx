@@ -21,7 +21,7 @@ interface Props {
   hitlRequest?: HITLRequestEvent | null
   onHitlDismiss?: () => void
   onHitlSubmit?: (question: string) => void
-  onSubmitChoice?: (messageId: string, chosenId: string, chosenQuery: string) => void
+  onSubmitChoice?: (messageId: string, chosenId: string, chosenQuery: string, candidate?: import('../../types').DatasetCandidate) => void
 }
 
 function useSuggestions(): string[] {
@@ -88,8 +88,8 @@ export function MessageList({ messages, onSuggestion, onSendMessage, onPrefillPr
           <ChatMessage
             key={msg.id}
             message={msg}
-            onSubmitChoice={(chosenId, chosenQuery) =>
-              onSubmitChoice?.(msg.id, chosenId, chosenQuery)
+            onSubmitChoice={(chosenId, chosenQuery, candidate) =>
+              onSubmitChoice?.(msg.id, chosenId, chosenQuery, candidate)
             }
             onPrefillPrompt={onPrefillPrompt}
             isStreaming={isStreaming}

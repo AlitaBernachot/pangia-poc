@@ -356,6 +356,47 @@ class DataGouvMCPAgent(BaseAgent):
                             pass
 
                     messages.append(ToolMessage(content=tool_content, tool_call_id=tc_id))
+
+                    # ── Inline disambiguation after search_datasets ───────────
+                    # Check immediately after EACH search call so the choice
+                    # panel reaches the user before any further (slow) LLM
+                    # iterations.  If the user has already identified a dataset
+                    # (UUID or exact quoted title in the query) we skip.
+                    if tc_name == "search_datasets":
+                        _inline_candidates = extract_dataset_candidates(messages, search_call_ids)
+                        if len(_inline_candidates) > 1 and not user_identifies_dataset(inp.query, _inline_candidates):
+                            _inline_total = extract_search_total(messages, search_call_ids)
+                            _inline_items = [
+                                ChoiceItem(
+                                    id=c.get("id", ""),
+                                    title=c.get("title", ""),
+                                    description=c.get("description", ""),
+                                    url=c.get("url", ""),
+                                    organization=c.get("organization", ""),
+                                )
+                                for c in _inline_candidates
+                            ]
+                            _inline_result = await self.request_choice(
+                                session_id=inp.session_id,
+                                original_query=inp.query,
+                                items=_inline_items,
+                                total=_inline_total,
+                            )
+                            if not _inline_result.resolved:
+                                return AgentOutput(
+                                    agent_name=self.name,
+                                    answer="La sélection du dataset a expiré. Veuillez reformuler votre requête.",
+                                    confidence=0.0,
+                                    state={"choice_timeout": True},
+                                )
+                            # Re-run _run() with the chosen query so the LLM
+                            # fetches only the selected dataset.
+                            return await self._run(AgentInput(
+                                query=_inline_result.chosen_query,
+                                session_id=inp.session_id,
+                                context=inp.context,
+                            ))
+
         except Exception as exc:
             logger.exception("DataGouvMCPAgent: ReAct loop error")
             return AgentOutput(agent_name=self.name, answer="", confidence=0.0, error=str(exc))
@@ -438,40 +479,6 @@ class DataGouvMCPAgent(BaseAgent):
 
         # ── Build AgentOutput.state extras ────────────────────────────────────
         extra_state: dict = {}
-
-        # Dataset disambiguation — delegate to BaseAgent.request_choice()
-        candidates = extract_dataset_candidates(messages, search_call_ids)
-        if len(candidates) > 1 and not user_identifies_dataset(inp.query, candidates):
-            search_total = extract_search_total(messages, search_call_ids)
-            choice_items = [
-                ChoiceItem(
-                    id=c.get("id", ""),
-                    title=c.get("title", ""),
-                    description=c.get("description", ""),
-                    url=c.get("url", ""),
-                    organization=c.get("organization", ""),
-                )
-                for c in candidates
-            ]
-            choice_result = await self.request_choice(
-                session_id=inp.session_id,
-                original_query=inp.query,
-                items=choice_items,
-                total=search_total,
-            )
-            if not choice_result.resolved:
-                return AgentOutput(
-                    agent_name=self.name,
-                    answer="La sélection du dataset a expiré. Veuillez reformuler votre requête.",
-                    confidence=0.0,
-                    state={"choice_timeout": True},
-                )
-            # Re-run with the user-chosen query so the agent fetches the right dataset
-            return await self._run(AgentInput(
-                query=choice_result.chosen_query,
-                session_id=inp.session_id,
-                context=inp.context,
-            ))
 
         # GeoJSON layer
         if geojson_data is not None:

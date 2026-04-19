@@ -3,14 +3,46 @@
 // SPDX-License-Identifier: MIT
 
 import ReactMarkdown from 'react-markdown'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, CheckCircle2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { type Message, AGENT_COLORS } from '../../types'
+import { type Message, type DatasetCandidate, AGENT_COLORS } from '../../types'
 import { AgentIcon } from '../AgentIcon'
 import { AgentActivityPanel } from './AgentActivityPanel'
 import { MapViewer } from '../MapViewer'
 import { DataVizViewer } from '../DataViz/DataVizViewer'
 import { DatasetChoicePanel } from './DatasetChoicePanel'
+
+function ChosenDatasetBadge({ candidate }: { candidate: DatasetCandidate }) {
+  const { t } = useTranslation()
+  return (
+    <div className="flex items-start gap-3 px-4 py-3 rounded-xl border border-green-500/20 bg-green-500/5">
+      <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-green-400" />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-green-400/80 uppercase tracking-wide mb-1">
+          {t('datasetChoice.chosen')}
+        </p>
+        <p className="text-sm font-semibold text-white leading-snug">{candidate.title}</p>
+        <div className="flex flex-wrap items-center gap-x-2 mt-0.5">
+          {candidate.organization && (
+            <span className="text-xs text-white/40">{candidate.organization}</span>
+          )}
+          {candidate.url && (
+            <a
+              href={candidate.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-0.5 text-xs text-blue-400/70 hover:text-blue-400 transition-colors"
+            >
+              <ExternalLink size={10} className="shrink-0" />
+              data.gouv.fr
+            </a>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 const markdownComponents = {
   a: ({ href, children }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
@@ -28,7 +60,7 @@ const markdownComponents = {
 
 interface Props {
   message: Message
-  onSubmitChoice?: (chosenId: string, chosenQuery: string) => void
+  onSubmitChoice?: (chosenId: string, chosenQuery: string, candidate: import('../../types').DatasetCandidate) => void
   onPrefillPrompt?: (text: string) => void
   isStreaming?: boolean
   awaitingClarification?: boolean
@@ -93,6 +125,21 @@ export function ChatMessage({ message, onSubmitChoice, onPrefillPrompt, isStream
           </div>
         )}
 
+        {/* Chosen dataset badge — shown right after the activity panel, before results */}
+        {message.chosenDataset && !message.choiceRequest && (
+          <ChosenDatasetBadge candidate={message.chosenDataset} />
+        )}
+
+        {/* Dataset choice — agent-level disambiguation */}
+        {message.choiceRequest && message.choiceRequest.items.length > 0 && (
+          <DatasetChoicePanel
+            candidates={message.choiceRequest.items}
+            total={message.choiceRequest.total}
+            onSelect={(candidate) => onSubmitChoice?.(candidate.id, `Je veux travailler avec le dataset : "${candidate.title}"${candidate.id ? ` (ID: ${candidate.id})` : ''}`, candidate)}
+            onPrefillPrompt={onPrefillPrompt}
+          />
+        )}
+
         {/* Map — GeoJSON and/or OGC API Features layers */}
         {(message.geojson || message.ogcLayers?.length) && (
           <MapViewer geojson={message.geojson} ogcLayers={message.ogcLayers} />
@@ -100,16 +147,6 @@ export function ChatMessage({ message, onSubmitChoice, onPrefillPrompt, isStream
 
         {/* DataViz */}
         {message.dataviz && <DataVizViewer dataviz={message.dataviz} />}
-
-        {/* Dataset choice — agent-level disambiguation */}
-        {message.choiceRequest && message.choiceRequest.items.length > 0 && (
-          <DatasetChoicePanel
-            candidates={message.choiceRequest.items}
-            total={message.choiceRequest.total}
-            onSelect={(candidate) => onSubmitChoice?.(candidate.id, `Je veux travailler avec le dataset : "${candidate.title}"${candidate.id ? ` (ID: ${candidate.id})` : ''}`)}
-            onPrefillPrompt={onPrefillPrompt}
-          />
-        )}
 
         {/* Final answer / thinking indicator */}
         {(message.content || message.streaming) && (

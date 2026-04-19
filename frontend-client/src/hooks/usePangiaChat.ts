@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { useCallback, useRef, useState } from 'react'
-import type { AgentActivity, AgentInfo, ChoiceRequestEvent, DataVizPayload, HITLRequestEvent, Message, OgcLayer, ToolActivity } from '../types'
+import type { AgentActivity, AgentInfo, ChoiceRequestEvent, DatasetCandidate, DataVizPayload, HITLRequestEvent, Message, OgcLayer, ToolActivity } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -15,6 +15,10 @@ export function usePangiaChat() {
   const [selectedSources, setSelectedSources] = useState<string[]>([])
   const [hitlRequest, setHitlRequest] = useState<HITLRequestEvent | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // Always-current ref used by callbacks that need synchronous access to the
+  // latest messages without capturing a stale closure value.
+  const messagesRef = useRef<Message[]>(messages)
+  messagesRef.current = messages
 
   // Empty dependency array: fetchAgents only calls the backend and sets local state;
   // it doesn't capture any reactive values that would change over time.
@@ -132,6 +136,19 @@ export function usePangiaChat() {
               if (answer) {
                 updateAssistant((m) => ({ ...m, content: answer }))
               }
+            } else if (type === 'agent_start') {
+              const agent = event.agent as string
+              updateAssistant((m) => {
+                const activities = [...(m.agentActivity ?? [])]
+                const idx = activities.findIndex((a) => a.agent === agent)
+                if (idx < 0) {
+                  activities.push({ agent, content: '', streaming: true, tools: [] })
+                } else {
+                  // resumed after a choice — mark streaming again
+                  activities[idx] = { ...activities[idx], streaming: true }
+                }
+                return { ...m, agentActivity: activities }
+              })
             } else if (type === 'agent_token') {
               const agent = event.agent as string
               const token = event.content as string
@@ -310,16 +327,28 @@ export function usePangiaChat() {
   )
 
   const submitChoiceResponse = useCallback(
-    async (messageId: string, chosenId: string, chosenQuery: string) => {
-      let requestId = ''
-      setMessages((prev) => {
-        const msg = prev.find((m) => m.id === messageId)
-        if (msg?.choiceRequest) requestId = msg.choiceRequest.request_id
-        return prev.map((m) =>
-          m.id === messageId ? { ...m, choiceRequest: null } : m,
-        )
-      })
+    async (messageId: string, chosenId: string, chosenQuery: string, candidate?: DatasetCandidate) => {
+      // Read requestId synchronously from the ref — React 18 state updaters
+      // run asynchronously, so reading via setMessages(fn) side-effect would
+      // leave requestId as '' when checked immediately after.
+      const choiceMsg = messagesRef.current.find((m) => m.id === messageId)
+      const requestId = choiceMsg?.choiceRequest?.request_id
+      const agentName = choiceMsg?.choiceRequest?.agent
       if (!requestId) return
+      // Clear the choice panel, store the chosen dataset for display, and
+      // mark the agent as streaming again so the activity panel shows
+      // "Thinking…" while the resumed run executes.
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId) return m
+          const agentActivity = agentName
+            ? (m.agentActivity ?? []).map((a) =>
+                a.agent === agentName ? { ...a, streaming: true, tools: [] } : a,
+              )
+            : m.agentActivity
+          return { ...m, choiceRequest: null, chosenDataset: candidate ?? null, streaming: true, agentActivity }
+        }),
+      )
       try {
         await fetch(`${API_BASE}/api/choice/respond`, {
           method: 'POST',

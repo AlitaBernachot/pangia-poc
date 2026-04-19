@@ -94,6 +94,7 @@ export interface Message {
   geojson?: Record<string, unknown> | null
   dataviz?: DataVizPayload | null
   choiceRequest?: ChoiceRequestEvent | null
+  chosenDataset?: DatasetCandidate | null
   ogcLayers?: OgcLayer[] | null
   attachments?: Attachment[]
   hitlRequest?: HITLRequestEvent | null

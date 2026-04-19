@@ -49,7 +49,8 @@
     "openSource": "Open source page",
     "clickTitle": "Click to pre-fill the prompt",
     "prefillPrefix": "Use this data",
-    "selectHint": "To continue, select the dataset you want to work with by clicking \"Select\", or click its title to refine your question."
+    "selectHint": "To continue, select the dataset you want to work with by clicking \"Select\", or click its title to refine your question.",
+    "chosen": "Selected dataset"
   },
   "agentActivity": {
     "thinking": "Thinking…",
