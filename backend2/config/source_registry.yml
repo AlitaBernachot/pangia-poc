@@ -12,6 +12,7 @@
 # ------
 # id            : unique identifier — matches the agent key in AGENTS registry
 # connector     : agent key used in agents_to_call (identical to id)
+# active        : true = available for routing; false = disabled (skipped at runtime)
 # description   : rich description for embedding (makes the entry semantically searchable)
 # topics        : keyword list for deterministic matching
 # entity_types  : entity / data-type list for deterministic matching
@@ -23,6 +24,7 @@ sources:
 
   - id: neo4j_agent
     connector: neo4j_agent
+    active: false
     label: Neo4j
     description: >
       Neo4j knowledge graph agent. Answers questions about geographic entities,
@@ -65,6 +67,7 @@ sources:
 
   - id: postgis_agent
     connector: postgis_agent
+    active: false
     label: PostGIS
     description: >
       PostGIS spatial SQL agent. Answers geographic questions using PostgreSQL
@@ -113,6 +116,7 @@ sources:
 
   - id: rdf_agent
     connector: rdf_agent
+    active: false
     label: RDF / SPARQL
     description: >
       RDF / SPARQL agent for Ontotext GraphDB. Answers Semantic Web questions
@@ -157,6 +161,7 @@ sources:
 
   - id: vector_chroma_agent
     connector: vector_chroma_agent
+    active: false
     label: Vector (Chroma)
     description: >
       ChromaDB vector search agent. Retrieves and synthesises answers using
@@ -193,6 +198,7 @@ sources:
 
   - id: datagouv_mcp_agent
     connector: datagouv_mcp_agent
+    active: true
     label: Data.gouv.fr
     description: >
       data.gouv.fr MCP agent. Discovers and describes French open government
@@ -235,6 +241,7 @@ sources:
 
   - id: geonetwork_mcp_agent
     connector: geonetwork_mcp_agent
+    active: false
     label: GeoNetwork
     description: >
       GeoNetwork MCP agent. Searches and describes geospatial metadata catalogues
@@ -278,6 +285,7 @@ sources:
 
   - id: rag_agent
     connector: rag_agent
+    active: false
     label: RAG
     description: >
       Retrieval-Augmented Generation agent. Answers general knowledge questions
@@ -314,6 +322,7 @@ sources:
 
   - id: calculator_agent
     connector: calculator_agent
+    active: false
     label: Calculator
     description: >
       Calculator agent. Evaluates arithmetic and mathematical expressions
@@ -348,6 +357,7 @@ sources:
 
   - id: summary_agent
     connector: summary_agent
+    active: false
     label: Summary
     description: >
       Summarisation agent. Rewrites queries with an explicit summarisation

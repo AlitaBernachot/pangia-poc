@@ -108,11 +108,10 @@ export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStrea
             total={message.datasetChoiceTotal}
             onSelect={(candidate) => onSelectDataset?.(candidate)}
             onPrefillPrompt={onPrefillPrompt}
-            disabled={isStreaming}
           />
         )}
 
-        {/* Final answer — always last */}
+        {/* Final answer / thinking indicator */}
         {(message.content || message.streaming) && (
           <div
             className={`px-4 py-3 text-sm text-white leading-relaxed prose-chat`}
@@ -123,7 +122,7 @@ export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStrea
                 {message.streaming && <span className="cursor-blink" />}
               </>
             ) : (
-              message.streaming && (
+              message.streaming && !message.geojson && !message.dataviz && !message.datasetChoice?.length && (
                 <span className="thinking-indicator">
                   {awaitingClarification ? t('hitl.awaitingClarification') : t('chatMessage.thinking')}
                 </span>

@@ -437,6 +437,13 @@ class DataVizAgent(BaseAgent):
                         continue
 
         if dataviz_data:
+            # Normalise table keys: LLM sometimes uses tool param names
+            # (columns_json / rows_json) instead of the output keys (columns / rows).
+            for tbl in dataviz_data.get("tables") or []:
+                if "columns_json" in tbl and "columns" not in tbl:
+                    tbl["columns"] = tbl.pop("columns_json")
+                if "rows_json" in tbl and "rows" not in tbl:
+                    tbl["rows"] = tbl.pop("rows_json")
             parts = []
             if dataviz_data.get("charts"):
                 parts.append(f"{len(dataviz_data['charts'])} chart(s)")

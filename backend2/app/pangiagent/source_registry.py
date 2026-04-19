@@ -52,6 +52,7 @@ class SourceEntry(BaseModel):
 
     id: str
     connector: str
+    active: bool = True
     label: str
     description: str
     topics: list[str] = Field(default_factory=list)
@@ -158,12 +159,13 @@ async def bootstrap_registry_embeddings() -> None:
     try:
         client = await _get_chroma_client()
         collection = await client.get_or_create_collection(name=_COLLECTION_NAME)
-        ids = [entry.id for entry in SOURCE_REGISTRY]
-        documents = [_build_document(entry) for entry in SOURCE_REGISTRY]
+        active_entries = [e for e in SOURCE_REGISTRY if e.active]
+        ids = [entry.id for entry in active_entries]
+        documents = [_build_document(entry) for entry in active_entries]
         await collection.upsert(ids=ids, documents=documents)
         logger.info(
             "source_registry: bootstrapped %d entries into ChromaDB collection '%s'",
-            len(SOURCE_REGISTRY),
+            len(active_entries),
             _COLLECTION_NAME,
         )
     except Exception:
@@ -205,8 +207,8 @@ async def semantic_search_sources(query: str) -> dict[str, float]:
 
 
 def get_registry() -> list[SourceEntry]:
-    """Return the full source registry."""
-    return SOURCE_REGISTRY
+    """Return only the active source registry entries."""
+    return [e for e in SOURCE_REGISTRY if e.active]
 
 
 def get_suggestions() -> list[str]:

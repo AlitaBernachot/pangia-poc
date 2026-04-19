@@ -26,7 +26,7 @@ from app.pangiagent.agents.base_agent import BaseAgent
 - Pre- and post-guardrail hook execution (via `run()`)
 - Timing (`duration_ms` written to `output.state`)
 - Uniform error handling and logging
-- System prompt loading from `config/agents_prompts.yaml` (via `get_prompt(default)`)
+- System prompt loading from `config/prompts/<agent_name>.yaml` (via `get_prompt(default)`)
 
 **Exception:** Utility agents that are called directly inside a LangGraph node rather than fanned out as independent sub-agents (e.g. `AmbiguityAgent`) do **not** need to inherit from `BaseAgent`. Document this clearly in the module docstring.
 
@@ -65,7 +65,7 @@ class SearchAgent(BaseAgent):
 
 Pass `**kwargs` through to `super().__init__()` so that `pre_guardrails` and `post_guardrails` can be injected by the caller.
 
-Always define `_DEFAULT_PROMPT` as a class attribute so the hardcoded fallback is visible in source.  `get_prompt()` looks up the agent's `name` in `config/agents_prompts.yaml` and returns `_DEFAULT_PROMPT` when the key is absent.
+Always define `_DEFAULT_PROMPT` as a class attribute so the hardcoded fallback is visible in source.  `get_prompt()` loads `config/prompts/<agent_name>.yaml` (key `prompt:`) and returns `_DEFAULT_PROMPT` when the file is absent. Create a new `config/prompts/<agent_name>.yaml` file whenever you add a new agent.
 
 ## Shared functionality belongs in BaseAgent
 

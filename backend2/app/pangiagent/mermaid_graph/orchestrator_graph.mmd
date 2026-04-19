@@ -10,16 +10,25 @@ graph TD;
 	hitl_wait_node(hitl_wait_node)
 	router_node(router_node)
 	merge_node(merge_node)
+	humanoutput_node(humanoutput_node)
+	dataviz_node(dataviz_node)
+	mapviz_node(mapviz_node)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> memory_node;
 	ambiguity_node -.-> hitl_wait_node;
 	ambiguity_node -.-> router_node;
 	calculator_agent\3aexecute_node --> merge_node;
 	datagouv_mcp_agent\3aexecute_node --> merge_node;
+	dataviz_node -.-> __end__;
+	dataviz_node -.-> mapviz_node;
 	geonetwork_mcp_agent\3aexecute_node --> merge_node;
 	hitl_wait_node -.-> __end__;
 	hitl_wait_node -.-> router_node;
+	humanoutput_node -.-> __end__;
+	humanoutput_node -.-> dataviz_node;
+	humanoutput_node -.-> mapviz_node;
 	memory_node --> ambiguity_node;
+	merge_node --> humanoutput_node;
 	neo4j_agent\3aexecute_node --> merge_node;
 	postgis_agent\3aexecute_node --> merge_node;
 	rag_agent\3aexecute_node --> merge_node;
@@ -36,7 +45,7 @@ graph TD;
 	router_node -.-> vector_chroma_agent\3aexecute_node;
 	summary_agent\3aexecute_node --> merge_node;
 	vector_chroma_agent\3aexecute_node --> merge_node;
-	merge_node --> __end__;
+	mapviz_node --> __end__;
 	subgraph summary_agent
 	summary_agent\3aenrich_node(enrich_node)
 	summary_agent\3aexecute_node(execute_node)

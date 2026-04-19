@@ -22,36 +22,29 @@ logger = logging.getLogger(__name__)
 
 # Resolve path: backend2/app/pangiagent/agents/base_agent.py
 #   → parent.parent.parent.parent = backend2/
-_PROMPTS_FILE = Path(__file__).parent.parent.parent.parent / "config" / "agents_prompts.yaml"
+_PROMPTS_DIR = Path(__file__).parent.parent.parent.parent / "config" / "prompts"
 
 
-@lru_cache(maxsize=1)
-def load_prompts() -> dict[str, str]:
-    """Load and cache all agent system prompts from ``config/agents_prompts.yaml``.
+@lru_cache(maxsize=None)
+def _load_prompt_file(agent_name: str) -> str | None:
+    """Load the prompt for *agent_name* from ``config/prompts/<agent_name>.yaml``.
 
-    Returns an empty dict (and logs a warning) if the file is missing or
-    malformed so that agents can fall back to their hardcoded defaults
-    without crashing.
-
-    Call ``load_prompts.cache_clear()`` in tests that need to inject a
-    different prompt mapping.
+    Returns the prompt string, or ``None`` if the file does not exist or
+    the ``prompt`` key is missing.
     """
-    if not _PROMPTS_FILE.exists():
-        logger.warning(
-            "BaseAgent: %s not found — all agents will use default prompts",
-            _PROMPTS_FILE,
-        )
-        return {}
+    path = _PROMPTS_DIR / f"{agent_name}.yaml"
+    if not path.exists():
+        return None
     try:
-        with _PROMPTS_FILE.open(encoding="utf-8") as fh:
+        with path.open(encoding="utf-8") as fh:
             data = yaml.safe_load(fh) or {}
-        if not isinstance(data, dict):
-            raise TypeError(f"Expected a YAML mapping, got {type(data)}")
-        logger.debug("BaseAgent: loaded %d prompt(s) from %s", len(data), _PROMPTS_FILE)
-        return {k: str(v).strip() for k, v in data.items()}
+        value = data.get("prompt")
+        if value:
+            logger.debug("BaseAgent: loaded prompt for '%s' from %s", agent_name, path)
+            return str(value).strip()
     except Exception:
-        logger.exception("BaseAgent: failed to load %s — using defaults", _PROMPTS_FILE)
-        return {}
+        logger.exception("BaseAgent: failed to load %s", path)
+    return None
 
 
 class BaseAgent(ABC):
@@ -67,10 +60,11 @@ class BaseAgent(ABC):
         self.max_iterations: int = get_agent_max_iterations(name)
 
     def get_prompt(self, default: str) -> str:
-        """Return the system prompt for this agent from ``config/agents_prompts.yaml``.
+        """Return the system prompt for this agent.
 
-        Looks up the agent's ``name`` in the YAML file loaded by
-        ``load_prompts()``.  Falls back to *default* when the key is absent.
+        Resolution order:
+        1. ``config/prompts/<agent_name>.yaml`` (``prompt`` key).
+        2. *default* — hardcoded ``_DEFAULT_PROMPT`` on the subclass.
 
         Parameters
         ----------
@@ -79,7 +73,7 @@ class BaseAgent(ABC):
             on the subclass so the intended behaviour is always visible in
             source.
         """
-        return load_prompts().get(self.name, default)
+        return _load_prompt_file(self.name) or default
 
     @abstractmethod
     def get_capabilities(self) -> str:
@@ -169,7 +163,17 @@ class BaseAgent(ABC):
             # layer can emit the appropriate frontend events.
             for key in ("dataviz", "geojson", "pending_dataset_choice", "pending_dataset_choice_total"):
                 if key in output.state:
-                    entry[key] = output.state[key]
+                    value = output.state[key]
+                    # Normalise dataviz table keys: LLM sometimes uses tool
+                    # param names (columns_json / rows_json) instead of the
+                    # expected output keys (columns / rows).
+                    if key == "dataviz" and isinstance(value, dict):
+                        for tbl in value.get("tables") or []:
+                            if "columns_json" in tbl and "columns" not in tbl:
+                                tbl["columns"] = tbl.pop("columns_json")
+                            if "rows_json" in tbl and "rows" not in tbl:
+                                tbl["rows"] = tbl.pop("rows_json")
+                    entry[key] = value
             return {
                 "sub_results": {
                     agent_name: entry

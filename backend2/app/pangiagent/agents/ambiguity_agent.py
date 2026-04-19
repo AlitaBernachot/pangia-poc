@@ -17,7 +17,7 @@ import logging
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.pangiagent.agents.base_agent import load_prompts
+from app.pangiagent.agents.base_agent import _load_prompt_file
 from app.pangiagent.model_config import build_llm, get_agent_model_config
 from app.config import get_settings
 
@@ -41,7 +41,7 @@ class AmbiguityAgent:
         settings = get_settings()
         self._llm = build_llm(get_agent_model_config("ambiguity_agent"))
         self._threshold = settings.hitl_ambiguity_threshold
-        self._system_prompt = load_prompts().get("ambiguity_agent", self._DEFAULT_PROMPT)
+        self._system_prompt = _load_prompt_file("ambiguity_agent") or self._DEFAULT_PROMPT
 
     async def detect(self, query: str) -> tuple[float, list[str]]:
         """Score *query* for ambiguity.
