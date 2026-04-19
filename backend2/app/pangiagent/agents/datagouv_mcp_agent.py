@@ -116,10 +116,13 @@ Veuillez me préciser le numéro ou le titre exact du dataset souhaité."
 - **Always state explicitly** it is a preview.
 
 #### Strategy B — Full retrieval (user asks to "display", "show", "give me all the data")
-- Call `get_resource_info` on the resource to obtain the direct download URL (`url` field).
-- Then call `fetch_resource_file` with that URL to download and parse the complete file.
+- Use `get_resource_info` on **each resource** of the dataset to inspect available formats.
+- For each resource whose URL ends in `.csv`, `.json`, or `.geojson`, call
+  `fetch_resource_file` with the confirmed URL.
 - **If the dataset exposes BOTH a tabular file (CSV/JSON) AND a GeoJSON file**, call
   `fetch_resource_file` **twice** — once for the tabular file, once for the GeoJSON.
+  This is important: **always fetch GeoJSON resources when available** — they will be
+  rendered as an interactive map in the UI.
 - **Do NOT call `query_resource_data` at all** — the full file supersedes any preview.
 - **Do NOT list any rows or examples** in your text response.
 - **You MUST end with a short non-empty text message** containing at minimum: dataset
@@ -259,6 +262,8 @@ class DataGouvMCPAgent(BaseAgent):
         search_call_ids: set[str] = set()
         # URLs confirmed to come from get_resource_info tool responses
         _confirmed_urls: set[str] = set()
+        # URLs already processed by fetch_resource_file during the loop
+        _fetched_urls: set[str] = set()
 
         try:
             for _ in range(self.max_iterations):
@@ -306,8 +311,10 @@ class DataGouvMCPAgent(BaseAgent):
 
                     # ── Extract confirmed URLs from get_resource_info responses ──
                     # Any URL appearing in a real tool response becomes trusted.
+                    # Exclude backslash so JSON-encoded escape sequences (e.g. \n)
+                    # don't get appended to the URL.
                     if tc_name == "get_resource_info":
-                        for _url in re.findall(r'https?://[^\s\'"<>]+', tool_content):
+                        for _url in re.findall(r'https?://[^\s\'"<>\\]+', tool_content):
                             _confirmed_urls.add(_url.rstrip(".,)"))
 
                     # ── Guard: fetch_resource_file must use a confirmed URL ────
@@ -330,6 +337,9 @@ class DataGouvMCPAgent(BaseAgent):
                             continue
 
                     if tc_name == "fetch_resource_file":
+                        req_url_fetched: str = (tc.get("args") or {}).get("url", "")
+                        if req_url_fetched:
+                            _fetched_urls.add(req_url_fetched)
                         try:
                             parsed_tool = json.loads(tool_content)
                             if isinstance(parsed_tool, dict) and "rows" in parsed_tool:
@@ -345,6 +355,35 @@ class DataGouvMCPAgent(BaseAgent):
         except Exception as exc:
             logger.exception("DataGouvMCPAgent: ReAct loop error")
             return AgentOutput(agent_name=self.name, answer="", confidence=0.0, error=str(exc))
+
+        # ── Auto-fetch GeoJSON URLs not fetched by the LLM ──────────────────────
+        # Scan all tool responses for URLs ending in .geojson that were confirmed
+        # (appeared in real tool responses) but not explicitly fetched by the LLM.
+        # NOTE: tool response text may contain JSON-encoded escape sequences (e.g.
+        # literal backslash-n for newlines).  Exclude backslash from the URL pattern
+        # so we stop before any such sequence and don't produce malformed URLs.
+        _geojson_auto_candidates: list[str] = []
+        for msg in messages:
+            if isinstance(msg, ToolMessage):
+                for _u in re.findall(r'https?://[^\s\'"<>\\]+', msg.content):
+                    _u = _u.rstrip(".,)")
+                    if (
+                        _u.lower().endswith(".geojson")
+                        or re.search(r'[?&]format=geojson', _u, re.IGNORECASE)
+                        or "/geojson" in _u.lower()
+                    ) and _u not in _fetched_urls:
+                        _geojson_auto_candidates.append(_u)
+
+        for _gj_url in dict.fromkeys(_geojson_auto_candidates):  # dedupe, preserve order
+            try:
+                _gj_result = await fetch_resource_file.ainvoke({"url": _gj_url})
+                _gj_parsed = json.loads(_gj_result)
+                if isinstance(_gj_parsed, dict) and _gj_parsed.get("format") == "geojson" and "rows" in _gj_parsed:
+                    fetch_payloads.append(_gj_parsed)
+                    logger.info("DataGouvMCPAgent: auto-fetched GeoJSON from %s", _gj_url)
+                    break
+            except Exception:
+                logger.warning("DataGouvMCPAgent: auto-fetch GeoJSON failed for %s", _gj_url)
 
         # ── Build result text ─────────────────────────────────────────────────
         result_text = ""

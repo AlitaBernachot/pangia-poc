@@ -83,6 +83,22 @@ class BaseAgent(ABC):
     async def _run(self, inp: AgentInput) -> AgentOutput:
         """Core agent logic."""
 
+    def make_node(self):
+        """Return a callable suitable for ``workflow.add_node()``.
+
+        The default implementation delegates to :meth:`as_subgraph`, which
+        wraps this agent in a single-node LangGraph subgraph and merges its
+        result into ``sub_results``.
+
+        Override in subclasses that need to interact directly with
+        ``OrchestratorState`` (e.g. post-processing agents such as
+        ``HumanOutputAgent``, ``DataVizAgent``, ``MapVizAgent``).
+        In those overrides, the returned callable must be an ``async`` function
+        accepting an ``OrchestratorState`` dict and returning a partial state
+        update dict.
+        """
+        return self.as_subgraph()
+
     async def run(self, inp: AgentInput) -> AgentOutput:
         # Pre-guardrails
         for guardrail in self.pre_guardrails:

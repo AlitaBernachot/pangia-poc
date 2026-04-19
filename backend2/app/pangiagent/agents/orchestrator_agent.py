@@ -299,15 +299,17 @@ def _after_humanoutput(state: OrchestratorState) -> str:
     decision = state.get("output_decision") or {}
     if decision.get("needs_dataviz"):
         return "dataviz_node"
-    if decision.get("needs_map"):
+    # Skip mapviz_node if a real GeoJSON was already provided by a sub-agent
+    # (e.g. datagouv_mcp_agent fetched a .geojson file directly).
+    if decision.get("needs_map") and not state.get("geojson"):
         return "mapviz_node"
     return END
 
 
 def _after_dataviz(state: OrchestratorState) -> str:
-    """Route after dataviz_node: run mapviz if needed, else end."""
+    """Route after dataviz_node: run mapviz if needed and no real GeoJSON exists, else end."""
     decision = state.get("output_decision") or {}
-    return "mapviz_node" if decision.get("needs_map") else END
+    return "mapviz_node" if decision.get("needs_map") and not state.get("geojson") else END
 
 
 # ── Mermaid helper ─────────────────────────────────────────────────────────────
@@ -320,100 +322,6 @@ def _write_mermaid(graph, filename: str) -> None:
         logger.info("Mermaid diagram written → %s", path)
     except Exception:
         logger.exception("Failed to write Mermaid diagram for %s", filename)
-
-
-# ── Post-processing node factory ───────────────────────────────────────────────
-
-def _make_humanoutput_node(agent: "BaseAgent"):
-    """Return an async node function that runs *agent* with the full sub_results context."""
-    async def humanoutput_node(state: OrchestratorState) -> dict:
-        dataviz: Any = None
-        geojson: Any = None
-        for result in (state.get("sub_results") or {}).values():
-            if isinstance(result, dict):
-                if result.get("dataviz") and dataviz is None:
-                    dataviz = result["dataviz"]
-                if result.get("geojson") and geojson is None:
-                    geojson = result["geojson"]
-
-        sub_text: dict[str, str] = {
-            k: (v.get("answer") or "") if isinstance(v, dict) else str(v)
-            for k, v in (state.get("sub_results") or {}).items()
-        }
-        inp = AgentInput(
-            query=state["query"],
-            session_id=state["session_id"],
-            context={"sub_results": sub_text, "dataviz": dataviz, "geojson": geojson},
-        )
-        try:
-            output = await agent.run(inp)
-            decision = output.state.get("output_decision", {"needs_map": True, "needs_dataviz": True})
-        except Exception:
-            logger.exception("humanoutput_node: agent raised")
-            decision = {"needs_map": True, "needs_dataviz": True}
-
-        update: dict = {"output_decision": decision}
-        if dataviz is not None:
-            update["dataviz"] = dataviz
-        if geojson is not None:
-            update["geojson"] = geojson
-        return update
-
-    return humanoutput_node
-
-
-def _make_dataviz_node(agent: "BaseAgent"):
-    """Return an async node function that runs *agent* for dataviz generation."""
-    async def dataviz_node(state: OrchestratorState) -> dict:
-        sub_text: dict[str, str] = {
-            k: (v.get("answer") or "") if isinstance(v, dict) else str(v)
-            for k, v in (state.get("sub_results") or {}).items()
-        }
-        inp = AgentInput(
-            query=state["query"],
-            session_id=state["session_id"],
-            context={
-                "sub_results": sub_text,
-                "dataviz": state.get("dataviz"),
-                "geojson": state.get("geojson"),
-            },
-        )
-        try:
-            output = await agent.run(inp)
-            dv = output.state.get("dataviz")
-        except Exception:
-            logger.exception("dataviz_node: agent raised")
-            dv = None
-        return {"dataviz": dv} if dv is not None else {}
-
-    return dataviz_node
-
-
-def _make_mapviz_node(agent: "BaseAgent"):
-    """Return an async node function that runs *agent* for GeoJSON generation."""
-    async def mapviz_node(state: OrchestratorState) -> dict:
-        sub_text: dict[str, str] = {
-            k: (v.get("answer") or "") if isinstance(v, dict) else str(v)
-            for k, v in (state.get("sub_results") or {}).items()
-        }
-        inp = AgentInput(
-            query=state["query"],
-            session_id=state["session_id"],
-            context={
-                "sub_results": sub_text,
-                "dataviz": state.get("dataviz"),
-                "geojson": state.get("geojson"),
-            },
-        )
-        try:
-            output = await agent.run(inp)
-            gj = output.state.get("geojson")
-        except Exception:
-            logger.exception("mapviz_node: agent raised")
-            gj = None
-        return {"geojson": gj} if gj is not None else {}
-
-    return mapviz_node
 
 
 # ── Graph construction ─────────────────────────────────────────────────────────
@@ -507,15 +415,15 @@ def build_graph(
         mapviz = output_agents.get("mapviz_agent")
 
         if humanoutput:
-            workflow.add_node("humanoutput_node", _make_humanoutput_node(humanoutput))
+            workflow.add_node("humanoutput_node", humanoutput.make_node())
             workflow.add_edge("merge_node", "humanoutput_node")
 
             after_humanoutput_targets: dict[str, str] = {END: END}
             if dataviz:
-                workflow.add_node("dataviz_node", _make_dataviz_node(dataviz))
+                workflow.add_node("dataviz_node", dataviz.make_node())
                 after_humanoutput_targets["dataviz_node"] = "dataviz_node"
             if mapviz:
-                workflow.add_node("mapviz_node", _make_mapviz_node(mapviz))
+                workflow.add_node("mapviz_node", mapviz.make_node())
                 after_humanoutput_targets["mapviz_node"] = "mapviz_node"
 
             workflow.add_conditional_edges(

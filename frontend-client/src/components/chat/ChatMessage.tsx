@@ -116,11 +116,11 @@ export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStrea
           <div
             className={`px-4 py-3 text-sm text-white leading-relaxed prose-chat`}
           >
-            {message.content ? (
-              <>
-                <ReactMarkdown components={markdownComponents}>{message.content}</ReactMarkdown>
-                {message.streaming && <span className="cursor-blink" />}
-              </>
+            {!message.streaming && message.content ? (
+              // Show text only after streaming is fully done so it always appears
+              // below map/dataviz (which are set by dataviz_node / mapviz_node
+              // post-processing that fires after merge_node's final_answer).
+              <ReactMarkdown components={markdownComponents}>{message.content}</ReactMarkdown>
             ) : (
               message.streaming && !message.geojson && !message.dataviz && !message.datasetChoice?.length && (
                 <span className="thinking-indicator">

@@ -25,7 +25,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any, Callable, Coroutine
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
@@ -33,6 +33,9 @@ from langchain_core.tools import tool
 from app.models import AgentInput, AgentOutput
 from app.pangiagent.agents.base_agent import BaseAgent
 from app.pangiagent.model_config import build_llm, get_agent_model_config
+
+if TYPE_CHECKING:
+    from app.pangiagent.state import OrchestratorState
 
 logger = logging.getLogger(__name__)
 
@@ -456,3 +459,31 @@ class DataVizAgent(BaseAgent):
         output = AgentOutput(agent_name=self.name, answer=summary, confidence=0.9)
         output.state["dataviz"] = dataviz_data
         return output
+
+    def make_node(self) -> Callable[[OrchestratorState], Coroutine[Any, Any, dict]]:
+        """Return an async node function that runs this agent for dataviz generation."""
+        agent = self
+
+        async def dataviz_node(state: OrchestratorState) -> dict:
+            sub_text: dict[str, str] = {
+                k: (v.get("answer") or "") if isinstance(v, dict) else str(v)
+                for k, v in (state.get("sub_results") or {}).items()
+            }
+            inp = AgentInput(
+                query=state["query"],
+                session_id=state["session_id"],
+                context={
+                    "sub_results": sub_text,
+                    "dataviz": state.get("dataviz"),
+                    "geojson": state.get("geojson"),
+                },
+            )
+            try:
+                output = await agent.run(inp)
+                dv = output.state.get("dataviz")
+            except Exception:
+                logger.exception("dataviz_node: agent raised")
+                dv = None
+            return {"dataviz": dv} if dv is not None else {}
+
+        return dataviz_node

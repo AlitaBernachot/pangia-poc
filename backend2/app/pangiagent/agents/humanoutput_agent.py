@@ -42,6 +42,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from typing import TYPE_CHECKING, Any, Callable, Coroutine
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -49,6 +50,9 @@ from app.models import AgentInput, AgentOutput
 from app.pangiagent.agents.base_agent import BaseAgent
 from app.pangiagent.model_config import build_llm, get_agent_model_config
 from libs.filereader import find_coord_columns
+
+if TYPE_CHECKING:
+    from app.pangiagent.state import OrchestratorState
 
 logger = logging.getLogger(__name__)
 
@@ -221,3 +225,42 @@ class HumanOutputAgent(BaseAgent):
             needs_dataviz = has_dataviz_signal
 
         return {"needs_map": needs_map, "needs_dataviz": needs_dataviz}
+
+    def make_node(self) -> Callable[[OrchestratorState], Coroutine[Any, Any, dict]]:
+        """Return an async node function that runs this agent with the full sub_results context."""
+        agent = self
+
+        async def humanoutput_node(state: OrchestratorState) -> dict:
+            dataviz: Any = None
+            geojson: Any = None
+            for result in (state.get("sub_results") or {}).values():
+                if isinstance(result, dict):
+                    if result.get("dataviz") and dataviz is None:
+                        dataviz = result["dataviz"]
+                    if result.get("geojson") and geojson is None:
+                        geojson = result["geojson"]
+
+            sub_text: dict[str, str] = {
+                k: (v.get("answer") or "") if isinstance(v, dict) else str(v)
+                for k, v in (state.get("sub_results") or {}).items()
+            }
+            inp = AgentInput(
+                query=state["query"],
+                session_id=state["session_id"],
+                context={"sub_results": sub_text, "dataviz": dataviz, "geojson": geojson},
+            )
+            try:
+                output = await agent.run(inp)
+                decision = output.state.get("output_decision", {"needs_map": True, "needs_dataviz": True})
+            except Exception:
+                logger.exception("humanoutput_node: agent raised")
+                decision = {"needs_map": True, "needs_dataviz": True}
+
+            update: dict = {"output_decision": decision}
+            if dataviz is not None:
+                update["dataviz"] = dataviz
+            if geojson is not None:
+                update["geojson"] = geojson
+            return update
+
+        return humanoutput_node
