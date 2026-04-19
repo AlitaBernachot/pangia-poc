@@ -87,9 +87,23 @@ def _load_registry() -> list[SourceEntry]:
         return []
 
 
+def _load_suggestions() -> list[str]:
+    """Read the top-level ``suggestions`` list from ``config/source_registry.yml``."""
+    if not _REGISTRY_FILE.exists():
+        return []
+    try:
+        with _REGISTRY_FILE.open(encoding="utf-8") as fh:
+            data = yaml.safe_load(fh) or {}
+        return [str(s) for s in data.get("suggestions", [])]
+    except Exception:
+        logger.exception("source_registry: failed to load suggestions from %s", _REGISTRY_FILE)
+        return []
+
+
 # ── Module-level registry (populated at import time) ──────────────────────────
 
 SOURCE_REGISTRY: list[SourceEntry] = _load_registry()
+_SUGGESTIONS: list[str] = _load_suggestions()
 
 
 # ── ChromaDB client helpers ───────────────────────────────────────────────────
@@ -193,6 +207,11 @@ async def semantic_search_sources(query: str) -> dict[str, float]:
 def get_registry() -> list[SourceEntry]:
     """Return the full source registry."""
     return SOURCE_REGISTRY
+
+
+def get_suggestions() -> list[str]:
+    """Return the suggestion chips defined in ``config/source_registry.yml``."""
+    return _SUGGESTIONS
 
 
 def get_entry(source_id: str) -> SourceEntry | None:

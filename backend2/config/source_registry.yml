@@ -380,3 +380,12 @@ sources:
       - "TL;DR: what is PostGIS used for?"
       - "Provide an overview of LangGraph's architecture."
       - "Briefly explain what a semantic web triplestore is."
+
+# ── Suggestion chips shown in the frontend UI ─────────────────────────────────
+suggestions:
+  - "Affiche les données des élections municipales de 2026"
+  - "Quels datasets open data existent sur la qualité de l'air en France ?"
+  - "Montre les stations de vélos en libre-service à Paris"
+  - "Y a-t-il des données géographiques sur les zones inondables ?"
+  - "Liste les parkings disponibles à Lyon"
+  - "Donne-moi les données sur les déchetteries en Île-de-France"

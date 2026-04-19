@@ -151,6 +151,9 @@ def get_agent_max_iterations(agent_key: str) -> int:
     settings = get_settings()
     per_agent: int = getattr(settings, f"{agent_key}_max_iterations", 0)
     return per_agent if per_agent > 0 else settings.agent_max_iterations
+
+
+def get_agent_model_config(agent_name: str) -> AgentModelConfig:
     """Build an :class:`AgentModelConfig` for *agent_name* from settings.
 
     Resolution order for each field:
