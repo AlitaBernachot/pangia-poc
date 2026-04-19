@@ -152,7 +152,19 @@ def _parse_csv(content: bytes, *, max_rows: int | None = None) -> ParsedFile:
     try:
         dialect = csv.Sniffer().sniff(sample, delimiters=",;\t|")
     except csv.Error:
-        dialect = csv.excel  # type: ignore[assignment]
+        dialect = None
+
+    # Sniffer can mis-detect the delimiter (e.g. pick comma on a semicolon file
+    # because the sample contains commas inside values).  Count occurrences of
+    # each candidate delimiter on the first non-empty line and pick the most
+    # frequent one when the sniffer result looks wrong.
+    first_line = text.split("\n", 1)[0] if "\n" in text else text[:1024]
+    counts = {d: first_line.count(d) for d in (";", "\t", "|", ",")}
+    best_delim = max(counts, key=lambda d: counts[d])
+    if dialect is None or counts.get(dialect.delimiter, 0) < counts.get(best_delim, 0):
+        class _Dialect(csv.excel):  # type: ignore[misc]
+            delimiter = best_delim
+        dialect = _Dialect
 
     reader = csv.DictReader(io.StringIO(text), dialect=dialect)
     columns = list(reader.fieldnames or [])

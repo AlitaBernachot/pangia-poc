@@ -253,9 +253,22 @@ class DataGouvMCPAgent(BaseAgent):
         llm = build_llm(get_agent_model_config(self.name)).bind_tools(all_tools)
         tool_map = {t.name: t for t in all_tools}
 
+        _chosen_dataset_id: str | None = inp.context.get("chosen_dataset_id")
+
+        if _chosen_dataset_id:
+            human_content = (
+                f"{inp.query}\n\n"
+                f"[CONTEXTE] L'utilisateur a déjà sélectionné le dataset ID : {_chosen_dataset_id}. "
+                "N'appelle PAS search_datasets. Appelle directement list_dataset_resources ou "
+                "get_resource_info pour récupérer les ressources de ce dataset, puis "
+                "fetch_resource_file pour télécharger le fichier CSV et/ou GeoJSON disponibles."
+            )
+        else:
+            human_content = inp.query
+
         messages: list = [
             SystemMessage(content=self._system_prompt),
-            HumanMessage(content=inp.query),
+            HumanMessage(content=human_content),
         ]
 
         fetch_payloads: list[dict] = []
@@ -280,8 +293,11 @@ class DataGouvMCPAgent(BaseAgent):
                     tc_name: str = tc["name"]
 
                     # ── Runtime guard: block fetch before search ──────────────
+                    # Skip the guard when a dataset was already chosen by the user
+                    # (recursive call after inline disambiguation) — searching again
+                    # would re-trigger the choice panel unnecessarily.
                     if tc_name in ("fetch_resource_file", "get_resource_info", "query_resource_data"):
-                        if not search_call_ids:
+                        if not search_call_ids and not _chosen_dataset_id:
                             # LLM tried to skip search — force it back on track
                             messages.append(ToolMessage(
                                 content=(
@@ -364,7 +380,11 @@ class DataGouvMCPAgent(BaseAgent):
                     # (UUID or exact quoted title in the query) we skip.
                     if tc_name == "search_datasets":
                         _inline_candidates = extract_dataset_candidates(messages, search_call_ids)
-                        if len(_inline_candidates) > 1 and not user_identifies_dataset(inp.query, _inline_candidates):
+                        if (
+                            len(_inline_candidates) > 1
+                            and not user_identifies_dataset(inp.query, _inline_candidates)
+                            and not _chosen_dataset_id
+                        ):
                             _inline_total = extract_search_total(messages, search_call_ids)
                             _inline_items = [
                                 ChoiceItem(
@@ -389,12 +409,13 @@ class DataGouvMCPAgent(BaseAgent):
                                     confidence=0.0,
                                     state={"choice_timeout": True},
                                 )
-                            # Re-run _run() with the chosen query so the LLM
-                            # fetches only the selected dataset.
+                            # Re-run _run() with the chosen query and the
+                            # chosen_dataset_id so the guard and disambiguation
+                            # are both skipped in the recursive call.
                             return await self._run(AgentInput(
                                 query=_inline_result.chosen_query,
                                 session_id=inp.session_id,
-                                context=inp.context,
+                                context={**inp.context, "chosen_dataset_id": _inline_result.chosen_id},
                             ))
 
         except Exception as exc:
