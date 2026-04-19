@@ -264,6 +264,8 @@ class DataGouvMCPAgent(BaseAgent):
         _confirmed_urls: set[str] = set()
         # URLs already processed by fetch_resource_file during the loop
         _fetched_urls: set[str] = set()
+        # Map url → format for successfully fetched resources
+        _fetched_url_formats: dict[str, str] = {}
 
         try:
             for _ in range(self.max_iterations):
@@ -347,6 +349,8 @@ class DataGouvMCPAgent(BaseAgent):
                                 fmt = parsed_tool.get("format", "data")
                                 total = parsed_tool.get("total_rows", len(parsed_tool["rows"]))
                                 cols = parsed_tool.get("columns", [])
+                                if req_url_fetched and fmt:
+                                    _fetched_url_formats[req_url_fetched] = fmt
                                 tool_content = f"[fetch_resource_file OK] format={fmt}, total_rows={total}, columns={cols}"
                         except (json.JSONDecodeError, ValueError):
                             pass
@@ -380,6 +384,7 @@ class DataGouvMCPAgent(BaseAgent):
                 _gj_parsed = json.loads(_gj_result)
                 if isinstance(_gj_parsed, dict) and _gj_parsed.get("format") == "geojson" and "rows" in _gj_parsed:
                     fetch_payloads.append(_gj_parsed)
+                    _fetched_url_formats[_gj_url] = "geojson"
                     logger.info("DataGouvMCPAgent: auto-fetched GeoJSON from %s", _gj_url)
                     break
             except Exception:
@@ -395,6 +400,16 @@ class DataGouvMCPAgent(BaseAgent):
                 if text:
                     result_text = text
                     break
+
+        # ── Append fetched resource links (owned by this agent) ───────────────
+        # The datagouv agent is responsible for formatting its own download links
+        # so that downstream synthesis never needs to know about resource URLs.
+        if _fetched_url_formats:
+            links = "\n".join(
+                f"- [{fmt.upper()}]({url})"
+                for url, fmt in _fetched_url_formats.items()
+            )
+            result_text = (result_text.rstrip("\n") or "") + f"\n\n**Téléchargement :**\n{links}"
 
         # ── Separate tabular vs GeoJSON payloads ──────────────────────────────
         tabular_data: dict | None = None

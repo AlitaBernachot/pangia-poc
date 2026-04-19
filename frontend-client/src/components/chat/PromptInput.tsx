@@ -192,8 +192,7 @@ export function PromptInput({
           onKeyDown={handleKeyDown}
           placeholder={isDragging ? '' : t('promptInput.placeholder')}
           rows={1}
-          disabled={isStreaming}
-          className="w-full bg-transparent border-none outline-none resize-none text-sm text-white placeholder:text-white/30 leading-relaxed px-4 pt-4 pb-2 min-h-14 max-h-40 overflow-y-auto font-sans disabled:cursor-not-allowed"
+          className="w-full bg-transparent border-none outline-none resize-none text-sm text-white placeholder:text-white/30 leading-relaxed px-4 pt-4 pb-2 min-h-14 max-h-40 overflow-y-auto font-sans"
         />
 
         {/* Footer */}
@@ -204,9 +203,8 @@ export function PromptInput({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isStreaming}
               title={t('promptInput.attachFiles')}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
             >
               <Paperclip size={13} />
               <span>{t('promptInput.attach')}</span>
@@ -227,8 +225,7 @@ export function PromptInput({
               <button
                 type="button"
                 onClick={() => setAgentMenuOpen((o) => !o)}
-                disabled={isStreaming}
-                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed select-none"
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors select-none"
               >
                 <Database size={13} />
                 <span>{t('promptInput.sources')}</span>
