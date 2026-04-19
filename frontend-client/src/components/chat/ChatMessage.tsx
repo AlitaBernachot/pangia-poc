@@ -5,7 +5,7 @@
 import ReactMarkdown from 'react-markdown'
 import { ExternalLink } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { type Message, type DatasetCandidate, AGENT_COLORS } from '../../types'
+import { type Message, AGENT_COLORS } from '../../types'
 import { AgentIcon } from '../AgentIcon'
 import { AgentActivityPanel } from './AgentActivityPanel'
 import { MapViewer } from '../MapViewer'
@@ -28,13 +28,13 @@ const markdownComponents = {
 
 interface Props {
   message: Message
-  onSelectDataset?: (candidate: DatasetCandidate) => void
+  onSubmitChoice?: (chosenId: string, chosenQuery: string) => void
   onPrefillPrompt?: (text: string) => void
   isStreaming?: boolean
   awaitingClarification?: boolean
 }
 
-export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStreaming, awaitingClarification }: Props) {
+export function ChatMessage({ message, onSubmitChoice, onPrefillPrompt, isStreaming, awaitingClarification }: Props) {
   const { t } = useTranslation()
   const isUser = message.role === 'user'
 
@@ -101,12 +101,12 @@ export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStrea
         {/* DataViz */}
         {message.dataviz && <DataVizViewer dataviz={message.dataviz} />}
 
-        {/* Dataset choice — human-in-the-loop disambiguation */}
-        {message.datasetChoice && message.datasetChoice.length > 0 && (
+        {/* Dataset choice — agent-level disambiguation */}
+        {message.choiceRequest && message.choiceRequest.items.length > 0 && (
           <DatasetChoicePanel
-            candidates={message.datasetChoice}
-            total={message.datasetChoiceTotal}
-            onSelect={(candidate) => onSelectDataset?.(candidate)}
+            candidates={message.choiceRequest.items}
+            total={message.choiceRequest.total}
+            onSelect={(candidate) => onSubmitChoice?.(candidate.id, `Je veux travailler avec le dataset : "${candidate.title}"${candidate.id ? ` (ID: ${candidate.id})` : ''}`)}
             onPrefillPrompt={onPrefillPrompt}
           />
         )}
@@ -122,7 +122,7 @@ export function ChatMessage({ message, onSelectDataset, onPrefillPrompt, isStrea
               // post-processing that fires after merge_node's final_answer).
               <ReactMarkdown components={markdownComponents}>{message.content}</ReactMarkdown>
             ) : (
-              message.streaming && !message.geojson && !message.dataviz && !message.datasetChoice?.length && (
+              message.streaming && !message.geojson && !message.dataviz && !message.choiceRequest?.items.length && (
                 <span className="thinking-indicator">
                   {awaitingClarification ? t('hitl.awaitingClarification') : t('chatMessage.thinking')}
                 </span>

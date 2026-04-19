@@ -67,6 +67,14 @@ export interface DatasetCandidate {
   url: string
   organization: string
 }
+
+export interface ChoiceRequestEvent {
+  request_id: string
+  agent: string
+  items: DatasetCandidate[]
+  total?: number | null
+  original_query: string
+}
 // ─── OGC Layer (GeoNetwork) ──────────────────────────────────────────────────
 
 export interface OgcLayer {
@@ -85,8 +93,7 @@ export interface Message {
   agentActivity?: AgentActivity[]
   geojson?: Record<string, unknown> | null
   dataviz?: DataVizPayload | null
-  datasetChoice?: DatasetCandidate[] | null
-  datasetChoiceTotal?: number | null
+  choiceRequest?: ChoiceRequestEvent | null
   ogcLayers?: OgcLayer[] | null
   attachments?: Attachment[]
   hitlRequest?: HITLRequestEvent | null

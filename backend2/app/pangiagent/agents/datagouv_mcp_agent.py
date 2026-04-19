@@ -15,7 +15,7 @@ from langchain_core.tools import tool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from app.config import get_settings
-from app.models import AgentInput, AgentOutput
+from app.models import AgentInput, AgentOutput, ChoiceItem
 from app.pangiagent.agents.base_agent import BaseAgent
 from app.pangiagent.model_config import build_llm, get_agent_model_config
 from libs.filereader import fetch_and_parse
@@ -439,19 +439,39 @@ class DataGouvMCPAgent(BaseAgent):
         # ── Build AgentOutput.state extras ────────────────────────────────────
         extra_state: dict = {}
 
-        # Dataset disambiguation
+        # Dataset disambiguation — delegate to BaseAgent.request_choice()
         candidates = extract_dataset_candidates(messages, search_call_ids)
         if len(candidates) > 1 and not user_identifies_dataset(inp.query, candidates):
             search_total = extract_search_total(messages, search_call_ids)
-            extra_state["pending_dataset_choice"] = candidates
-            extra_state["pending_dataset_choice_total"] = search_total
-            # Discard fetched data — user must pick first
-            return AgentOutput(
-                agent_name=self.name,
-                answer=result_text,
-                confidence=0.6,
-                state=extra_state,
+            choice_items = [
+                ChoiceItem(
+                    id=c.get("id", ""),
+                    title=c.get("title", ""),
+                    description=c.get("description", ""),
+                    url=c.get("url", ""),
+                    organization=c.get("organization", ""),
+                )
+                for c in candidates
+            ]
+            choice_result = await self.request_choice(
+                session_id=inp.session_id,
+                original_query=inp.query,
+                items=choice_items,
+                total=search_total,
             )
+            if not choice_result.resolved:
+                return AgentOutput(
+                    agent_name=self.name,
+                    answer="La sélection du dataset a expiré. Veuillez reformuler votre requête.",
+                    confidence=0.0,
+                    state={"choice_timeout": True},
+                )
+            # Re-run with the user-chosen query so the agent fetches the right dataset
+            return await self._run(AgentInput(
+                query=choice_result.chosen_query,
+                session_id=inp.session_id,
+                context=inp.context,
+            ))
 
         # GeoJSON layer
         if geojson_data is not None:

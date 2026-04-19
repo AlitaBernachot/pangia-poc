@@ -87,6 +87,12 @@ class OrchestratorState(TypedDict):
     hitl_questions: list[str]
     hitl_status: str  # "" | "pending" | "resolved" | "timeout"
 
+    # ── Agent choice (structured disambiguation, reusable) ────────────────────
+    choice_request_id: str
+    choice_agent: str   # which agent issued the choice request
+    choice_status: str  # "" | "pending" | "resolved" | "timeout"
+    choice_query: str   # rewritten query after choice is resolved
+
     # ── Post-processing output (humanoutput / dataviz / mapviz nodes) ─────────
     output_decision: dict[str, Any]   # {"needs_map": bool, "needs_dataviz": bool}
     dataviz: dict[str, Any]           # chart / KPI / table payload for frontend

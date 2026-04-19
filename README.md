@@ -864,6 +864,8 @@ Replace `<SUBAGENT>` with `ADDRESS`, `SPATIAL_PARSER`, `DISTANCE`, `BUFFER`,
 
 ## Backend V2 – Second-Generation Multi-Agent System
 
+> 📖 **Full Backend V2 documentation:** [backend2/README.md](backend2/README.md)
+
 The second-generation backend (`backend2/`) adds the following capabilities on top of the existing POC:
 
 | Feature | Implementation |
@@ -1040,6 +1042,10 @@ At startup, `build_graph()` writes Mermaid diagrams to `backend2/app/mermaid_gra
 | `routing_plan` | LLM-generated execution plan (agents + reasoning) |
 | `agent_start` | A sub-agent subgraph began execution |
 | `agent_end` | One agent finished (answer, confidence, duration_ms) |
+| `dataviz` | Chart / KPI / table payload from DataVizAgent |
+| `geojson` | GeoJSON FeatureCollection from MapVizAgent |
+| `output_decision` | `{needs_map, needs_dataviz}` from HumanOutputAgent |
+| `choice_request` | Agent needs user to pick an item (dataset, result, …) |
 | `final_answer` | Merged answer from all agents |
 | `done` | Stream complete |
 | `error` | Unhandled error |

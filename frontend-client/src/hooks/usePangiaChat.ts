@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { useCallback, useRef, useState } from 'react'
-import type { AgentActivity, AgentInfo, DatasetCandidate, DataVizPayload, HITLRequestEvent, Message, OgcLayer, ToolActivity } from '../types'
+import type { AgentActivity, AgentInfo, ChoiceRequestEvent, DataVizPayload, HITLRequestEvent, Message, OgcLayer, ToolActivity } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -212,8 +212,18 @@ export function usePangiaChat() {
             } else if (type === 'dataset_choice') {
               updateAssistant((m) => ({
                 ...m,
-                datasetChoice: event.candidates as DatasetCandidate[],
-                datasetChoiceTotal: (event.total as number | null) ?? null,
+                choiceRequest: {
+                  request_id: event.request_id as string,
+                  agent: event.agent as string,
+                  items: event.candidates as ChoiceRequestEvent['items'],
+                  total: (event.total as number | null) ?? null,
+                  original_query: event.original_query as string,
+                },
+              }))
+            } else if (type === 'choice_request') {
+              updateAssistant((m) => ({
+                ...m,
+                choiceRequest: event as unknown as ChoiceRequestEvent,
               }))
             } else if (type === 'hitl_request') {
               // V2 HITL — show modal to the user
@@ -299,6 +309,30 @@ export function usePangiaChat() {
     [hitlRequest],
   )
 
+  const submitChoiceResponse = useCallback(
+    async (messageId: string, chosenId: string, chosenQuery: string) => {
+      let requestId = ''
+      setMessages((prev) => {
+        const msg = prev.find((m) => m.id === messageId)
+        if (msg?.choiceRequest) requestId = msg.choiceRequest.request_id
+        return prev.map((m) =>
+          m.id === messageId ? { ...m, choiceRequest: null } : m,
+        )
+      })
+      if (!requestId) return
+      try {
+        await fetch(`${API_BASE}/api/choice/respond`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ request_id: requestId, chosen_id: chosenId, chosen_query: chosenQuery }),
+        })
+      } catch {
+        // Non-fatal
+      }
+    },
+    [],
+  )
+
   return {
     messages,
     isStreaming,
@@ -313,5 +347,6 @@ export function usePangiaChat() {
     hitlRequest,
     dismissHitl,
     submitHitlResponse,
+    submitChoiceResponse,
   }
 }

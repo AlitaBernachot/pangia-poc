@@ -22,6 +22,7 @@ export function ChatPage() {
     hitlRequest,
     dismissHitl,
     submitHitlResponse,
+    submitChoiceResponse,
   } = usePangiaChat()
 
   const [prefillText, setPrefillText] = useState<string | undefined>(undefined)
@@ -50,6 +51,7 @@ export function ChatPage() {
         hitlRequest={hitlRequest}
         onHitlDismiss={dismissHitl}
         onHitlSubmit={submitHitlResponse}
+        onSubmitChoice={submitChoiceResponse}
       />
 
       {/* Prompt */}

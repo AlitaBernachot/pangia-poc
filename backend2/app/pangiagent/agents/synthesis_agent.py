@@ -135,12 +135,8 @@ class SynthesisAgent(BaseAgent):
         agent = self
 
         async def synthesis_node(state: OrchestratorState) -> dict:
-            # Skip synthesis when a dataset-choice HITL panel is pending —
-            # the DatasetChoicePanel is the primary UI element in that case.
+            # Build raw context from the merged sub-agent answers
             sub_results: dict[str, Any] = state.get("sub_results") or {}
-            for result in sub_results.values():
-                if isinstance(result, dict) and result.get("pending_dataset_choice"):
-                    return {}
 
             # Build raw context from the merged sub-agent answers
             successful = [

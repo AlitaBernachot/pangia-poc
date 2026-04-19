@@ -7,14 +7,15 @@ from __future__ import annotations
 import logging
 import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import yaml
 from langgraph.graph import END, StateGraph
 
-from app.models import AgentInput, AgentOutput
+from app.models import AgentInput, AgentOutput, ChoiceItem, ChoiceRequest, ChoiceResponse
 from app.pangiagent.model_config import get_agent_max_iterations
 from app.pangiagent.state import SubAgentState
 
@@ -47,6 +48,27 @@ def _load_prompt_file(agent_name: str) -> str | None:
     return None
 
 
+@dataclass
+class ChoiceResult:
+    """Outcome of a ``BaseAgent.request_choice()`` call.
+
+    Attributes
+    ----------
+    resolved:
+        ``True`` if the user picked an item; ``False`` on timeout.
+    chosen_id:
+        The ``id`` of the ``ChoiceItem`` the user selected (empty on timeout).
+    chosen_query:
+        The query rewritten to target the chosen item (empty on timeout).
+    request_id:
+        The unique ID of the ``ChoiceRequest`` that was issued.
+    """
+    resolved: bool
+    chosen_id: str = ""
+    chosen_query: str = ""
+    request_id: str = ""
+
+
 class BaseAgent(ABC):
     def __init__(
         self,
@@ -58,6 +80,65 @@ class BaseAgent(ABC):
         self.pre_guardrails = pre_guardrails or []
         self.post_guardrails = post_guardrails or []
         self.max_iterations: int = get_agent_max_iterations(name)
+
+    # ── Choice / disambiguation helper ────────────────────────────────────────
+
+    async def request_choice(
+        self,
+        session_id: str,
+        original_query: str,
+        items: list[ChoiceItem],
+        total: int | None = None,
+    ) -> ChoiceResult:
+        """Suspend the agent and ask the user to pick one item from *items*.
+
+        This is the reusable building block for any agent that needs human
+        disambiguation.  It registers a :class:`ChoiceRequest` with the
+        :class:`~app.pangiagent.hitl.HITLManager`, signals the orchestrator
+        via ``AgentOutput.state["pending_choice_request_id"]``, and then
+        **awaits** the future resolved by :meth:`HITLManager.resolve_choice`.
+
+        Parameters
+        ----------
+        session_id:
+            The current session identifier.
+        original_query:
+            The user's original query (used for context in the frontend).
+        items:
+            List of :class:`ChoiceItem` instances to present to the user.
+        total:
+            Optional total number of matching items when *items* is a
+            truncated subset of a larger result set.
+
+        Returns
+        -------
+        ChoiceResult
+            ``resolved=True`` with ``chosen_id`` and ``chosen_query`` when
+            the user picks an item; ``resolved=False`` on timeout.
+        """
+        from app.pangiagent.hitl import get_hitl_manager
+        import uuid
+
+        request_id = str(uuid.uuid4())
+        choice_request = ChoiceRequest(
+            request_id=request_id,
+            session_id=session_id,
+            agent_name=self.name,
+            original_query=original_query,
+            items=items,
+            total=total,
+        )
+        manager = get_hitl_manager()
+        await manager.create_choice_request(choice_request)
+        result: ChoiceResponse | None = await manager.wait_for_choice(request_id)
+        if result is None:
+            return ChoiceResult(resolved=False, request_id=request_id)
+        return ChoiceResult(
+            resolved=True,
+            chosen_id=result.chosen_id,
+            chosen_query=result.chosen_query,
+            request_id=request_id,
+        )
 
     def get_prompt(self, default: str) -> str:
         """Return the system prompt for this agent.
@@ -175,9 +256,9 @@ class BaseAgent(ABC):
                 "violations": output.state.get("post_guardrail_violations", []),
             }
             # Forward any rich-data extras produced by the agent
-            # (dataviz, geojson, pending_dataset_choice, etc.) so the SSE
-            # layer can emit the appropriate frontend events.
-            for key in ("dataviz", "geojson", "pending_dataset_choice", "pending_dataset_choice_total"):
+            # (dataviz, geojson, etc.) so the SSE layer can emit the appropriate
+            # frontend events.
+            for key in ("dataviz", "geojson"):
                 if key in output.state:
                     value = output.state[key]
                     # Normalise dataviz table keys: LLM sometimes uses tool

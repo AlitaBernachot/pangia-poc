@@ -50,6 +50,35 @@ class HITLResponse(BaseModel):
     clarified_query: str
 
 
+class ChoiceItem(BaseModel):
+    """A single selectable option surfaced by an agent that needs user disambiguation."""
+    id: str
+    title: str
+    description: str = ""
+    url: str = ""
+    organization: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ChoiceRequest(BaseModel):
+    """Issued by an agent when it needs the user to pick one item from a list."""
+    request_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    session_id: str
+    agent_name: str
+    original_query: str
+    items: list[ChoiceItem]
+    total: int | None = None  # total matching items if list was truncated
+    status: str = "pending"   # pending | answered | timeout
+    chosen_id: str | None = None
+    chosen_query: str | None = None  # query rewritten to target the chosen item
+
+
+class ChoiceResponse(BaseModel):
+    request_id: str
+    chosen_id: str
+    chosen_query: str
+
+
 class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None

@@ -16,7 +16,7 @@ from app.pangiagent.hitl import get_hitl_manager
 from app.pangiagent.source_registry import get_registry
 from app.pangiagent.sse_stream import drain_queue_to_sse, run_graph_to_queue
 from app.pangiagent.state import OrchestratorState
-from app.models import ChatRequest, HITLResponse
+from app.models import ChatRequest, HITLResponse, ChoiceResponse
 
 router = APIRouter()
 
@@ -95,5 +95,18 @@ async def hitl_respond(body: HITLResponse):
         raise HTTPException(
             status_code=404,
             detail="HITL request not found or already resolved",
+        )
+    return {"status": "ok", "request_id": body.request_id}
+
+
+@router.post("/api/choice/respond")
+async def choice_respond(body: ChoiceResponse):
+    """Resolve an agent choice request (e.g. dataset disambiguation)."""
+    manager = get_hitl_manager()
+    ok = await manager.resolve_choice(body)
+    if not ok:
+        raise HTTPException(
+            status_code=404,
+            detail="Choice request not found or already resolved",
         )
     return {"status": "ok", "request_id": body.request_id}

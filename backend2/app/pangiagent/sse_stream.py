@@ -41,6 +41,7 @@ from typing import Any, AsyncGenerator
 
 from app.pangiagent.audit import get_audit
 from app.pangiagent.agents.orchestrator_agent import _AGENT_NODE_NAMES
+from app.pangiagent.hitl import get_hitl_manager
 from app.pangiagent.state import OrchestratorState
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,32 @@ async def run_graph_to_queue(
     await audit.log(session_id, "request_start", {"query": original_query})
 
     await queue.put(_sse({"type": "status", "message": "Processing your request…"}))
+
+    # Subscribe to choice_request notifications fired from inside sub-agents
+    hitl_manager = get_hitl_manager()
+    notif_queue: asyncio.Queue = asyncio.Queue()
+    hitl_manager.subscribe(session_id, notif_queue)
+
+    async def _forward_notifications() -> None:
+        """Drain the notification queue and push choice_request SSE events."""
+        while True:
+            item = await notif_queue.get()
+            if item is None:
+                break
+            event_type, payload = item
+            if event_type == "choice_request":
+                from app.models import ChoiceRequest
+                if isinstance(payload, ChoiceRequest):
+                    await queue.put(_sse({
+                        "type": "choice_request",
+                        "request_id": payload.request_id,
+                        "agent": payload.agent_name,
+                        "items": [i.model_dump() for i in payload.items],
+                        "total": payload.total,
+                        "original_query": payload.original_query,
+                    }))
+
+    notif_task = asyncio.create_task(_forward_notifications())
 
     try:
         async for event in graph.astream_events(initial_state, version="v2"):
@@ -161,12 +188,6 @@ async def run_graph_to_queue(
                         await queue.put(_sse({"type": "dataviz", "data": result["dataviz"]}))
                     if "geojson" in result:
                         await queue.put(_sse({"type": "geojson", "data": result["geojson"]}))
-                    if "pending_dataset_choice" in result and result["pending_dataset_choice"]:
-                        await queue.put(_sse({
-                            "type": "dataset_choice",
-                            "candidates": result["pending_dataset_choice"],
-                            "total": result.get("pending_dataset_choice_total"),
-                        }))
 
             # ── merge_node end → final_answer (fallback when no synthesis node) ──
             # When a synthesis_node is wired, it will emit the real final_answer
@@ -218,6 +239,11 @@ async def run_graph_to_queue(
         logger.exception("Unhandled error in run_graph_to_queue")
         await audit.log(session_id, "stream_error", {"error": str(exc)})
         await queue.put(_sse({"type": "error", "message": "An internal error occurred. Please try again."}))
+
+    finally:
+        hitl_manager.unsubscribe(session_id, notif_queue)
+        await notif_queue.put(None)  # signal the forwarder to stop
+        await notif_task
 
     await queue.put(_sse({"type": "done"}))
     await queue.put(_QUEUE_SENTINEL)
