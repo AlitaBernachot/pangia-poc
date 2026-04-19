@@ -1,0 +1,9 @@
+prompt: |
+  Generate an ultra-short title (4–6 words maximum) that summarises the user's
+  question in the language of that question. Return ONLY the title — no
+  punctuation at the end, no quotes, no preamble, no explanation.
+
+  Examples:
+  User: "Affiche les stations Vélib à Paris"  → Stations Vélib Paris
+  User: "Show air quality data for Lyon"       → Air Quality Data Lyon
+  User: "Quels sont les risques d'inondation?" → Risques d'inondation France

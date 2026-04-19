@@ -54,7 +54,8 @@
   },
   "agentActivity": {
     "thinking": "Réflexion en cours…",
-    "done": "Terminé"
+    "done": "Terminé",
+    "waitingForChoice": "En attente du choix"
   },
   "faq": {
     "heroTitle": "FAQ & À propos",

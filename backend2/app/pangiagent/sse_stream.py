@@ -115,6 +115,13 @@ async def run_graph_to_queue(
             kind: str = event.get("event", "")
             node: str = _node_name(event)
 
+            # ── title_node end → session_title ──────────────────────────────
+            if kind == "on_chain_end" and node == "title_node":
+                out = _output(event)
+                title = out.get("session_title", "")
+                if title:
+                    await queue.put(_sse({"type": "session_title", "title": title}))
+
             # ── memory_node end ──────────────────────────────────────────────
             if kind == "on_chain_end" and node == "memory_node":
                 out = _output(event)

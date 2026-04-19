@@ -8,7 +8,11 @@ import { MessageList } from '../components/chat/MessageList'
 import { PromptInput } from '../components/chat/PromptInput'
 import type { Attachment } from '../types'
 
-export function ChatPage() {
+interface Props {
+  onSessionTitle?: (title: string) => void
+}
+
+export function ChatPage({ onSessionTitle }: Props) {
   const {
     messages,
     isStreaming,
@@ -23,6 +27,7 @@ export function ChatPage() {
     dismissHitl,
     submitHitlResponse,
     submitChoiceResponse,
+    sessionTitle,
   } = usePangiaChat()
 
   const [prefillText, setPrefillText] = useState<string | undefined>(undefined)
@@ -30,6 +35,11 @@ export function ChatPage() {
   useEffect(() => {
     fetchAgents()
   }, [fetchAgents])
+
+  // Propagate title to parent (App.tsx) whenever it changes
+  useEffect(() => {
+    onSessionTitle?.(sessionTitle)
+  }, [sessionTitle, onSessionTitle])
 
   const handleSubmit = (text: string, _attachments: Attachment[]) => {
     sendMessage(text)

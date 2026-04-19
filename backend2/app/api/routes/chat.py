@@ -56,6 +56,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         "sub_results": {},
         "final_answer": "",
         "confidence": 0.0,
+        "session_title": "",
         "hitl_request_id": "",
         "hitl_questions": [],
         "hitl_status": "",

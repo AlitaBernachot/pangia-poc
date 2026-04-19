@@ -12,6 +12,7 @@ export interface AgentActivity {
   content: string
   streaming: boolean
   tools: ToolActivity[]
+  waitingForChoice?: boolean
 }
 
 // ─── DataViz types ────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ config:
 graph TD;
 	__start__([<p>__start__</p>]):::first
 	memory_node(memory_node)
+	title_node(title_node)
 	ambiguity_node(ambiguity_node)
 	hitl_wait_node(hitl_wait_node)
 	router_node(router_node)
@@ -29,7 +30,7 @@ graph TD;
 	humanoutput_node -.-> mapviz_node;
 	humanoutput_node -. &nbsp;__end__&nbsp; .-> synthesis_node;
 	mapviz_node --> synthesis_node;
-	memory_node --> ambiguity_node;
+	memory_node --> title_node;
 	merge_node --> humanoutput_node;
 	neo4j_agent\3aexecute_node --> merge_node;
 	postgis_agent\3aexecute_node --> merge_node;
@@ -46,6 +47,7 @@ graph TD;
 	router_node -.-> summary_agent\3aenrich_node;
 	router_node -.-> vector_chroma_agent\3aexecute_node;
 	summary_agent\3aexecute_node --> merge_node;
+	title_node --> ambiguity_node;
 	vector_chroma_agent\3aexecute_node --> merge_node;
 	synthesis_node --> __end__;
 	subgraph summary_agent

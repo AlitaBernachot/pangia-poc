@@ -54,7 +54,8 @@
   },
   "agentActivity": {
     "thinking": "Thinking…",
-    "done": "Done"
+    "done": "Done",
+    "waitingForChoice": "Awaiting your choice"
   },
   "faq": {
     "heroTitle": "FAQ & About",

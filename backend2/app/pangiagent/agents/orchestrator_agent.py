@@ -57,6 +57,7 @@ from app.models import AgentInput, HITLRequest
 from app.pangiagent.router import DynamicRouter
 from app.pangiagent.state import OrchestratorState
 from app.pangiagent.agents.ambiguity_agent import AmbiguityAgent
+from app.pangiagent.agents.title_agent import TitleAgent
 
 if TYPE_CHECKING:
     from app.pangiagent.agents.base_agent import BaseAgent
@@ -99,6 +100,19 @@ async def memory_node(state: OrchestratorState) -> dict:
         {"long_term_facts": len(facts), "short_term_keys": list(stm_data.keys())},
     )
     return {"context": {"long_term_facts": facts, "short_term": stm_data}}
+
+
+async def title_node(state: OrchestratorState) -> dict:
+    """Generate a short session title from the user's first query.
+
+    Only runs on the first turn of a session (when ``session_title`` is still
+    empty).  On subsequent turns the existing title is preserved.
+    """
+    if state.get("session_title"):
+        return {}
+    agent = TitleAgent()
+    title = await agent.generate(state["query"])
+    return {"session_title": title}
 
 
 async def ambiguity_node(state: OrchestratorState) -> dict:
@@ -389,6 +403,7 @@ def build_graph(
 
     # ── Core orchestration nodes ───────────────────────────────────────────
     workflow.add_node("memory_node", memory_node)
+    workflow.add_node("title_node", title_node)
     workflow.add_node("ambiguity_node", ambiguity_node)
     workflow.add_node("hitl_wait_node", hitl_wait_node)
     workflow.add_node("router_node", router_node)
@@ -412,7 +427,8 @@ def build_graph(
 
     # ── Sequential backbone ────────────────────────────────────────────────
     workflow.set_entry_point("memory_node")
-    workflow.add_edge("memory_node", "ambiguity_node")
+    workflow.add_edge("memory_node", "title_node")
+    workflow.add_edge("title_node", "ambiguity_node")
 
     workflow.add_conditional_edges(
         "ambiguity_node",

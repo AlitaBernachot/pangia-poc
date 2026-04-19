@@ -11,6 +11,7 @@ export function usePangiaChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionTitle, setSessionTitle] = useState<string>('')
   const [agents, setAgents] = useState<AgentInfo[]>([])
   const [selectedSources, setSelectedSources] = useState<string[]>([])
   const [hitlRequest, setHitlRequest] = useState<HITLRequestEvent | null>(null)
@@ -112,6 +113,8 @@ export function usePangiaChat() {
 
             if (type === 'session') {
               setSessionId(event.session_id as string)
+            } else if (type === 'session_title') {
+              setSessionTitle(event.title as string)
             } else if (type === 'routing') {
               const agents = event.agents as string[]
               updateAssistant((m) => ({ ...m, routingAgents: agents }))
@@ -144,8 +147,8 @@ export function usePangiaChat() {
                 if (idx < 0) {
                   activities.push({ agent, content: '', streaming: true, tools: [] })
                 } else {
-                  // resumed after a choice — mark streaming again
-                  activities[idx] = { ...activities[idx], streaming: true }
+                  // resumed after a choice — mark streaming again, clear waitingForChoice
+                  activities[idx] = { ...activities[idx], streaming: true, waitingForChoice: false }
                 }
                 return { ...m, agentActivity: activities }
               })
@@ -227,21 +230,37 @@ export function usePangiaChat() {
                 dataviz: event.data as DataVizPayload,
               }))
             } else if (type === 'dataset_choice') {
-              updateAssistant((m) => ({
-                ...m,
-                choiceRequest: {
-                  request_id: event.request_id as string,
-                  agent: event.agent as string,
-                  items: event.candidates as ChoiceRequestEvent['items'],
-                  total: (event.total as number | null) ?? null,
-                  original_query: event.original_query as string,
-                },
-              }))
+              const agentName = event.agent as string
+              updateAssistant((m) => {
+                const agentActivity = agentName
+                  ? (m.agentActivity ?? []).map((a) =>
+                      a.agent === agentName ? { ...a, waitingForChoice: true } : a,
+                    )
+                  : m.agentActivity
+                return {
+                  ...m,
+                  agentActivity,
+                  choiceRequest: {
+                    request_id: event.request_id as string,
+                    agent: agentName,
+                    items: event.candidates as ChoiceRequestEvent['items'],
+                    total: (event.total as number | null) ?? null,
+                    original_query: event.original_query as string,
+                  },
+                }
+              })
             } else if (type === 'choice_request') {
-              updateAssistant((m) => ({
-                ...m,
-                choiceRequest: event as unknown as ChoiceRequestEvent,
-              }))
+              const choiceEvent = event as unknown as ChoiceRequestEvent
+              updateAssistant((m) => {
+                // Mark the agent that issued the request as waitingForChoice
+                const agentName = choiceEvent.agent
+                const agentActivity = agentName
+                  ? (m.agentActivity ?? []).map((a) =>
+                      a.agent === agentName ? { ...a, waitingForChoice: true } : a,
+                    )
+                  : m.agentActivity
+                return { ...m, choiceRequest: choiceEvent, agentActivity }
+              })
             } else if (type === 'hitl_request') {
               // V2 HITL — show modal to the user
               setHitlRequest({
@@ -303,6 +322,7 @@ export function usePangiaChat() {
   const clearMessages = useCallback(() => {
     setMessages([])
     setSessionId(null)
+    setSessionTitle('')
   }, [])
 
   const dismissHitl = useCallback(() => setHitlRequest(null), [])
@@ -343,7 +363,7 @@ export function usePangiaChat() {
           if (m.id !== messageId) return m
           const agentActivity = agentName
             ? (m.agentActivity ?? []).map((a) =>
-                a.agent === agentName ? { ...a, streaming: true, tools: [] } : a,
+                a.agent === agentName ? { ...a, streaming: true, waitingForChoice: false, tools: [] } : a,
               )
             : m.agentActivity
           return { ...m, choiceRequest: null, chosenDataset: candidate ?? null, streaming: true, agentActivity }
@@ -366,6 +386,7 @@ export function usePangiaChat() {
     messages,
     isStreaming,
     sessionId,
+    sessionTitle,
     agents,
     selectedSources,
     setSelectedSources,
