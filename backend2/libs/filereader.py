@@ -344,3 +344,6 @@ def rows_to_geojson(
     if not features:
         return None
     return {"type": "FeatureCollection", "features": features}
+
+# Public aliases for coordinate-detection helpers used by agent modules
+find_coord_columns = _find_coord_columns

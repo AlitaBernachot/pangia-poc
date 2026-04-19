@@ -392,6 +392,8 @@ class DataVizAgent(BaseAgent):
                             elif tc["name"] == "build_kpi" and "label" in item:
                                 collected_kpis.append(item)
                             elif tc["name"] == "build_table" and "columns" in item and not preseeded_tables:
+                                # Skip LLM-built tables when pre-built tables exist; the
+                                # pre-seeded table from a connector already contains all rows intact.
                                 collected_tables.append(item)
                     except (json.JSONDecodeError, ValueError):
                         pass

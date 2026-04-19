@@ -48,7 +48,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.models import AgentInput, AgentOutput
 from app.pangiagent.agents.base_agent import BaseAgent
 from app.pangiagent.model_config import build_llm, get_agent_model_config
-from libs.filereader import _find_coord_columns
+from libs.filereader import find_coord_columns
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +153,7 @@ class HumanOutputAgent(BaseAgent):
         if has_prebuilt_dataviz or existing_geojson is not None:
             tables = (existing_dataviz or {}).get("tables", [])
             columns = tables[0].get("columns", []) if tables else []
-            lat_col, lon_col = _find_coord_columns(columns)
+            lat_col, lon_col = find_coord_columns(columns)
             needs_map = existing_geojson is not None or (lat_col is not None and lon_col is not None)
             return {
                 "needs_map": needs_map,
