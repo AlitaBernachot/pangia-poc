@@ -208,6 +208,74 @@ class DataGouvMCPAgent(BaseAgent):
         )
 
     async def _run(self, inp: AgentInput) -> AgentOutput:
+        return await self._run_by_action(inp)
+
+    # ── Intent-aware action handlers ──────────────────────────────────────────────
+
+    async def _run_display(self, inp: AgentInput, intent: dict) -> AgentOutput:
+        """Full data retrieval: fetch CSV/JSON and GeoJSON when available."""
+        parts: list[str] = []
+        if intent["filters"]:
+            filter_desc = "; ".join(
+                f'{f["column"]}={f["value"]} ({f.get("op", "contains")})'
+                for f in intent["filters"]
+            )
+            parts.append(f"[INTENT] applique les filtres : {filter_desc}.")
+        if intent["geo_scope"]:
+            parts.append(f"[INTENT] geo_scope={intent['geo_scope']!r}")
+        return await self._do_react(inp, intent, "\n".join(parts))
+
+    async def _run_filter(self, inp: AgentInput, intent: dict) -> AgentOutput:
+        """Filtered data retrieval — applies column filters from the parsed intent."""
+        parts: list[str] = []
+        if intent["filters"]:
+            filter_desc = "; ".join(
+                f'{f["column"]}={f["value"]} ({f.get("op", "contains")})'
+                for f in intent["filters"]
+            )
+            parts.append(f"[INTENT] action=filter → applique les filtres : {filter_desc}.")
+        if intent["geo_scope"]:
+            parts.append(f"[INTENT] geo_scope={intent['geo_scope']!r}")
+        return await self._do_react(inp, intent, "\n".join(parts))
+
+    async def _run_search(self, inp: AgentInput, intent: dict) -> AgentOutput:
+        """Metadata-only search — does not download data files."""
+        parts = [
+            "[INTENT] action=search → cherche uniquement les métadonnées, "
+            "ne télécharge pas les fichiers.",
+        ]
+        if intent["geo_scope"]:
+            parts.append(f"[INTENT] geo_scope={intent['geo_scope']!r}")
+        return await self._do_react(inp, intent, "\n".join(parts))
+
+    async def _run_preview(self, inp: AgentInput, intent: dict) -> AgentOutput:
+        """Preview mode — query_resource_data only, no full file download."""
+        parts = [
+            "[INTENT] action=preview → utilise query_resource_data avec page_size=20 "
+            "pour un aperçu, ne télécharge pas le fichier complet.",
+        ]
+        if intent["geo_scope"]:
+            parts.append(f"[INTENT] geo_scope={intent['geo_scope']!r}")
+        return await self._do_react(inp, intent, "\n".join(parts))
+
+    async def _run_compare(self, inp: AgentInput, intent: dict) -> AgentOutput:
+        """Compare multiple datasets on the same topic."""
+        parts = [
+            "[INTENT] action=compare → récupère plusieurs datasets sur ce sujet "
+            "pour permettre une comparaison.",
+        ]
+        if intent["geo_scope"]:
+            parts.append(f"[INTENT] geo_scope={intent['geo_scope']!r}")
+        return await self._do_react(inp, intent, "\n".join(parts))
+
+    # ── Shared ReAct loop ─────────────────────────────────────────────────────
+
+    async def _do_react(
+        self,
+        inp: AgentInput,
+        intent: dict,
+        ctx_hint: str = "",
+    ) -> AgentOutput:
         settings = get_settings()
 
         mcp_client = MultiServerMCPClient(
@@ -237,11 +305,6 @@ class DataGouvMCPAgent(BaseAgent):
         tool_map = {t.name: t for t in all_tools}
 
         _chosen_dataset_id: str | None = inp.context.get("chosen_dataset_id")
-        _intent: dict = inp.context.get("intent") or {}
-        _intent_action: str = _intent.get("action", "display")
-        _intent_concept: str = _intent.get("dataset_concept", "")
-        _intent_filters: list = _intent.get("filters") or []
-        _intent_geo: str = _intent.get("geo_scope", "")
 
         if _chosen_dataset_id:
             human_content = (
@@ -251,33 +314,10 @@ class DataGouvMCPAgent(BaseAgent):
                 "get_resource_info pour récupérer les ressources de ce dataset, puis "
                 "fetch_resource_file pour télécharger le fichier CSV et/ou GeoJSON disponibles."
             )
+        elif ctx_hint:
+            human_content = inp.query + "\n\n" + ctx_hint
         else:
-            # Build context hint from parsed intent
-            _ctx_parts: list[str] = []
-            if _intent_action == "search":
-                _ctx_parts.append(
-                    "[INTENT] action=search → cherche uniquement les métadonnées, "
-                    "ne télécharge pas les fichiers."
-                )
-            elif _intent_action == "preview":
-                _ctx_parts.append(
-                    "[INTENT] action=preview → utilise query_resource_data avec page_size=20 "
-                    "pour un aperçu, ne télécharge pas le fichier complet."
-                )
-            elif _intent_action == "filter" and _intent_filters:
-                _filter_desc = "; ".join(
-                    f'{f["column"]}={f["value"]} ({f.get("op","contains")})'
-                    for f in _intent_filters
-                )
-                _ctx_parts.append(
-                    f"[INTENT] action=filter → applique les filtres : {_filter_desc}."
-                )
-            if _intent_geo:
-                _ctx_parts.append(f"[INTENT] geo_scope={_intent_geo!r}")
-
             human_content = inp.query
-            if _ctx_parts:
-                human_content = inp.query + "\n\n" + "\n".join(_ctx_parts)
 
         messages: list = [
             SystemMessage(content=self._system_prompt),
@@ -305,10 +345,10 @@ class DataGouvMCPAgent(BaseAgent):
             if search_tool:
                 import uuid as _uuid
                 # Prefer the parsed concept over the raw query
-                _base = _intent_concept if _intent_concept else strip_action_prefix(inp.query)
+                _base = intent["dataset_concept"] if intent["dataset_concept"] else strip_action_prefix(inp.query)
                 # Append geo scope if not already part of the concept
-                if _intent_geo and _intent_geo.lower() not in _base.lower():
-                    _base = f"{_base} {_intent_geo}"
+                if intent["geo_scope"] and intent["geo_scope"].lower() not in _base.lower():
+                    _base = f'{_base} {intent["geo_scope"]}'
                 _combined_query = (_base + " " + " ".join(_extra_terms)).strip()
                 logger.info(
                     "DataGouvMCPAgent: pre-search (combined) → '%s'", _combined_query

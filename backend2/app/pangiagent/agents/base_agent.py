@@ -156,6 +156,102 @@ class BaseAgent(ABC):
         """
         return _load_prompt_file(self.name) or default
 
+    # ── Intent helpers (populated by IntentParserAgent before fan-out) ────────
+
+    def get_intent(self, inp: AgentInput) -> dict:
+        """Extract and normalise the structured intent from ``inp.context["intent"]``.
+
+        Returns a dict with guaranteed keys: ``action``, ``dataset_concept``,
+        ``filters``, ``geo_scope``.  Populated by ``IntentParserAgent`` in
+        ``intent_node`` before the agent fan-out; returns sensible defaults
+        when no intent was parsed.
+
+        Usage::
+
+            intent = self.get_intent(inp)
+            action = intent["action"]        # "display" | "filter" | "search" | "preview" | "compare"
+            concept = intent["dataset_concept"]
+            filters = intent["filters"]      # list[{"column", "value", "op"}]
+            geo = intent["geo_scope"]
+        """
+        raw: dict = inp.context.get("intent") or {}
+        return {
+            "action": str(raw.get("action", "display")).lower().strip(),
+            "dataset_concept": str(raw.get("dataset_concept", "")).strip(),
+            "filters": list(raw.get("filters") or []),
+            "geo_scope": str(raw.get("geo_scope", "")).strip(),
+        }
+
+    async def _run_by_action(self, inp: AgentInput) -> AgentOutput:
+        """Dispatch to the appropriate ``_run_<action>`` handler.
+
+        Use this as the body of ``_run()`` in intent-aware sub-agents::
+
+            async def _run(self, inp: AgentInput) -> AgentOutput:
+                return await self._run_by_action(inp)
+
+        Then override one or more of :meth:`_run_display`, :meth:`_run_filter`,
+        :meth:`_run_search`, :meth:`_run_preview`, :meth:`_run_compare`.
+        Unknown action values fall back to :meth:`_run_display`.
+        """
+        intent = self.get_intent(inp)
+        action = intent["action"]
+        dispatch = {
+            "display": self._run_display,
+            "filter": self._run_filter,
+            "search": self._run_search,
+            "preview": self._run_preview,
+            "compare": self._run_compare,
+        }
+        handler = dispatch.get(action)
+        if handler is None:
+            logger.warning(
+                "%s: unknown intent action %r — falling back to _run_display",
+                self.name,
+                action,
+            )
+            handler = self._run_display
+        return await handler(inp, intent)
+
+    async def _run_display(self, inp: AgentInput, intent: dict) -> AgentOutput:
+        """Handle ``action=display``: show / visualise all data.
+
+        Override in sub-agents that support intent-based dispatch.
+        Agents that do not need action dispatch should override :meth:`_run` directly.
+        """
+        raise NotImplementedError(
+            f"Agent '{self.name}' must implement _run_display() "
+            "or override _run() directly."
+        )
+
+    async def _run_filter(self, inp: AgentInput, intent: dict) -> AgentOutput:
+        """Handle ``action=filter``: records matching a condition.
+
+        Default: delegates to :meth:`_run_display`.
+        """
+        return await self._run_display(inp, intent)
+
+    async def _run_search(self, inp: AgentInput, intent: dict) -> AgentOutput:
+        """Handle ``action=search``: discover what datasets exist on a topic.
+
+        Default: delegates to :meth:`_run_display`.
+        """
+        return await self._run_display(inp, intent)
+
+    async def _run_preview(self, inp: AgentInput, intent: dict) -> AgentOutput:
+        """Handle ``action=preview``: sample / overview of data.
+
+        Default: delegates to :meth:`_run_display`.
+        """
+        return await self._run_display(inp, intent)
+
+    async def _run_compare(self, inp: AgentInput, intent: dict) -> AgentOutput:
+        """Handle ``action=compare``: compare two or more datasets.
+
+        Default: delegates to :meth:`_run_display`.
+        """
+        return await self._run_display(inp, intent)
+
     @abstractmethod
     def get_capabilities(self) -> str:
         """Return a description of what this agent can do."""
