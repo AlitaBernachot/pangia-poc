@@ -16,7 +16,7 @@
     "subtitle": "Tu IA geoespacial inteligente. Haz preguntas sobre datos geográficos, mapas, análisis espacial y mucho más."
   },
   "promptInput": {
-    "placeholder": "Pregunta cualquier cosa sobre datos geoespaciales…",
+    "placeholder": "¿En qué puedo ayudarte?",
     "dropFiles": "Suelta los archivos aquí",
     "attach": "Adjuntar",
     "attachFiles": "Adjuntar archivos",
@@ -33,6 +33,14 @@
     "routingTo": "Enrutando a",
     "thinking": "Pensando..."
   },
+  "hitl": {
+    "clarificationNeeded": "Aclaración requerida",
+    "dismiss": "Ignorar",
+    "original": "Original:",
+    "awaitingClarification": "Esperando tu aclaración…",
+    "hint": "Haz clic en una sugerencia para continuar, o escribe tu aclaración en el campo de abajo.",
+    "clickHint": "Clic para enviar esta respuesta"
+  },
   "datasetChoice": {
     "prompt": "{{count}} datasets encontrados. ¿Cuál deseas usar?",
     "promptWithTotal": "{{total}} datasets encontrados en total — mostrando los primeros {{shown}}. ¿Cuál deseas usar?",
@@ -41,11 +49,13 @@
     "openSource": "Abrir página fuente",
     "clickTitle": "Clic para rellenar el campo de entrada",
     "prefillPrefix": "Usar estos datos",
-    "selectHint": "Para continuar, seleccione el dataset con el que desea trabajar haciendo clic en \"Seleccionar\", o haga clic en su título para refinar su pregunta."
+    "selectHint": "Para continuar, seleccione el dataset con el que desea trabajar haciendo clic en \"Seleccionar\", o haga clic en su título para refinar su pregunta.",
+    "chosen": "Dataset seleccionado"
   },
   "agentActivity": {
     "thinking": "Pensando…",
-    "done": "Listo"
+    "done": "Listo",
+    "waitingForChoice": "Esperando tu elección"
   },
   "faq": {
     "heroTitle": "FAQ y Acerca de",

@@ -1,0 +1,441 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
+# Source Registry — declarative capability manifest for all PangIA V2 connector agents.
+#
+# Each entry is embedded at startup into the `pangiagent_source_registry` ChromaDB
+# collection by `source_registry.bootstrap_registry_embeddings()`.
+# SmartDispatcherAgent uses these entries for deterministic + semantic routing.
+#
+# Fields
+# ------
+# id            : unique identifier — matches the agent key in AGENTS registry
+# connector     : agent key used in agents_to_call (identical to id)
+# active        : true = available for routing; false = disabled (skipped at runtime)
+# description   : rich description for embedding (makes the entry semantically searchable)
+# topics        : keyword list for deterministic matching
+# entity_types  : entity / data-type list for deterministic matching
+# capabilities  : standardised capability tags (see vocabulary below)
+# geo_scope     : geographic coverage — null means global
+# example_questions : representative questions this source can answer
+
+sources:
+
+  - id: neo4j_agent
+    connector: neo4j_agent
+    active: false
+    label: Neo4j
+    description: >
+      Neo4j knowledge graph agent. Answers questions about geographic entities,
+      their spatial relationships, administrative hierarchies, and co-occurrences
+      stored in a Neo4j property graph. Generates and explains Cypher queries.
+      Useful for graph traversal, entity search, relationship exploration,
+      and neighbourhood analysis in geographic knowledge graphs.
+    topics:
+      - graph
+      - knowledge graph
+      - cypher
+      - neo4j
+      - relationship
+      - entity
+      - node
+      - neighbourhood
+      - administrative
+      - hierarchy
+    entity_types:
+      - city
+      - region
+      - country
+      - administrative unit
+      - place
+      - organization
+      - infrastructure
+    capabilities:
+      - relationship
+      - graph_traversal
+      - entity_search
+      - co-occurrence
+      - hierarchy
+    geo_scope: null
+    example_questions:
+      - "Which cities are connected to Paris in the knowledge graph?"
+      - "What administrative regions surround Île-de-France?"
+      - "Find all hospitals within 5 km of a given node."
+      - "Show the hierarchy of administrative units in France."
+      - "Which entities co-occur with 'Loire' in the graph?"
+
+  - id: postgis_agent
+    connector: postgis_agent
+    active: true
+    label: MyPostGIS
+    description: >
+      PostGIS spatial SQL agent. Answers geographic questions using PostgreSQL
+      with PostGIS extension. Generates SQL queries with spatial functions such
+      as ST_Contains, ST_Distance, ST_Intersects, ST_Within, ST_Buffer,
+      ST_Area, and ST_Centroid. Best suited for precise spatial analysis,
+      proximity queries, intersection detection, buffer zones, and area
+      calculations on vector geometries stored in a PostGIS database.
+    topics:
+      - postgis
+      - spatial
+      - geometry
+      - sql
+      - coordinates
+      - buffer
+      - intersection
+      - distance
+      - area
+      - polygon
+      - point
+      - linestring
+      - geojson
+    entity_types:
+      - geometry
+      - polygon
+      - point
+      - linestring
+      - multipolygon
+      - spatial feature
+      - geographic boundary
+    capabilities:
+      - spatial_query
+      - buffer
+      - intersection
+      - area
+      - distance
+      - coordinates
+      - geometry
+    geo_scope: null
+    example_questions:
+      - "Quels lieux d'intérêt se trouvent à moins de 500 mètres du centre de Paris ?"
+      - "Quelle est la superficie de la commune de Lyon en km² ?"
+      - "Quelles communes intersectent une zone de risque d'inondation ?"
+      - "Quels hôpitaux sont situés dans une zone à risque critique ?"
+      - "Liste les zones de risque de niveau élevé dans le département 13."
+      - "Quels musées sont dans un rayon de 2 km du Louvre ?"
+      - "Quelle commune a la plus grande population parmi celles de la région Occitanie ?"
+    prompt: |
+      ## Database schema (MyPostGIS)
+
+      ### lieux_interet — Points of interest (POINT, SRID 4326)
+      | column      | type   | description                                   |
+      |-------------|--------|-----------------------------------------------|
+      | id          | serial | primary key                                   |
+      | nom         | text   | name                                          |
+      | categorie   | text   | musee, hopital, parc, restaurant, monument    |
+      | adresse     | text   | street address                                |
+      | ville       | text   | city name                                     |
+      | code_postal | text   | postal code                                   |
+      | geom        | point  | WGS-84 coordinates (SRID 4326)                |
+
+      ### communes — Municipalities (MULTIPOLYGON, SRID 4326)
+      | column         | type         | description                        |
+      |----------------|--------------|------------------------------------|
+      | id             | serial       | primary key                        |
+      | code_insee     | text         | INSEE code (unique)                |
+      | nom            | text         | municipality name                  |
+      | departement    | text         | department name and number         |
+      | region         | text         | region name                        |
+      | population     | integer      | population count                   |
+      | superficie_km2 | numeric      | area in km²                        |
+      | geom           | multipolygon | boundary polygon (SRID 4326)       |
+
+      ### zones_risque — Risk zones (POLYGON, SRID 4326)
+      | column      | type    | description                                       |
+      |-------------|---------|---------------------------------------------------|
+      | id          | serial  | primary key                                       |
+      | code        | text    | unique zone code                                  |
+      | nom         | text    | zone name                                         |
+      | type_risque | text    | inondation, incendie, sismique, pollution          |
+      | niveau      | text    | faible, modere, eleve, critique                   |
+      | commune     | text    | associated municipality name                      |
+      | departement | text    | department number/name                            |
+      | geom        | polygon | zone boundary (SRID 4326)                         |
+
+  - id: rdf_agent
+    connector: rdf_agent
+    active: false
+    label: RDF / SPARQL
+    description: >
+      RDF / SPARQL agent for Ontotext GraphDB. Answers Semantic Web questions
+      by generating SPARQL queries against a triplestore containing geographic
+      and thematic RDF data modelled with OWL ontologies. Supports ontology
+      traversal, linked data exploration, semantic reasoning, and property
+      path queries. Ideal for questions about class hierarchies, linked open
+      data, and standardised vocabularies such as GeoSPARQL.
+    topics:
+      - rdf
+      - sparql
+      - ontology
+      - linked data
+      - semantic web
+      - graphdb
+      - triple
+      - owl
+      - geosparql
+      - vocabulary
+      - class
+      - property
+    entity_types:
+      - rdf resource
+      - owl class
+      - rdfs label
+      - geographic feature (GeoSPARQL)
+      - dataset
+    capabilities:
+      - ontology
+      - linked_data
+      - sparql
+      - semantic_reasoning
+      - entity_search
+      - hierarchy
+    geo_scope: null
+    example_questions:
+      - "What RDF classes represent administrative divisions in the ontology?"
+      - "List all owl:subClassOf relationships for the GeoFeature class."
+      - "SPARQL: find all resources with schema:containedIn France."
+      - "What datasets are linked to the concept of 'forest' in the triplestore?"
+      - "Retrieve all labels and descriptions for the resource dbpedia:Paris."
+
+  - id: vector_chroma_agent
+    connector: vector_chroma_agent
+    active: false
+    label: Vector (Chroma)
+    description: >
+      ChromaDB vector search agent. Retrieves and synthesises answers using
+      embedding-based semantic similarity search over a document collection
+      stored in ChromaDB. Best for unstructured text retrieval, document
+      similarity, semantic question answering, and finding conceptually
+      related content when exact keyword matching is insufficient.
+    topics:
+      - vector
+      - embedding
+      - semantic search
+      - chromadb
+      - similarity
+      - document retrieval
+      - text search
+      - nearest neighbour
+    entity_types:
+      - document
+      - text chunk
+      - embedding
+      - passage
+    capabilities:
+      - semantic_search
+      - similarity
+      - document_retrieval
+      - embedding
+    geo_scope: null
+    example_questions:
+      - "Find documents similar to this description of urban planning."
+      - "What passages in the knowledge base discuss climate adaptation?"
+      - "Retrieve the most relevant chunks about flood risk management."
+      - "Which documents mention infrastructure resilience in coastal areas?"
+      - "Semantic search for 'renewable energy policy France'."
+
+  - id: datagouv_mcp_agent
+    connector: datagouv_mcp_agent
+    active: true
+    label: Data.gouv.fr
+    description: >
+      data.gouv.fr MCP agent. Discovers and describes French open government
+      datasets published on data.gouv.fr, the official French open-data portal.
+      Answers questions about available public datasets, their producers,
+      formats, and update frequency. Covers topics such as public health,
+      transportation, environment, economy, education, and social statistics
+      published by French government agencies and local authorities.
+    topics:
+      - data.gouv.fr
+      - open data
+      - french government
+      - france
+      - public data
+      - official statistics
+      - dataset
+      - catalogue
+      - government
+      - ministry
+      - prefecture
+    entity_types:
+      - dataset
+      - organisation
+      - resource
+      - file
+      - producer
+    capabilities:
+      - open_data
+      - official_statistics
+      - government_data
+      - french_datasets
+      - document_retrieval
+    geo_scope: France
+    example_questions:
+      - "What datasets about air quality are available on data.gouv.fr?"
+      - "Find official French datasets on road accidents in 2023."
+      - "Which organisations published datasets on school locations in France?"
+      - "List datasets related to COVID-19 statistics for French departments."
+      - "Find open data about renewable energy production by region in France."
+
+  - id: geonetwork_mcp_agent
+    connector: geonetwork_mcp_agent
+    active: false
+    label: GeoNetwork
+    description: >
+      GeoNetwork MCP agent. Searches and describes geospatial metadata catalogues
+      using GeoNetwork, an open-source catalogue for geographic datasets and
+      services complying with ISO 19115/19139 metadata standards. Helps users
+      find, interpret, and compare geographic datasets including their spatial
+      extent, resolution, coordinate reference system, and intended use.
+      Covers raster, vector, and OGC web services (WMS, WFS, WMTS).
+    topics:
+      - geonetwork
+      - geospatial
+      - metadata
+      - iso 19115
+      - geographic dataset
+      - wms
+      - wfs
+      - wmts
+      - ogc
+      - catalogue
+      - raster
+      - vector
+    entity_types:
+      - geographic dataset
+      - OGC service
+      - metadata record
+      - layer
+      - coverage
+    capabilities:
+      - spatial_query
+      - coordinates
+      - geometry
+      - document_retrieval
+      - semantic_search
+    geo_scope: null
+    example_questions:
+      - "Find WMS layers covering the Provence-Alpes-Côte d'Azur region."
+      - "What geospatial datasets on land use are available in the catalogue?"
+      - "Describe the spatial extent and resolution of the DEM dataset."
+      - "List all WFS services related to hydrological data."
+      - "Find ISO 19115 metadata records about protected natural areas."
+
+  - id: rag_agent
+    connector: rag_agent
+    active: false
+    label: RAG
+    description: >
+      Retrieval-Augmented Generation agent. Answers general knowledge questions
+      by combining retrieved context documents with LLM reasoning. Provides
+      concise, grounded answers when context documents are injected upstream.
+      Falls back to LLM knowledge when no context is available. Best for
+      open-domain question answering, document-based Q&A, and synthesis tasks.
+    topics:
+      - question answering
+      - rag
+      - retrieval
+      - knowledge
+      - general
+      - context
+      - synthesis
+      - explanation
+      - definition
+    entity_types:
+      - document
+      - passage
+      - fact
+      - concept
+    capabilities:
+      - document_retrieval
+      - semantic_search
+      - embedding
+    geo_scope: null
+    example_questions:
+      - "What is the definition of a floodplain?"
+      - "Explain the concept of spatial data infrastructure."
+      - "Summarise the main findings from the provided context."
+      - "What are the key differences between WMS and WFS services?"
+      - "Answer based on the provided documents: what is GeoJSON?"
+
+  - id: calculator_agent
+    connector: calculator_agent
+    active: false
+    label: Calculator
+    description: >
+      Calculator agent. Evaluates arithmetic and mathematical expressions
+      safely using AST-based evaluation. Handles basic arithmetic (+, -, *, /),
+      power (**), modulo (%), integer division (//), and parenthesised
+      expressions. Does not require LLM calls — purely deterministic.
+    topics:
+      - calculate
+      - calculation
+      - arithmetic
+      - math
+      - formula
+      - compute
+      - number
+      - sum
+      - average
+      - percentage
+    entity_types:
+      - number
+      - expression
+      - formula
+    capabilities:
+      - arithmetic
+      - calculation
+    geo_scope: null
+    example_questions:
+      - "What is 42 * 17 + 13?"
+      - "Calculate 15% of 340."
+      - "What is (1024 / 4) ** 2?"
+      - "Compute the sum: 12345 + 67890."
+      - "What is 7 modulo 3?"
+
+  - id: summary_agent
+    connector: summary_agent
+    active: false
+    label: Summary
+    description: >
+      Summarisation agent. Rewrites queries with an explicit summarisation
+      instruction and produces concise two-to-three sentence summaries followed
+      by a direct answer. Useful for condensing long documents, explaining
+      complex topics concisely, or when the user explicitly requests a summary
+      or brief overview.
+    topics:
+      - summarise
+      - summary
+      - brief
+      - overview
+      - explain
+      - condense
+      - tldr
+      - synthesis
+      - abstract
+    entity_types:
+      - text
+      - document
+      - report
+      - passage
+    capabilities:
+      - document_retrieval
+      - semantic_search
+    geo_scope: null
+    example_questions:
+      - "Give me a brief summary of this document."
+      - "Summarise the key points about climate change policy."
+      - "TL;DR: what is PostGIS used for?"
+      - "Provide an overview of LangGraph's architecture."
+      - "Briefly explain what a semantic web triplestore is."
+
+# ── Suggestion chips shown in the frontend UI ─────────────────────────────────
+suggestions:
+  - "Où se trouvent les webcams dans Orléans ?"
+  - "Affiche les données des élections municipales de 2026"
+  - "Quels datasets open data existent sur la qualité de l'air en France ?"
+  - "Montre les stations de vélos en libre-service à Paris"
+  - "Y a-t-il des données géographiques sur les zones inondables ?"
+  - "Liste les parkings disponibles à Lyon"
+  - "Donne-moi les données sur les déchetteries en Île-de-France"

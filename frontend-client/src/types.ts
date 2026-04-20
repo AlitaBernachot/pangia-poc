@@ -12,6 +12,7 @@ export interface AgentActivity {
   content: string
   streaming: boolean
   tools: ToolActivity[]
+  waitingForChoice?: boolean
 }
 
 // ─── DataViz types ────────────────────────────────────────────────────────────
@@ -50,6 +51,14 @@ export interface DataVizPayload {
   tables?: DataVizTable[]
 }
 
+// ─── V2 HITL (Human-in-the-Loop) ─────────────────────────────────────────────
+
+export interface HITLRequestEvent {
+  request_id: string
+  questions: string[]
+  original_query: string
+}
+
 // ─── Dataset choice (human-in-the-loop) ──────────────────────────────────────
 
 export interface DatasetCandidate {
@@ -58,6 +67,14 @@ export interface DatasetCandidate {
   description: string
   url: string
   organization: string
+}
+
+export interface ChoiceRequestEvent {
+  request_id: string
+  agent: string
+  items: DatasetCandidate[]
+  total?: number | null
+  original_query: string
 }
 // ─── OGC Layer (GeoNetwork) ──────────────────────────────────────────────────
 
@@ -77,10 +94,12 @@ export interface Message {
   agentActivity?: AgentActivity[]
   geojson?: Record<string, unknown> | null
   dataviz?: DataVizPayload | null
-  datasetChoice?: DatasetCandidate[] | null
-  datasetChoiceTotal?: number | null
+  choiceRequest?: ChoiceRequestEvent | null
+  chosenDataset?: DatasetCandidate | null
   ogcLayers?: OgcLayer[] | null
   attachments?: Attachment[]
+  hitlRequest?: HITLRequestEvent | null
+  routingPlan?: { steps: { agent_name: string; parallel_group: number }[]; reasoning: string } | null
 }
 
 export interface AgentInfo {

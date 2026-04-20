@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
+import { useState } from 'react'
 import type { DataVizTable } from '../../types'
+
+const PAGE_SIZE = 50
 
 const IMAGE_URL_RE = /^https?:\/\/.+\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i
 
@@ -27,6 +30,10 @@ interface Props {
 }
 
 export function TableViewer({ table }: Props) {
+  const [page, setPage] = useState(0)
+  const totalPages = Math.ceil(table.rows.length / PAGE_SIZE)
+  const visibleRows = table.rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
   function downloadCsv() {
     const escape = (v: string | number) => {
       const s = String(v)
@@ -74,7 +81,7 @@ export function TableViewer({ table }: Props) {
             </tr>
           </thead>
           <tbody>
-            {table.rows.map((row, i) => (
+            {visibleRows.map((row, i) => (
               <tr key={i} className="border-b border-white/5 last:border-0">
                 {row.map((cell, j) => (
                   <td key={j} className="text-white/75 py-1 px-2">
@@ -87,8 +94,49 @@ export function TableViewer({ table }: Props) {
         </table>
       </div>
       {/* Footer */}
-      <div className="px-3 py-1.5 border-t border-white/8 text-[11px] text-white/35">
-        {table.rows.length} enregistrement{table.rows.length !== 1 ? 's' : ''}
+      <div className="flex items-center gap-2 px-3 py-1.5 border-t border-white/8 text-[11px] text-white/35">
+        <span>
+          {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, table.rows.length)} / {table.rows.length} enregistrement{table.rows.length !== 1 ? 's' : ''}
+        </span>
+        {totalPages > 1 && (
+          <div className="ml-auto flex items-center gap-1">
+            <button
+              type="button"
+              disabled={page === 0}
+              onClick={() => setPage(0)}
+              className="px-1.5 py-0.5 rounded border border-white/10 hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+            >
+              «
+            </button>
+            <button
+              type="button"
+              disabled={page === 0}
+              onClick={() => setPage((p) => p - 1)}
+              className="px-1.5 py-0.5 rounded border border-white/10 hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+            >
+              ‹
+            </button>
+            <span className="px-2 text-white/50">
+              {page + 1} / {totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page === totalPages - 1}
+              onClick={() => setPage((p) => p + 1)}
+              className="px-1.5 py-0.5 rounded border border-white/10 hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+            >
+              ›
+            </button>
+            <button
+              type="button"
+              disabled={page === totalPages - 1}
+              onClick={() => setPage(totalPages - 1)}
+              className="px-1.5 py-0.5 rounded border border-white/10 hover:border-white/20 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+            >
+              »
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

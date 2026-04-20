@@ -16,7 +16,7 @@
     "subtitle": "Your intelligent geospatial AI. Ask questions about geographic data, maps, spatial analysis, and more."
   },
   "promptInput": {
-    "placeholder": "Ask anything about geospatial data…",
+    "placeholder": "How can I help you?",
     "dropFiles": "Drop files here",
     "attach": "Attach",
     "attachFiles": "Attach files",
@@ -33,6 +33,14 @@
     "routingTo": "Routing to",
     "thinking": "Thinking..."
   },
+  "hitl": {
+    "clarificationNeeded": "Clarification needed",
+    "dismiss": "Dismiss",
+    "original": "Original:",
+    "awaitingClarification": "Awaiting your clarification…",
+    "hint": "Click a suggestion to continue, or type your clarification in the prompt below.",
+    "clickHint": "Click to send this as your clarification"
+  },
   "datasetChoice": {
     "prompt": "{{count}} datasets found. Which one would you like to use?",
     "promptWithTotal": "{{total}} datasets found in total — showing the first {{shown}}. Which one would you like to use?",
@@ -41,11 +49,13 @@
     "openSource": "Open source page",
     "clickTitle": "Click to pre-fill the prompt",
     "prefillPrefix": "Use this data",
-    "selectHint": "To continue, select the dataset you want to work with by clicking \"Select\", or click its title to refine your question."
+    "selectHint": "To continue, select the dataset you want to work with by clicking \"Select\", or click its title to refine your question.",
+    "chosen": "Selected dataset"
   },
   "agentActivity": {
     "thinking": "Thinking…",
-    "done": "Done"
+    "done": "Done",
+    "waitingForChoice": "Awaiting your choice"
   },
   "faq": {
     "heroTitle": "FAQ & About",

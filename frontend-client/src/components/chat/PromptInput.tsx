@@ -19,7 +19,7 @@ import { AgentIcon } from '../AgentIcon'
 interface Props {
   isStreaming: boolean
   availableAgents: AgentInfo[]
-  selectedAgents: string[]
+  selectedSources: string[]
   onSelectedAgentsChange: (keys: string[]) => void
   onSubmit: (text: string, attachments: Attachment[]) => void
   onStop?: () => void
@@ -42,7 +42,7 @@ function isImageType(type: string): boolean {
 export function PromptInput({
   isStreaming,
   availableAgents,
-  selectedAgents,
+  selectedSources,
   onSelectedAgentsChange,
   onSubmit,
   onStop,
@@ -192,8 +192,7 @@ export function PromptInput({
           onKeyDown={handleKeyDown}
           placeholder={isDragging ? '' : t('promptInput.placeholder')}
           rows={1}
-          disabled={isStreaming}
-          className="w-full bg-transparent border-none outline-none resize-none text-sm text-white placeholder:text-white/30 leading-relaxed px-4 pt-4 pb-2 min-h-14 max-h-40 overflow-y-auto font-sans disabled:cursor-not-allowed"
+          className="w-full bg-transparent border-none outline-none resize-none text-sm text-white placeholder:text-white/30 leading-relaxed px-4 pt-4 pb-2 min-h-14 max-h-40 overflow-y-auto font-sans"
         />
 
         {/* Footer */}
@@ -204,9 +203,8 @@ export function PromptInput({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isStreaming}
               title={t('promptInput.attachFiles')}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
             >
               <Paperclip size={13} />
               <span>{t('promptInput.attach')}</span>
@@ -227,14 +225,13 @@ export function PromptInput({
               <button
                 type="button"
                 onClick={() => setAgentMenuOpen((o) => !o)}
-                disabled={isStreaming}
-                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed select-none"
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors select-none"
               >
                 <Database size={13} />
                 <span>{t('promptInput.sources')}</span>
-                {selectedAgents.length < availableAgents.length && (
+                {selectedSources.length < availableAgents.length && (
                   <span className="ml-0.5 px-1 py-0 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] font-semibold leading-4">
-                    {selectedAgents.length}
+                    {selectedSources.length}
                   </span>
                 )}
                 <ChevronUp
@@ -249,17 +246,17 @@ export function PromptInput({
                     {t('promptInput.sourcesLabel')}
                   </p>
                   {availableAgents.map((agent) => {
-                    const selected = selectedAgents.includes(agent.key)
-                    const isLast = selectedAgents.length === 1 && selected
+                    const selected = selectedSources.includes(agent.key)
+                    const isLast = selectedSources.length === 1 && selected
                     return (
                       <button
                         key={agent.key}
                         type="button"
                         onClick={() => {
                           if (selected) {
-                            if (!isLast) onSelectedAgentsChange(selectedAgents.filter((k) => k !== agent.key))
+                            if (!isLast) onSelectedAgentsChange(selectedSources.filter((k) => k !== agent.key))
                           } else {
-                            onSelectedAgentsChange([...selectedAgents, agent.key])
+                            onSelectedAgentsChange([...selectedSources, agent.key])
                           }
                         }}
                         disabled={isLast}

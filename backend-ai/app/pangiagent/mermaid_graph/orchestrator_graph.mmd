@@ -1,0 +1,86 @@
+---
+config:
+  flowchart:
+    curve: linear
+---
+graph TD;
+	__start__([<p>__start__</p>]):::first
+	memory_node(memory_node)
+	title_node(title_node)
+	ambiguity_node(ambiguity_node)
+	hitl_wait_node(hitl_wait_node)
+	router_node(router_node)
+	merge_node(merge_node)
+	intent_node(intent_node)
+	synthesis_node(synthesis_node)
+	humanoutput_node(humanoutput_node)
+	dataviz_node(dataviz_node)
+	mapviz_node(mapviz_node)
+	__end__([<p>__end__</p>]):::last
+	__start__ --> memory_node;
+	ambiguity_node -.-> hitl_wait_node;
+	ambiguity_node -.-> router_node;
+	calculator_agent\3aexecute_node --> merge_node;
+	datagouv_mcp_agent\3aexecute_node --> merge_node;
+	dataviz_node -.-> mapviz_node;
+	dataviz_node -. &nbsp;__end__&nbsp; .-> synthesis_node;
+	geonetwork_mcp_agent\3aexecute_node --> merge_node;
+	hitl_wait_node -.-> __end__;
+	hitl_wait_node -.-> router_node;
+	humanoutput_node -.-> dataviz_node;
+	humanoutput_node -.-> mapviz_node;
+	humanoutput_node -. &nbsp;__end__&nbsp; .-> synthesis_node;
+	intent_node --> ambiguity_node;
+	mapviz_node --> synthesis_node;
+	memory_node --> title_node;
+	merge_node --> humanoutput_node;
+	neo4j_agent\3aexecute_node --> merge_node;
+	postgis_agent\3aexecute_node --> merge_node;
+	rag_agent\3aexecute_node --> merge_node;
+	rdf_agent\3aexecute_node --> merge_node;
+	router_node -.-> calculator_agent\3aexecute_node;
+	router_node -.-> datagouv_mcp_agent\3aexecute_node;
+	router_node -.-> geonetwork_mcp_agent\3aexecute_node;
+	router_node -.-> merge_node;
+	router_node -.-> neo4j_agent\3aexecute_node;
+	router_node -.-> postgis_agent\3aexecute_node;
+	router_node -.-> rag_agent\3aexecute_node;
+	router_node -.-> rdf_agent\3aexecute_node;
+	router_node -.-> summary_agent\3aenrich_node;
+	router_node -.-> vector_chroma_agent\3aexecute_node;
+	summary_agent\3aexecute_node --> merge_node;
+	title_node --> intent_node;
+	vector_chroma_agent\3aexecute_node --> merge_node;
+	synthesis_node --> __end__;
+	subgraph summary_agent
+	summary_agent\3aenrich_node(enrich_node)
+	summary_agent\3aexecute_node(execute_node)
+	summary_agent\3aenrich_node --> summary_agent\3aexecute_node;
+	end
+	subgraph rag_agent
+	rag_agent\3aexecute_node(execute_node)
+	end
+	subgraph calculator_agent
+	calculator_agent\3aexecute_node(execute_node)
+	end
+	subgraph neo4j_agent
+	neo4j_agent\3aexecute_node(execute_node)
+	end
+	subgraph postgis_agent
+	postgis_agent\3aexecute_node(execute_node)
+	end
+	subgraph rdf_agent
+	rdf_agent\3aexecute_node(execute_node)
+	end
+	subgraph vector_chroma_agent
+	vector_chroma_agent\3aexecute_node(execute_node)
+	end
+	subgraph datagouv_mcp_agent
+	datagouv_mcp_agent\3aexecute_node(execute_node)
+	end
+	subgraph geonetwork_mcp_agent
+	geonetwork_mcp_agent\3aexecute_node(execute_node)
+	end
+	classDef default fill:#f2f0ff,line-height:1.2
+	classDef first fill-opacity:0
+	classDef last fill:#bfb6fc

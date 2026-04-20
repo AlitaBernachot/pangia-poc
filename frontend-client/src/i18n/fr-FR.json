@@ -16,7 +16,7 @@
     "subtitle": "Votre IA géospatiale intelligente. Posez des questions sur les données géographiques, les cartes, l'analyse spatiale, et bien plus encore."
   },
   "promptInput": {
-    "placeholder": "Posez n'importe quelle question sur les données géospatiales…",
+    "placeholder": "Comment puis-je vous aider ?",
     "dropFiles": "Déposez les fichiers ici",
     "attach": "Joindre",
     "attachFiles": "Joindre des fichiers",
@@ -33,6 +33,14 @@
     "routingTo": "Routage vers",
     "thinking": "Réflexion en cours..."
   },
+  "hitl": {
+    "clarificationNeeded": "Clarification requise",
+    "dismiss": "Ignorer",
+    "original": "Original :",
+    "awaitingClarification": "En attente de votre clarification…",
+    "hint": "Cliquez sur une suggestion pour continuer, ou saisissez votre clarification dans le champ ci-dessous.",
+    "clickHint": "Cliquer pour envoyer cette réponse"
+  },
   "datasetChoice": {
     "prompt": "{{count}} datasets trouvés. Lequel souhaitez-vous utiliser ?",
     "promptWithTotal": "{{total}} datasets trouvés au total — affichage des {{shown}} premiers. Lequel souhaitez-vous utiliser ?",
@@ -41,11 +49,13 @@
     "openSource": "Ouvrir la page source",
     "clickTitle": "Cliquer pour pré-remplir la saisie",
     "prefillPrefix": "Utilise ces données",
-    "selectHint": "Pour continuer, sélectionnez le dataset sur lequel vous souhaitez travailler en cliquant sur « Sélectionner », ou cliquez sur son titre pour affiner votre question."
+    "selectHint": "Pour continuer, sélectionnez le dataset sur lequel vous souhaitez travailler en cliquant sur « Sélectionner », ou cliquez sur son titre pour affiner votre question.",
+    "chosen": "Dataset sélectionné"
   },
   "agentActivity": {
     "thinking": "Réflexion en cours…",
-    "done": "Terminé"
+    "done": "Terminé",
+    "waitingForChoice": "En attente du choix"
   },
   "faq": {
     "heroTitle": "FAQ & À propos",

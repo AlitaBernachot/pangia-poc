@@ -7,17 +7,30 @@ import { MessageSquare, HelpCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { LanguageSwitcher } from './LanguageSwitcher'
 
-export function Navbar() {
+interface Props {
+  sessionTitle?: string
+}
+
+export function Navbar({ sessionTitle }: Props) {
   const { t } = useTranslation()
 
   return (
     <header className="flex items-center justify-between px-5 h-14 border-b border-white/8 bg-[#0d0d0f]/80 backdrop-blur-sm sticky top-0 z-50">
-      <a href="/" className="flex items-center gap-2 text-white font-semibold text-lg">
+      <a href="/" className="flex items-center gap-2 text-white font-semibold text-lg shrink-0">
         <img src="/logo.png" alt="PangIA" className="size-7 rounded" />
         <span>PangIA</span>
       </a>
 
-      <div className="flex items-center gap-3">
+      {/* Session title — right of the logo, uppercase */}
+      {sessionTitle && (
+        <span id="session-title" className="ml-8 text-xs font-semibold uppercase tracking-widest truncate max-w-[260px]">
+          {sessionTitle}
+        </span>
+      )}
+
+      <div className="flex-1" />
+
+      <div className="flex items-center gap-3 shrink-0">
         <nav className="flex items-center gap-1">
           <NavLink
             to="/"

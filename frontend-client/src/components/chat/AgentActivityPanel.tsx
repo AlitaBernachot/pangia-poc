@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { type AgentActivity, AGENT_COLORS } from '../../types'
 import { AgentIcon } from '../AgentIcon'
 import { ToolIcon } from '../ToolIcon'
-import { ChevronDown, ChevronRight, CheckCheck, Lightbulb } from 'lucide-react'
+import { ChevronDown, ChevronRight, CheckCheck, Lightbulb, Clock } from 'lucide-react'
 
 interface Props {
   activity: AgentActivity
@@ -38,12 +38,17 @@ export function AgentActivityPanel({ activity }: Props) {
         <span className="font-medium text-white/80">{activity.agent}</span>
         <span
           className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
-            activity.streaming
-              ? ''
-              : 'border text-green-400 border-green-400'
+            !activity.streaming
+              ? 'border text-green-400 border-green-400'
+              : ''
           }`}
         >
-          {activity.streaming ? (
+          {activity.waitingForChoice ? (
+            <span className="inline-flex items-center gap-1 text-amber-400/80">
+              <Clock size={10} />
+              <span>{t('agentActivity.waitingForChoice')}</span>
+            </span>
+          ) : activity.streaming ? (
             runningTool ? (
               <span className="inline-flex items-center gap-1">
                 <span className="shimmer-icon">

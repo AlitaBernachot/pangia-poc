@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 import { useCallback, useRef, useState } from 'react'
-import type { AgentActivity, AgentInfo, DatasetCandidate, DataVizPayload, Message, OgcLayer, ToolActivity } from '../types'
+import type { AgentActivity, AgentInfo, ChoiceRequestEvent, DatasetCandidate, DataVizPayload, HITLRequestEvent, Message, OgcLayer, ToolActivity } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -11,20 +11,31 @@ export function usePangiaChat() {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionTitle, setSessionTitle] = useState<string>('')
   const [agents, setAgents] = useState<AgentInfo[]>([])
-  const [selectedAgents, setSelectedAgents] = useState<string[]>([])
+  const [selectedSources, setSelectedSources] = useState<string[]>([])
+  const [hitlRequest, setHitlRequest] = useState<HITLRequestEvent | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  // Always-current ref used by callbacks that need synchronous access to the
+  // latest messages without capturing a stale closure value.
+  const messagesRef = useRef<Message[]>(messages)
+  messagesRef.current = messages
 
   // Empty dependency array: fetchAgents only calls the backend and sets local state;
   // it doesn't capture any reactive values that would change over time.
   const fetchAgents = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/agents`)
+      const res = await fetch(`${API_BASE}/api/sources`)
       if (!res.ok) return
       const data = await res.json()
-      const list: AgentInfo[] = data.agents ?? []
+      const list: AgentInfo[] = (data.sources ?? []).map((s: { id: string; label: string }) => ({
+        key: s.id,
+        label: s.label,
+      }))
       setAgents(list)
-      setSelectedAgents(list.map((a) => a.key))
+      // TODO: temporary — only pre-select datagouv until other connectors are fully wired
+      const datagouv = list.find((a) => a.key === 'datagouv_mcp_agent')
+      setSelectedSources(datagouv ? [datagouv.key] : list.map((a) => a.key))
     } catch {
       // backend not available yet — no-op
     }
@@ -64,7 +75,7 @@ export function usePangiaChat() {
           body: JSON.stringify({
             message: text.trim(),
             session_id: sessionId,
-            selected_agents: selectedAgents.length > 0 ? selectedAgents : undefined,
+            selected_sources: selectedSources.length > 0 ? selectedSources : undefined,
           }),
           signal: ctrl.signal,
         })
@@ -104,14 +115,45 @@ export function usePangiaChat() {
 
             if (type === 'session') {
               setSessionId(event.session_id as string)
+            } else if (type === 'session_title') {
+              setSessionTitle(event.title as string)
             } else if (type === 'routing') {
               const agents = event.agents as string[]
               updateAssistant((m) => ({ ...m, routingAgents: agents }))
+            } else if (type === 'routing_plan') {
+              // V2 routing plan — backend emits `agents` (flat array) + `reasoning`
+              const agents = (event.agents as string[] | undefined) ?? []
+              const reasoning = (event.reasoning as string | undefined) ?? ''
+              updateAssistant((m) => ({
+                ...m,
+                routingAgents: agents,
+                routingPlan: { steps: agents.map((a, i) => ({ agent_name: a, parallel_group: i })), reasoning },
+              }))
             } else if (type === 'token') {
               updateAssistant((m) => ({
                 ...m,
                 content: m.content + (event.content as string),
               }))
+            } else if (type === 'final_answer') {
+              // Replace content — synthesis_node may emit a second final_answer
+              // that supersedes the raw merge_node answer.
+              const answer = event.answer as string
+              if (answer) {
+                updateAssistant((m) => ({ ...m, content: answer }))
+              }
+            } else if (type === 'agent_start') {
+              const agent = event.agent as string
+              updateAssistant((m) => {
+                const activities = [...(m.agentActivity ?? [])]
+                const idx = activities.findIndex((a) => a.agent === agent)
+                if (idx < 0) {
+                  activities.push({ agent, content: '', streaming: true, tools: [] })
+                } else {
+                  // resumed after a choice — mark streaming again, clear waitingForChoice
+                  activities[idx] = { ...activities[idx], streaming: true, waitingForChoice: false }
+                }
+                return { ...m, agentActivity: activities }
+              })
             } else if (type === 'agent_token') {
               const agent = event.agent as string
               const token = event.content as string
@@ -126,6 +168,28 @@ export function usePangiaChat() {
                   }
                 } else {
                   activities.push({ agent, content: token, streaming: true, tools: [] })
+                }
+                return { ...m, agentActivity: activities }
+              })
+            } else if (type === 'agent_end') {
+              // V2 agent_end — mark streaming done.
+              // Keep the streamed content already accumulated via agent_token
+              // (which is the full response); only fall back to the answer
+              // field if no streaming happened (answer is truncated to 500 chars).
+              const agent = event.agent as string
+              const answer = (event.answer as string | undefined) ?? ''
+              updateAssistant((m) => {
+                const activities = [...(m.agentActivity ?? [])]
+                const idx = activities.findIndex((a) => a.agent === agent)
+                if (idx >= 0) {
+                  const streamed = activities[idx].content
+                  activities[idx] = {
+                    ...activities[idx],
+                    content: streamed.length > answer.length ? streamed : answer,
+                    streaming: false,
+                  }
+                } else {
+                  activities.push({ agent, content: answer, streaming: false, tools: [] })
                 }
                 return { ...m, agentActivity: activities }
               })
@@ -176,11 +240,46 @@ export function usePangiaChat() {
                 dataviz: event.data as DataVizPayload,
               }))
             } else if (type === 'dataset_choice') {
-              updateAssistant((m) => ({
-                ...m,
-                datasetChoice: event.candidates as DatasetCandidate[],
-                datasetChoiceTotal: (event.total as number | null) ?? null,
-              }))
+              const agentName = event.agent as string
+              updateAssistant((m) => {
+                const agentActivity = agentName
+                  ? (m.agentActivity ?? []).map((a) =>
+                      a.agent === agentName ? { ...a, waitingForChoice: true } : a,
+                    )
+                  : m.agentActivity
+                return {
+                  ...m,
+                  agentActivity,
+                  choiceRequest: {
+                    request_id: event.request_id as string,
+                    agent: agentName,
+                    items: event.candidates as ChoiceRequestEvent['items'],
+                    total: (event.total as number | null) ?? null,
+                    original_query: event.original_query as string,
+                  },
+                }
+              })
+            } else if (type === 'choice_request') {
+              const choiceEvent = event as unknown as ChoiceRequestEvent
+              updateAssistant((m) => {
+                // Mark the agent that issued the request as waitingForChoice
+                const agentName = choiceEvent.agent
+                const agentActivity = agentName
+                  ? (m.agentActivity ?? []).map((a) =>
+                      a.agent === agentName ? { ...a, waitingForChoice: true } : a,
+                    )
+                  : m.agentActivity
+                return { ...m, choiceRequest: choiceEvent, agentActivity }
+              })
+            } else if (type === 'hitl_request') {
+              // V2 HITL — show modal to the user
+              setHitlRequest({
+                request_id: event.request_id as string,
+                questions: event.questions as string[],
+                original_query: event.original_query as string,
+              })
+            } else if (type === 'hitl_resolved' || type === 'hitl_timeout') {
+              setHitlRequest(null)
             } else if (type === 'done') {
               updateAssistant((m) => {
                 const activities = (m.agentActivity ?? []).map(
@@ -211,7 +310,7 @@ export function usePangiaChat() {
         abortRef.current = null
       }
     },
-    [isStreaming, sessionId, selectedAgents],
+    [isStreaming, sessionId, selectedSources],
   )
 
   const stopStreaming = useCallback(() => {
@@ -233,18 +332,81 @@ export function usePangiaChat() {
   const clearMessages = useCallback(() => {
     setMessages([])
     setSessionId(null)
+    setSessionTitle('')
   }, [])
+
+  const dismissHitl = useCallback(() => setHitlRequest(null), [])
+
+  const submitHitlResponse = useCallback(
+    async (question: string) => {
+      if (!hitlRequest) return
+      const requestId = hitlRequest.request_id
+      // Clear the modal immediately so the UI stops waiting
+      setHitlRequest(null)
+      try {
+        await fetch(`${API_BASE}/api/hitl/respond`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ request_id: requestId, clarified_query: question }),
+        })
+      } catch {
+        // Non-fatal — the backend will timeout gracefully
+      }
+    },
+    [hitlRequest],
+  )
+
+  const submitChoiceResponse = useCallback(
+    async (messageId: string, chosenId: string, chosenQuery: string, candidate?: DatasetCandidate) => {
+      // Read requestId synchronously from the ref — React 18 state updaters
+      // run asynchronously, so reading via setMessages(fn) side-effect would
+      // leave requestId as '' when checked immediately after.
+      const choiceMsg = messagesRef.current.find((m) => m.id === messageId)
+      const requestId = choiceMsg?.choiceRequest?.request_id
+      const agentName = choiceMsg?.choiceRequest?.agent
+      if (!requestId) return
+      // Clear the choice panel, store the chosen dataset for display, and
+      // mark the agent as streaming again so the activity panel shows
+      // "Thinking…" while the resumed run executes.
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== messageId) return m
+          const agentActivity = agentName
+            ? (m.agentActivity ?? []).map((a) =>
+                a.agent === agentName ? { ...a, streaming: true, waitingForChoice: false, tools: [] } : a,
+              )
+            : m.agentActivity
+          return { ...m, choiceRequest: null, chosenDataset: candidate ?? null, streaming: true, agentActivity }
+        }),
+      )
+      try {
+        await fetch(`${API_BASE}/api/choice/respond`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ request_id: requestId, chosen_id: chosenId, chosen_query: chosenQuery }),
+        })
+      } catch {
+        // Non-fatal
+      }
+    },
+    [],
+  )
 
   return {
     messages,
     isStreaming,
     sessionId,
+    sessionTitle,
     agents,
-    selectedAgents,
-    setSelectedAgents,
+    selectedSources,
+    setSelectedSources,
     sendMessage,
     stopStreaming,
     clearMessages,
     fetchAgents,
+    hitlRequest,
+    dismissHitl,
+    submitHitlResponse,
+    submitChoiceResponse,
   }
 }
