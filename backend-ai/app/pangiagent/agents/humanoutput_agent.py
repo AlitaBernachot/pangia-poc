@@ -49,7 +49,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.models import AgentInput, AgentOutput
 from app.pangiagent.agents.base_agent import BaseAgent
 from app.pangiagent.model_config import build_llm, get_agent_model_config
-from libs.filereader import find_coord_columns
+from libs.filereader import find_coord_columns, find_wkt_geom_column
 
 if TYPE_CHECKING:
     from app.pangiagent.state import OrchestratorState
@@ -162,7 +162,8 @@ class HumanOutputAgent(BaseAgent):
             tables = (existing_dataviz or {}).get("tables", [])
             columns = tables[0].get("columns", []) if tables else []
             lat_col, lon_col = find_coord_columns(columns)
-            needs_map = existing_geojson is not None or (lat_col is not None and lon_col is not None)
+            has_wkt_geom = find_wkt_geom_column(columns) is not None
+            needs_map = existing_geojson is not None or (lat_col is not None and lon_col is not None) or has_wkt_geom
             # Let intent override: if user explicitly asked for a map, honour it
             if intent_needs_map is True:
                 needs_map = True

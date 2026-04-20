@@ -914,6 +914,8 @@ backend-ai/
         │   └── calculator_agent_graph.mmd
         └── agents/
             ├── base_agent.py           Abstract BaseAgent: guardrails, prompt loading, as_subgraph()
+            ├── base_react_agent.py     BaseReActAgent — intermediate base for tool-using agents (ReAct loop)
+            ├── base_add_sources_agent.py BaseAddSourcesAgent — mixin: structured source tracking
             ├── ambiguity_agent.py      AmbiguityAgent — LLM ambiguity scorer for HITL
             ├── intent_parser_agent.py  IntentParserAgent — structured intent extraction (action, concept, filters, geo)
             ├── orchestrator_agent.py   build_graph() — orchestrator StateGraph + Mermaid output

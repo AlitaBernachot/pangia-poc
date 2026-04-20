@@ -130,6 +130,7 @@ class SummaryAgent(BaseAgent):
                         "error": output.error,
                         "duration_ms": output.state.get("duration_ms", 0),
                         "violations": output.state.get("post_guardrail_violations", []),
+                        "sources": [s.model_dump() for s in output.sources],
                     }
                 }
             }

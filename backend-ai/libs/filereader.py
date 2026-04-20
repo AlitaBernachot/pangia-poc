@@ -267,6 +267,17 @@ _COMBINED_COORD_NAMES = {
 _COMBINED_SUBSTRINGS = ["geo_point", "coord", "geoloc", "gps"]
 _LATLON_CELL_RE = re.compile(r"(-?\d{1,3}\.\d+)[,\s]+(-?\d{1,3}\.\d+)")
 
+# WKT geometry column detection
+_WKT_GEOM_NAMES = {
+    "the_geom", "geom", "geometry", "wkb_geometry", "shape", "geo_shape",
+    "geographie", "geometrie",
+}
+_WKT_GEOM_SUBSTRINGS = ["geom", "shape", "geometr"]
+# Matches: POINT (lon lat) or POINT(lon lat)
+_WKT_POINT_RE = re.compile(
+    r"POINT\s*\(\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\)", re.IGNORECASE
+)
+
 
 def _find_coord_columns(columns: list[str]) -> tuple[str | None, str | None]:
     """Return ``(lat_col, lon_col)`` by matching column names case-insensitively.
@@ -300,6 +311,19 @@ def _find_combined_coord_column(columns: list[str]) -> str | None:
         return match
     return next(
         (orig for lower, orig in cols_lower.items() if any(s in lower for s in _COMBINED_SUBSTRINGS)),
+        None,
+    )
+
+
+def _find_wkt_geom_column(columns: list[str]) -> str | None:
+    """Find a column holding WKT geometry strings (e.g. ``the_geom``, ``geom``)."""
+    cols_lower = {c.lower().strip(): c for c in columns}
+    match = next((cols_lower[k] for k in _WKT_GEOM_NAMES if k in cols_lower), None)
+    if match:
+        return match
+    return next(
+        (orig for lower, orig in cols_lower.items()
+         if any(s in lower for s in _WKT_GEOM_SUBSTRINGS)),
         None,
     )
 
@@ -353,9 +377,30 @@ def rows_to_geojson(
                     "geometry": {"type": "Point", "coordinates": [lon, lat]},
                     "properties": props,
                 })
+        else:
+            wkt_col = _find_wkt_geom_column(columns)
+            if wkt_col:
+                for row in rows:
+                    cell = str(row.get(wkt_col, "")).strip()
+                    m = _WKT_POINT_RE.search(cell)
+                    if not m:
+                        continue
+                    try:
+                        lon, lat = float(m.group(1)), float(m.group(2))
+                    except ValueError:
+                        continue
+                    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+                        continue
+                    props = {k: v for k, v in row.items() if k != wkt_col}
+                    features.append({
+                        "type": "Feature",
+                        "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                        "properties": props,
+                    })
     if not features:
         return None
     return {"type": "FeatureCollection", "features": features}
 
 # Public aliases for coordinate-detection helpers used by agent modules
 find_coord_columns = _find_coord_columns
+find_wkt_geom_column = _find_wkt_geom_column

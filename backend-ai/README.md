@@ -15,31 +15,49 @@ This is the second-generation backend for PangIA. It adds guardrails, structured
 
 ## Table of Contents
 
-- [Directory structure](#directory-structure)
-- [Orchestrator graph topology](#orchestrator-graph-topology)
-- [Agent catalogue](#agent-catalogue)
-- [BaseAgent — the reusable base class](#baseagent--the-reusable-base-class)
-  - [Lifecycle hooks](#lifecycle-hooks)
-  - [Prompt loading](#prompt-loading)
-  - [Subgraph compilation](#subgraph-compilation)
-  - [Agent-level choice requests (`request_choice`)](#agent-level-choice-requests-request_choice)
-- [HITL — ambiguity clarification](#hitl--ambiguity-clarification)
-- [Choice flow — agent-level disambiguation](#choice-flow--agent-level-disambiguation)
-  - [How it works end-to-end](#how-it-works-end-to-end)
-  - [Reusing `request_choice` in another agent](#reusing-request_choice-in-another-agent)
-- [Guardrails](#guardrails)
-- [Memory](#memory)
-- [Audit trail](#audit-trail)
-- [Routing](#routing)
-- [Post-processing pipeline](#post-processing-pipeline)
-- [Synthesis agent](#synthesis-agent)
-- [data.gouv.fr MCP agent](#datagouvfr-mcp-agent)
-- [SSE event types](#sse-event-types)
-- [API endpoints](#api-endpoints)
-- [Environment variables](#environment-variables)
-- [Configurable system prompts](#configurable-system-prompts)
-- [Adding a new agent](#adding-a-new-agent)
-- [Running locally (without Docker)](#running-locally-without-docker)
+- [Backend V2 — PangIA Second-Generation Multi-Agent System](#backend-v2--pangia-second-generation-multi-agent-system)
+  - [Table of Contents](#table-of-contents)
+  - [Directory structure](#directory-structure)
+  - [Orchestrator graph topology](#orchestrator-graph-topology)
+  - [Agent catalogue](#agent-catalogue)
+  - [BaseAgent — the reusable base class](#baseagent--the-reusable-base-class)
+    - [Agent inheritance hierarchy](#agent-inheritance-hierarchy)
+    - [Lifecycle hooks](#lifecycle-hooks)
+    - [Prompt loading](#prompt-loading)
+    - [Subgraph compilation](#subgraph-compilation)
+    - [Agent-level choice requests (`request_choice`)](#agent-level-choice-requests-request_choice)
+  - [HITL — ambiguity clarification](#hitl--ambiguity-clarification)
+  - [Choice flow — agent-level disambiguation](#choice-flow--agent-level-disambiguation)
+    - [How it works end-to-end](#how-it-works-end-to-end)
+    - [Reusing `request_choice` in another agent](#reusing-request_choice-in-another-agent)
+  - [Guardrails](#guardrails)
+  - [Memory](#memory)
+    - [Short-term memory](#short-term-memory)
+    - [Long-term memory](#long-term-memory)
+  - [Audit trail](#audit-trail)
+  - [Routing](#routing)
+    - [SmartDispatcherAgent (default, no LLM)](#smartdispatcheragent-default-no-llm)
+    - [DynamicRouter (LLM-based fallback)](#dynamicrouter-llm-based-fallback)
+    - [Source registry](#source-registry)
+  - [Post-processing pipeline](#post-processing-pipeline)
+    - [HumanOutputAgent](#humanoutputagent)
+    - [DataVizAgent](#datavizagent)
+    - [MapVizAgent](#mapvizagent)
+  - [Synthesis agent](#synthesis-agent)
+  - [data.gouv.fr MCP agent](#datagouvfr-mcp-agent)
+    - [Capabilities](#capabilities)
+    - [Dataset disambiguation via `request_choice`](#dataset-disambiguation-via-request_choice)
+    - [Download links](#download-links)
+  - [SSE event types](#sse-event-types)
+    - [`choice_request` event payload](#choice_request-event-payload)
+  - [API endpoints](#api-endpoints)
+    - [`POST /api/chat`](#post-apichat)
+    - [`POST /api/hitl/respond`](#post-apihitlrespond)
+    - [`POST /api/choice/respond`](#post-apichoicerespond)
+  - [Environment variables](#environment-variables)
+  - [Configurable system prompts](#configurable-system-prompts)
+  - [Adding a new agent](#adding-a-new-agent)
+  - [Running locally (without Docker)](#running-locally-without-docker)
 
 ---
 
@@ -95,6 +113,8 @@ backend-ai/
         ├── mermaid_graph/          Auto-generated LangGraph Mermaid diagrams (written at startup)
         └── agents/
             ├── base_agent.py           BaseAgent (abstract) — guardrails, prompt loading, subgraph, request_choice
+            ├── base_react_agent.py     BaseReActAgent — intermediate base for tool-using agents (ReAct loop)
+            ├── base_add_sources_agent.py BaseAddSourcesAgent — mixin: add_source / merge_sources / _generate_sources
             ├── ambiguity_agent.py      AmbiguityAgent — LLM ambiguity scorer (utility, not fanned-out)
             ├── title_agent.py          TitleAgent — generates a 4-6 word session title (utility, not fanned-out)
             ├── intent_parser_agent.py  IntentParserAgent — parses query into structured intent (utility, not fanned-out)
@@ -195,6 +215,36 @@ The Mermaid diagram is written to `app/pangiagent/mermaid_graph/orchestrator_gra
 **File:** `app/pangiagent/agents/base_agent.py`
 
 All sub-agents that participate in the orchestrator fan-out **must** inherit from `BaseAgent`.
+
+### Agent inheritance hierarchy
+
+```
+object
+├── BaseAgent (ABC)              base_agent.py — guardrails, prompt, HITL, intent
+│   └── BaseReActAgent           base_react_agent.py — generic ReAct loop (_react_loop, _invoke_tool)
+│       ├── DataVizAgent         dataviz_agent.py
+│       ├── MapVizAgent          mapviz_agent.py
+│       └── DataGouvMCPAgent ───┐ datagouv_mcp_agent.py
+└── BaseAddSourcesAgent (mixin) ┘ base_add_sources_agent.py
+    add_source / merge_sources /
+    _generate_sources
+```
+
+**`BaseReActAgent`** — inherit from this (instead of `BaseAgent` directly) when your agent calls external tools in a loop. Provides:
+- `_react_loop(messages, llm, tool_map)` — iterates up to `max_iterations`, dispatches tool calls, appends `ToolMessage` results.
+- `_invoke_tool(tc, tool_map)` — single-call hook; override for caching, guards, or disambiguation.
+
+**`BaseAddSourcesAgent`** — pure mixin (no `BaseAgent` dependency) for agents that expose structured data sources to the user. Combine via multiple inheritance:
+
+```python
+class MyAgent(BaseReActAgent, BaseAddSourcesAgent):
+    ...
+```
+
+Provides:
+- `add_source(output, title, url, kind, fmt)` — appends a deduplicated `AgentSource` to an `AgentOutput`.
+- `merge_sources(outputs)` — static; deduplicates and orders sources across multiple outputs (datasets → resources → other).
+- `_generate_sources(output, **context)` — no-op hook; override to populate sources after the core logic.
 
 ```python
 from app.pangiagent.agents.base_agent import BaseAgent

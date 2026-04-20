@@ -16,17 +16,65 @@ Do not add agent files directly under `backend-ai/app/` or any other directory.
 
 ## Inheritance
 
-Every new sub-agent that participates in the orchestrator fan-out **must** inherit from `BaseAgent`:
+### Base class hierarchy
+
+```
+object
+├── BaseAgent (ABC)              base_agent.py — guardrails, prompt, HITL, intent
+│   └── BaseReActAgent           base_react_agent.py — generic ReAct loop
+│       ├── DataVizAgent
+│       ├── MapVizAgent
+│       └── DataGouvMCPAgent ───┐
+└── BaseAddSourcesAgent (mixin) ┘ base_add_sources_agent.py
+```
+
+### Choosing the right base class
+
+| Your agent does… | Inherit from |
+|---|---|
+| Simple LLM call, no tools | `BaseAgent` |
+| Calls external tools in a ReAct loop | `BaseReActAgent` |
+| Exposes structured data sources to the user | add `BaseAddSourcesAgent` as a second base |
+
+**`BaseAgent`** — mandatory base for all fanned-out agents:
 
 ```python
 from app.pangiagent.agents.base_agent import BaseAgent
 ```
 
-`BaseAgent` provides:
+Provides:
 - Pre- and post-guardrail hook execution (via `run()`)
 - Timing (`duration_ms` written to `output.state`)
 - Uniform error handling and logging
 - System prompt loading from `config/prompts/<agent_name>.yaml` (via `get_prompt(default)`)
+
+**`BaseReActAgent`** — use instead of `BaseAgent` when your agent needs a tool-calling loop:
+
+```python
+from app.pangiagent.agents.base_react_agent import BaseReActAgent
+
+class MyAgent(BaseReActAgent):
+    ...
+```
+
+Provides in addition to `BaseAgent`:
+- `_react_loop(messages, llm, tool_map)` — iterates up to `max_iterations`, dispatches tool calls, appends `ToolMessage` results.
+- `_invoke_tool(tc, tool_map)` — single-call hook; override for caching, guards, or disambiguation.
+
+**`BaseAddSourcesAgent`** — pure mixin for agents that expose structured sources (`AgentSource`) to the synthesis layer. No `BaseAgent` dependency; combine via multiple inheritance:
+
+```python
+from app.pangiagent.agents.base_react_agent import BaseReActAgent
+from app.pangiagent.agents.base_add_sources_agent import BaseAddSourcesAgent
+
+class MyAgent(BaseReActAgent, BaseAddSourcesAgent):
+    ...
+```
+
+Provides:
+- `add_source(output, title, url, kind, fmt)` — deduplicated append.
+- `merge_sources(outputs)` — static; orders datasets → resources → other.
+- `_generate_sources(output, **context)` — no-op hook; override to populate sources after `_run()`.
 
 **Exception:** Utility agents that are called directly inside a LangGraph node rather than fanned out as independent sub-agents (e.g. `AmbiguityAgent`) do **not** need to inherit from `BaseAgent`. Document this clearly in the module docstring.
 

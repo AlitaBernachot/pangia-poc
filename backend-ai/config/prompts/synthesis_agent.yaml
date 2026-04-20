@@ -26,9 +26,8 @@ prompt: |
      (e.g. "les données sont affichées dans le tableau ci-dessus") without repeating values.
   4. When a GeoJSON / map layer is available, mention it concisely
      (e.g. "les webcams sont localisées sur la carte ci-dessus").
-  5. Preserve any Markdown links `[text](url)` that appear in the agent results — copy them
-     verbatim at the end of your response without altering the URL.
-     If no links are present in the agent results, do **not** invent or mention download links.
+  5. Do **not** include source or download links in your response — they are appended
+     automatically after your text.
   6. If you cannot determine a meaningful answer from the agent results, say so clearly.
   7. Answer in the **same language as the user's question**.
   8. Be concise: 1–4 sentences is ideal. Expand only if the topic genuinely requires it.

@@ -16,7 +16,8 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from app.config import get_settings
 from app.models import AgentInput, AgentOutput, ChoiceItem
-from app.pangiagent.agents.base_agent import BaseAgent
+from app.pangiagent.agents.base_add_sources_agent import BaseAddSourcesAgent
+from app.pangiagent.agents.base_react_agent import BaseReActAgent
 from app.pangiagent.model_config import build_llm, get_agent_model_config
 from libs.filereader import fetch_and_parse
 from libs.datagouv import (
@@ -193,7 +194,7 @@ async def fetch_resource_file(
 
 # ─── Agent class ──────────────────────────────────────────────────────────────
 
-class DataGouvMCPAgent(BaseAgent):
+class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
     name = "datagouv_mcp_agent"
     _DEFAULT_PROMPT = _DEFAULT_PROMPT
 
@@ -593,16 +594,6 @@ class DataGouvMCPAgent(BaseAgent):
                     result_text = text
                     break
 
-        # ── Append fetched resource links (owned by this agent) ───────────────
-        # The datagouv agent is responsible for formatting its own download links
-        # so that downstream synthesis never needs to know about resource URLs.
-        if _fetched_url_formats:
-            links = "\n".join(
-                f"- [{fmt.upper()}]({url})"
-                for url, fmt in _fetched_url_formats.items()
-            )
-            result_text = (result_text.rstrip("\n") or "") + f"\n\n**Téléchargement :**\n{links}"
-
         # ── Separate tabular vs GeoJSON payloads ──────────────────────────────
         tabular_data: dict | None = None
         geojson_data: dict | None = None
@@ -628,7 +619,7 @@ class DataGouvMCPAgent(BaseAgent):
         elif not result_text:
             result_text = "data.gouv.fr agent returned no result."
 
-        # ── Build AgentOutput.state extras ────────────────────────────────────
+        # ── Build AgentOutput ─────────────────────────────────────────────────
         extra_state: dict = {}
 
         # GeoJSON layer
@@ -654,9 +645,58 @@ class DataGouvMCPAgent(BaseAgent):
                     }],
                 }
 
-        return AgentOutput(
+        output = AgentOutput(
             agent_name=self.name,
             answer=result_text,
             confidence=0.85,
             state=extra_state,
         )
+
+        # ── Attach structured sources ─────────────────────────────────────────
+        self._generate_sources(
+            output,
+            messages=messages,
+            search_call_ids=search_call_ids,
+            chosen_dataset_id=_chosen_dataset_id,
+            fetched_url_formats=_fetched_url_formats,
+        )
+
+        return output
+
+    def _generate_sources(
+        self,
+        output: AgentOutput,
+        *,
+        messages: list,
+        search_call_ids: set,
+        chosen_dataset_id: str | None,
+        fetched_url_formats: dict[str, str],
+        **_kwargs: Any,
+    ) -> None:
+        """Populate *output* with dataset and resource sources."""
+        # 1. Dataset page (catalogue)
+        all_candidates = extract_dataset_candidates(messages, search_call_ids)
+        dataset_source: dict | None = None
+        if chosen_dataset_id:
+            dataset_source = next(
+                (c for c in all_candidates if c.get("id") == chosen_dataset_id), None
+            )
+        if dataset_source is None and all_candidates:
+            dataset_source = all_candidates[0]
+        if dataset_source and dataset_source.get("title"):
+            self.add_source(
+                output,
+                title=dataset_source["title"],
+                url=dataset_source.get("url", ""),
+                kind="dataset",
+            )
+
+        # 2. Downloaded resources
+        for res_url, res_fmt in fetched_url_formats.items():
+            self.add_source(
+                output,
+                title=res_fmt.upper(),
+                url=res_url,
+                kind="resource",
+                fmt=res_fmt.upper(),
+            )

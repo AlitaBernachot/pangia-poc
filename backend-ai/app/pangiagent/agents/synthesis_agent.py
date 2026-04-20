@@ -29,14 +29,11 @@ Design notes
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Coroutine
 
-import yaml
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.models import AgentInput, AgentOutput
+from app.models import AgentInput, AgentOutput, AgentSource
 from app.pangiagent.agents.base_agent import BaseAgent
 from app.pangiagent.model_config import build_llm, get_agent_model_config
 
@@ -44,6 +41,37 @@ if TYPE_CHECKING:
     from app.pangiagent.state import OrchestratorState
 
 logger = logging.getLogger(__name__)
+
+
+def _format_sources_footer(sources: list[AgentSource]) -> str:
+    """Format a list of :class:`~app.models.AgentSource` into a Markdown footer.
+
+    Produces two sections when both kinds are present:
+    - **Source(s) :** — dataset catalogue links
+    - **Téléchargement :** — downloadable resource links
+
+    Returns an empty string when *sources* is empty.
+    """
+    datasets = [s for s in sources if s.kind == "dataset"]
+    resources = [s for s in sources if s.kind == "resource"]
+    others = [s for s in sources if s.kind == "other"]
+
+    parts: list[str] = []
+    if datasets:
+        lines = "\n".join(
+            f"- [{s.title}]({s.url})" if s.url else f"- {s.title}"
+            for s in datasets
+        )
+        parts.append(f"**Source(s) :**\n{lines}")
+    if resources or others:
+        items = resources + others
+        lines = "\n".join(
+            f"- [{s.format or s.title}]({s.url})" if s.url else f"- {s.format or s.title}"
+            for s in items
+        )
+        parts.append(f"**Téléchargement :**\n{lines}")
+    return "\n\n".join(parts)
+
 
 _DEFAULT_PROMPT = """\
 You are the final synthesis layer of PangIA, a geospatial intelligence platform.
@@ -69,9 +97,8 @@ You will be given:
    ("les données sont affichées dans le tableau ci-dessus") without repeating values.
 4. When a GeoJSON / map layer is available, mention it concisely
    ("les webcams sont localisées sur la carte ci-dessus").
-5. Preserve any Markdown links `[text](url)` that appear in the agent results — copy them
-   verbatim at the end of your response without altering the URL.
-   If no links are present in the agent results, do **not** invent or mention download links.
+5. Do **not** include source or download links in your response — they are appended
+   automatically after your text.
 6. If you cannot determine a meaningful answer from the agent results, say so clearly.
 7. Answer in the **same language as the user's question**.
 8. Be concise: 1–4 sentences is ideal. Expand only if the topic genuinely requires it.
@@ -116,7 +143,7 @@ class SynthesisAgent(BaseAgent):
             f"[AGENT RESULTS]\n{raw_results}\n"
         )
         if context_notes:
-            user_content += f"\n[CONTEXT]\n" + "\n".join(context_notes) + "\n"
+            user_content += "\n[CONTEXT]\n" + "\n".join(context_notes) + "\n"
 
         llm = build_llm(get_agent_model_config(self.name))
         response = await llm.ainvoke([
@@ -135,10 +162,8 @@ class SynthesisAgent(BaseAgent):
         agent = self
 
         async def synthesis_node(state: OrchestratorState) -> dict:
-            # Build raw context from the merged sub-agent answers
             sub_results: dict[str, Any] = state.get("sub_results") or {}
 
-            # Build raw context from the merged sub-agent answers
             successful = [
                 (name, r)
                 for name, r in sub_results.items()
@@ -149,6 +174,29 @@ class SynthesisAgent(BaseAgent):
                 if successful
                 else ""
             )
+
+            # Collect structured sources from all sub-agent outputs
+            all_sources: list[AgentSource] = []
+            seen_urls: set[str] = set()
+            seen_titles: set[str] = set()
+            for kind_filter in ("dataset", "resource", "other"):
+                for r in sub_results.values():
+                    if not isinstance(r, dict):
+                        continue
+                    for s in r.get("sources") or []:
+                        if not isinstance(s, dict) or s.get("kind") != kind_filter:
+                            continue
+                        url = s.get("url", "")
+                        title = s.get("title", "")
+                        if url and url in seen_urls:
+                            continue
+                        if not url and title in seen_titles:
+                            continue
+                        if url:
+                            seen_urls.add(url)
+                        seen_titles.add(title)
+                        all_sources.append(AgentSource(**s))
+            footer = _format_sources_footer(all_sources)
 
             inp = AgentInput(
                 query=state["query"],
@@ -162,6 +210,8 @@ class SynthesisAgent(BaseAgent):
             try:
                 output = await agent.run(inp)
                 synthesised = output.answer
+                if footer:
+                    synthesised = synthesised.rstrip("\n") + "\n\n" + footer
             except Exception:
                 logger.exception("synthesis_node: agent raised, falling back to raw results")
                 synthesised = state.get("final_answer", "")

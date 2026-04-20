@@ -31,7 +31,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import tool
 
 from app.models import AgentInput, AgentOutput
-from app.pangiagent.agents.base_agent import BaseAgent
+from app.pangiagent.agents.base_react_agent import BaseReActAgent
 from app.pangiagent.model_config import build_llm, get_agent_model_config
 
 if TYPE_CHECKING:
@@ -269,7 +269,7 @@ _TOOL_MAP = {t.name: t for t in _DATAVIZ_TOOLS}
 # ─── Agent class ──────────────────────────────────────────────────────────────
 
 
-class DataVizAgent(BaseAgent):
+class DataVizAgent(BaseReActAgent):
     """LLM-backed agent that produces chart, KPI, and table structures.
 
     Note: this agent is **not** registered in the orchestrator fan-out; it is

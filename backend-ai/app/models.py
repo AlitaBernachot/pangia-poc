@@ -17,12 +17,22 @@ class AgentInput(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class AgentSource(BaseModel):
+    """A citable source produced by an agent (dataset page, resource download, etc.)."""
+    title: str
+    url: str = ""
+    kind: str = "dataset"   # "dataset" | "resource" | "other"
+    format: str = ""        # e.g. "CSV", "GeoJSON" — only for kind="resource"
+    agent_name: str = ""    # filled automatically by BaseAgent.add_source()
+
+
 class AgentOutput(BaseModel):
     agent_name: str
     answer: str
     confidence: float = 1.0
     state: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
+    sources: list[AgentSource] = Field(default_factory=list)
 
 
 class ExecutionStep(BaseModel):

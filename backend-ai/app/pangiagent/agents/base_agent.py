@@ -351,6 +351,7 @@ class BaseAgent(ABC):
                 "error": output.error,
                 "duration_ms": output.state.get("duration_ms", 0),
                 "violations": output.state.get("post_guardrail_violations", []),
+                "sources": [s.model_dump() for s in output.sources],
             }
             # Forward any rich-data extras produced by the agent
             # (dataviz, geojson, etc.) so the SSE layer can emit the appropriate
