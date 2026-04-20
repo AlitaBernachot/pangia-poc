@@ -14,7 +14,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
 |---|---|
 | **Frontend** | React 19 + Tailwind CSS v4, Vite, TypeScript (`frontend-client/`) |
 | **Backend V1** | FastAPI, SSE, LangChain + LangGraph (`backend/`) |
-| **Backend V2** | FastAPI, SSE, asyncio, guardrails, HITL, pgvector audit (`backend2/`) |
+| **Backend V2** | FastAPI, SSE, asyncio, guardrails, HITL, pgvector audit (`backend-ai/`) |
 | **Orchestration** | LangChain + LangGraph (2-stage routing: Intent Parser + Smart Dispatcher + parallel sub-agents) |
 | **Knowledge Graph** | Neo4j (Cypher) |
 | **RDF / Linked Data** | Ontotext GraphDB (SPARQL) |
@@ -65,7 +65,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
     - [Configuration](#configuration-1)
     - [Notes](#notes)
   - [Backend V2 – Second-Generation Multi-Agent System](#backend-v2--second-generation-multi-agent-system)
-    - [Architecture (`backend2/`)](#architecture-backend2)
+    - [Architecture (`backend-ai/`)](#architecture-backend-ai)
     - [Orchestrator LangGraph topology](#orchestrator-langgraph-topology)
     - [Sub-agent subgraph topology (default)](#sub-agent-subgraph-topology-default)
     - [Custom subgraph topology (SummaryAgent)](#custom-subgraph-topology-summaryagent)
@@ -495,8 +495,8 @@ answer.
 - Skips synthesis when a dataset-choice HITL panel is pending, keeping the UI clean.
 - Falls back to the raw merged answer if the LLM call fails.
 
-**File:** `backend2/app/pangiagent/agents/synthesis_agent.py`  
-**Prompt:** `backend2/config/prompts/synthesis_agent.yaml`
+**File:** `backend-ai/app/pangiagent/agents/synthesis_agent.py`  
+**Prompt:** `backend-ai/config/prompts/synthesis_agent.yaml`
 
 ---
 
@@ -864,9 +864,9 @@ Replace `<SUBAGENT>` with `ADDRESS`, `SPATIAL_PARSER`, `DISTANCE`, `BUFFER`,
 
 ## Backend V2 – Second-Generation Multi-Agent System
 
-> 📖 **Full Backend V2 documentation:** [backend2/README.md](backend2/README.md)
+> 📖 **Full Backend V2 documentation:** [backend-ai/README.md](backend-ai/README.md)
 
-The second-generation backend (`backend2/`) adds the following capabilities on top of the existing POC:
+The second-generation backend (`backend-ai/`) adds the following capabilities on top of the existing POC:
 
 | Feature | Implementation |
 |---|---|
@@ -881,10 +881,10 @@ The second-generation backend (`backend2/`) adds the following capabilities on t
 | **LangGraph graph** | Orchestrator compiled `StateGraph`; Mermaid written at startup |
 | **LangGraph subgraphs** | Each agent is a compiled `StateGraph` (pre-guardrail → execute → post-guardrail) |
 
-### Architecture (`backend2/`)
+### Architecture (`backend-ai/`)
 
 ```
-backend2/
+backend-ai/
 ├── Dockerfile                  Python 3.12-slim, port 8086
 ├── requirements.txt
 ├── init.sql                    PostgreSQL schema (run on first start)
@@ -1004,7 +1004,7 @@ retrieve → rerank → generate.
 
 ### Mermaid diagrams
 
-At startup, `build_graph()` writes Mermaid diagrams to `backend2/app/mermaid_graph/`:
+At startup, `build_graph()` writes Mermaid diagrams to `backend-ai/app/mermaid_graph/`:
 
 | File | Content |
 |---|---|
@@ -1086,7 +1086,7 @@ At startup, `build_graph()` writes Mermaid diagrams to `backend2/app/mermaid_gra
 
 ```bash
 # Start only the V2 backend and its dependencies
-docker compose up backend2 postgres2 redis
+docker compose up backend-ai postgres2 redis
 
 # Or start the full stack (both V1 and V2)
 docker compose up
@@ -1096,14 +1096,14 @@ Backend V2 is available at **http://localhost:8086**.
 
 ### PostgreSQL Schema
 
-The schema is applied automatically on first start via `backend2/init.sql`:
+The schema is applied automatically on first start via `backend-ai/init.sql`:
 
 - **`audit_logs`** — tamper-evident event log with SHA-256 hash chain.
 - **`long_term_memory`** — vector embeddings for persistent facts (pgvector `vector(1536)`).
 
 ### Source Registry
 
-`backend2/config/source_registry.yml` is a declarative YAML manifest that
+`backend-ai/config/source_registry.yml` is a declarative YAML manifest that
 describes the capabilities of every connector agent.  Each entry contains:
 
 | Field | Description |
@@ -1148,12 +1148,12 @@ loading) but is called directly inside `router_node` as an internal utility —
 it is **not** fanned out as a subgraph.
 
 ### Configurable system prompts
-`backend2/config/agents_prompts.yaml` at startup via `BaseAgent.get_prompt()`.
+`backend-ai/config/agents_prompts.yaml` at startup via `BaseAgent.get_prompt()`.
 The YAML file is loaded once per process (LRU-cached) and falls back to a
 hardcoded `_DEFAULT_PROMPT` class attribute when the key is absent.
 
 ```yaml
-# backend2/config/agents_prompts.yaml
+# backend-ai/config/agents_prompts.yaml
 rag_agent: |
   You are a knowledgeable assistant …
 summary_agent: |
@@ -1163,13 +1163,13 @@ ambiguity_agent: |
 ```
 
 To update a prompt without rebuilding the Docker image, edit `agents_prompts.yaml`
-and restart the `backend2` container (the file lives inside the mounted app
+and restart the `backend-ai` container (the file lives inside the mounted app
 volume).  In tests, call `load_prompts.cache_clear()` (imported from
 `app.pangiagent.agents.base_agent`) before injecting a custom mapping.
 
 ### Guardrails
 
-Three built-in guardrails in `backend2/app/pangiagent/guardrails.py`:
+Three built-in guardrails in `backend-ai/app/pangiagent/guardrails.py`:
 
 | Guardrail | Stage | Description |
 |---|---|---|

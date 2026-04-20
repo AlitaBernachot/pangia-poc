@@ -3,16 +3,16 @@
 #
 # SPDX-License-Identifier: MIT
 
-description: "Use when creating or modifying agent files in backend2/app/pangiagent/agents/. Covers file location, BaseAgent inheritance, naming conventions, registration, and documentation requirements."
-applyTo: "backend2/app/pangiagent/agents/*.py"
+description: "Use when creating or modifying agent files in backend-ai/app/pangiagent/agents/. Covers file location, BaseAgent inheritance, naming conventions, registration, and documentation requirements."
+applyTo: "backend-ai/app/pangiagent/agents/*.py"
 ---
 
 # Backend2 Agent Guidelines
 
 ## File location
 
-Every agent file **must** be placed in `backend2/app/pangiagent/agents/`.
-Do not add agent files directly under `backend2/app/` or any other directory.
+Every agent file **must** be placed in `backend-ai/app/pangiagent/agents/`.
+Do not add agent files directly under `backend-ai/app/` or any other directory.
 
 ## Inheritance
 
@@ -75,7 +75,7 @@ Non-`BaseAgent` utility classes (e.g. `AmbiguityAgent`) that need the same helpe
 
 ## Registering the agent
 
-Add the new agent to the `_AGENTS` dict in `backend2/app/api/routes/chat.py`:
+Add the new agent to the `_AGENTS` dict in `backend-ai/app/api/routes/chat.py`:
 
 ```python
 from app.pangiagent.agents.search_agent import SearchAgent
@@ -95,13 +95,13 @@ The dict key **must** match the `name` attribute passed to `BaseAgent.__init__()
 
 - **Pre-guardrails** receive an `AgentInput` and return `Optional[str]` (a violation message, or `None`).
 - **Post-guardrails** receive an `AgentOutput` and return `Optional[str]`.
-- Available guardrails live in `backend2/app/pangiagent/guardrails.py`.
+- Available guardrails live in `backend-ai/app/pangiagent/guardrails.py`.
 - A pre-guardrail violation short-circuits execution and returns an `AgentOutput` with `error` set.
 - A post-guardrail violation lowers `confidence` by 0.2 and records the violation in `output.state["post_guardrail_violations"]`.
 
 ## Documentation
 
-Whenever a new agent is added to `backend2/app/pangiagent/agents/`, **always** update `README.md`:
+Whenever a new agent is added to `backend-ai/app/pangiagent/agents/`, **always** update `README.md`:
 - Add the file to the architecture tree under `agents/`.
 - Add a row to the relevant table (Mermaid diagram list, capability descriptions, etc.) if applicable.
 - Describe the agent's purpose and any configuration or environment variables it requires.

@@ -69,7 +69,7 @@ _HITL_TIMEOUT_MSG = "Request timed out waiting for clarification."
 _NO_AGENT_ANSWER_MSG = "No agents produced a valid answer."
 
 # ── Mermaid output directory ───────────────────────────────────────────────────
-# Resolves to backend2/app/pangiagent/mermaid_graph/
+# Resolves to backend-ai/app/pangiagent/mermaid_graph/
 _MERMAID_DIR = Path(__file__).parent.parent / "mermaid_graph"
 _MERMAID_DIR.mkdir(exist_ok=True)
 

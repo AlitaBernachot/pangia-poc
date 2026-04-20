@@ -211,9 +211,9 @@ services:
     restart: unless-stopped
 
   # ── Backend V2 (FastAPI second-generation multi-agent) ────────────────────
-  backend2:
+  backend-ai:
     build:
-      context: ./backend2
+      context: ./backend-ai
       dockerfile: Dockerfile
     ports:
       - "8086:8086"
@@ -268,10 +268,10 @@ services:
       - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
       - PHOENIX_PROJECT_NAME=${PHOENIX_PROJECT_NAME:-pangia}
     volumes:
-      - ./backend2/app:/backend2/app
-      - ./backend2/config:/backend2/config
-      - ./backend2/libs:/backend2/libs
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8086 --reload --reload-dir /backend2/app --reload-dir /backend2/libs
+      - ./backend-ai/app:/backend-ai/app
+      - ./backend-ai/config:/backend-ai/config
+      - ./backend-ai/libs:/backend-ai/libs
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8086 --reload --reload-dir /backend-ai/app --reload-dir /backend-ai/libs
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8086/api/health || exit 1"]
       interval: 10s
@@ -285,7 +285,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  # ── PostgreSQL + pgvector (audit logs + long-term memory for backend2) ────
+  # ── PostgreSQL + pgvector (audit logs + long-term memory for backend-ai) ────
   postgres2:
     image: pgvector/pgvector:pg16
     ports:
@@ -296,7 +296,7 @@ services:
       - POSTGRES_DB=${POSTGRES2_DB:-pangia2}
     volumes:
       - postgres2_data:/var/lib/postgresql/data
-      - ./backend2/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./backend-ai/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES2_USER:-pangia2} -d ${POSTGRES2_DB:-pangia2}"]
       interval: 10s

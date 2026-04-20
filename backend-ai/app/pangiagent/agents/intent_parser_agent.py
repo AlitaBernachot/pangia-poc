@@ -35,7 +35,7 @@ be overridden per-agent via environment variables:
 * ``INTENT_PARSER_AGENT_TEMPERATURE``
 
 The system prompt can be overridden via
-``backend2/config/prompts/intent_parser_agent.yaml`` (``prompt:`` key).
+``backend-ai/config/prompts/intent_parser_agent.yaml`` (``prompt:`` key).
 """
 from __future__ import annotations
 

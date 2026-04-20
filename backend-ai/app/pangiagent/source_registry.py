@@ -5,7 +5,7 @@
 """Source Registry — declarative agent capability manifest + ChromaDB bootstrap.
 
 This module:
-1. Loads ``backend2/config/source_registry.yml`` into a list of
+1. Loads ``backend-ai/config/source_registry.yml`` into a list of
    :class:`SourceEntry` objects (``SOURCE_REGISTRY``).
 2. Bootstraps a dedicated ChromaDB collection (``pangiagent_source_registry``)
    by upserting one document per registry entry at startup.
@@ -34,9 +34,9 @@ from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-# Resolves to backend2/config/source_registry.yml
-# Path: backend2/app/pangiagent/source_registry.py
-#   → parent.parent.parent.parent = backend2/
+# Resolves to backend-ai/config/source_registry.yml
+# Path: backend-ai/app/pangiagent/source_registry.py
+#   → parent.parent.parent.parent = backend-ai/
 _REGISTRY_FILE = Path(__file__).parent.parent.parent / "config" / "source_registry.yml"
 
 _COLLECTION_NAME = "pangiagent_source_registry"

@@ -21,8 +21,8 @@ from app.pangiagent.state import SubAgentState
 
 logger = logging.getLogger(__name__)
 
-# Resolve path: backend2/app/pangiagent/agents/base_agent.py
-#   → parent.parent.parent.parent = backend2/
+# Resolve path: backend-ai/app/pangiagent/agents/base_agent.py
+#   → parent.parent.parent.parent = backend-ai/
 _PROMPTS_DIR = Path(__file__).parent.parent.parent.parent / "config" / "prompts"
 
 

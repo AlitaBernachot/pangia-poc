@@ -46,7 +46,7 @@ This is the second-generation backend for PangIA. It adds guardrails, structured
 ## Directory structure
 
 ```
-backend2/
+backend-ai/
 ├── Dockerfile                      Python 3.12-slim image, exposes port 8086
 ├── requirements.txt
 ├── init.sql                        PostgreSQL DDL (audit_logs, long_term_memory)
@@ -722,7 +722,7 @@ For post-processing agents (not fanned out), override `make_node()` instead and 
 ## Running locally (without Docker)
 
 ```bash
-cd backend2
+cd backend-ai
 
 # Requires Python 3.12+
 python -m venv .venv && source .venv/bin/activate
