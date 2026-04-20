@@ -56,6 +56,7 @@ backend2/
 │       ├── ambiguity_agent.yaml
 │       ├── datagouv_mcp_agent.yaml
 │       ├── dataviz_agent.yaml
+│       ├── intent_parser_agent.yaml
 │       ├── geonetwork_mcp_agent.yaml
 │       ├── humanoutput_agent.yaml
 │       ├── mapviz_agent.yaml
@@ -96,6 +97,7 @@ backend2/
             ├── base_agent.py           BaseAgent (abstract) — guardrails, prompt loading, subgraph, request_choice
             ├── ambiguity_agent.py      AmbiguityAgent — LLM ambiguity scorer (utility, not fanned-out)
             ├── title_agent.py          TitleAgent — generates a 4-6 word session title (utility, not fanned-out)
+            ├── intent_parser_agent.py  IntentParserAgent — parses query into structured intent (utility, not fanned-out)
             ├── orchestrator_agent.py   build_graph() — assembles the full LangGraph StateGraph
             ├── smart_dispatcher_agent.py SmartDispatcherAgent — keyword + semantic routing, no LLM
             ├── calculator_agent.py     CalculatorAgent — safe AST arithmetic evaluator
@@ -125,6 +127,10 @@ memory_node            ← loads LTM (pgvector) + STM (Redis) into context
     │
     ▼
 title_node             ← generates a short session title (first turn only, non-blocking)
+    │
+    ▼
+intent_node            ← IntentParserAgent: extracts action, dataset_concept, filters, geo_scope
+    │                      into state["context"]["intent"] for downstream agents
     │
     ▼
 ambiguity_node         ← LLM scores query ambiguity (0–1)
@@ -166,6 +172,7 @@ The Mermaid diagram is written to `app/pangiagent/mermaid_graph/orchestrator_gra
 |---|---|---|---|
 | `ambiguity_agent` | `AmbiguityAgent` | LLM ambiguity scorer; triggers HITL | No (utility node) |
 | `title_agent` | `TitleAgent` | Generates 4-6 word session title on first turn | No (utility node) |
+| `intent_parser_agent` | `IntentParserAgent` | Parses query into structured intent (action, concept, filters, geo_scope) | No (utility node) |
 | `smart_dispatcher_agent` | `SmartDispatcherAgent` | Keyword + semantic router; no LLM | No (utility, inside `router_node`) |
 | `rag_agent` | `RAGAgent` | LangChain RAG | ✓ |
 | `calculator_agent` | `CalculatorAgent` | Safe AST arithmetic | ✓ |

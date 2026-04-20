@@ -96,6 +96,10 @@ class OrchestratorState(TypedDict):
     choice_status: str  # "" | "pending" | "resolved" | "timeout"
     choice_query: str   # rewritten query after choice is resolved
 
+    # ── Intent (parsed by intent_node before routing) ─────────────────────────
+    # {"action": str, "dataset_concept": str, "filters": list, "geo_scope": str}
+    intent: Annotated[dict[str, Any], _keep_last]
+
     # ── Post-processing output (humanoutput / dataviz / mapviz nodes) ─────────
     output_decision: dict[str, Any]   # {"needs_map": bool, "needs_dataviz": bool}
     dataviz: dict[str, Any]           # chart / KPI / table payload for frontend

@@ -32,10 +32,6 @@ prompt: |
   ## Search rules
   - Always call `search_datasets` with `page_size=10` (never less).
   - If the first search returns no useful result, retry with broader or translated keywords.
-  - **Synonym expansion** — always run one `search_datasets` call per common variant:
-    caméra → also webcam, vidéosurveillance | capteur → also sonde, sensor
-    station → also borne, observatoire | déchetterie → also centre de tri
-    vélo → also piste cyclable | inondation → also crue, PPRi
   - If total results exceed 50, stop and ask the user to refine their query. List the
     first-page results so they can pick one directly.
 

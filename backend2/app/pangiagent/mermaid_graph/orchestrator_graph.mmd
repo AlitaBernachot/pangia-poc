@@ -11,6 +11,7 @@ graph TD;
 	hitl_wait_node(hitl_wait_node)
 	router_node(router_node)
 	merge_node(merge_node)
+	intent_node(intent_node)
 	synthesis_node(synthesis_node)
 	humanoutput_node(humanoutput_node)
 	dataviz_node(dataviz_node)
@@ -29,6 +30,7 @@ graph TD;
 	humanoutput_node -.-> dataviz_node;
 	humanoutput_node -.-> mapviz_node;
 	humanoutput_node -. &nbsp;__end__&nbsp; .-> synthesis_node;
+	intent_node --> ambiguity_node;
 	mapviz_node --> synthesis_node;
 	memory_node --> title_node;
 	merge_node --> humanoutput_node;
@@ -47,7 +49,7 @@ graph TD;
 	router_node -.-> summary_agent\3aenrich_node;
 	router_node -.-> vector_chroma_agent\3aexecute_node;
 	summary_agent\3aexecute_node --> merge_node;
-	title_node --> ambiguity_node;
+	title_node --> intent_node;
 	vector_chroma_agent\3aexecute_node --> merge_node;
 	synthesis_node --> __end__;
 	subgraph summary_agent

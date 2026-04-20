@@ -26,6 +26,8 @@ from libs.datagouv import (
     extract_search_total,
     user_identifies_dataset,
 )
+from libs.similarity import rank_by_similarity
+from libs.query_expander import expand_query, strip_action_prefix
 
 logger = logging.getLogger(__name__)
 
@@ -45,26 +47,7 @@ You have access to:
 ## Search rules
 - Always call `search_datasets` with `page_size=10` (never less) to get enough results.
 - If the first search returns no useful result, retry with broader or translated keywords.
-- **Synonym expansion** — many concepts have several common names in French datasets.
-  When the user's query contains a term that has known synonyms or alternate spellings,
-  **always run one `search_datasets` call per variant** (in parallel when possible), then
-  merge the results before presenting them. Do NOT stop after the first variant.
 
-  Common synonym groups to expand automatically:
-  | User term | Also search |
-  |-----------|-------------|
-  | caméra / caméras | webcam, camera, vidéosurveillance, CCTV |
-  | capteur | sonde, sensor, mesure, monitoring |
-  | station | borne, point de mesure, observatoire |
-  | déchetterie | déchèterie, centre de tri, collecte déchets |
-  | école | établissement scolaire, collège, lycée |
-  | parking | stationnement, parc de stationnement |
-  | vélo | cycliste, piste cyclable, itinéraire vélo, voie verte |
-  | bus | transport en commun, réseau de bus, ligne de bus |
-  | inondation | crue, risque inondation, PPRi, zone inondable |
-  | pollution | qualité de l'air, émissions, polluants |
-
-  If none of the synonyms return better results, fall back to the most generic term.
 
 - The MCP response includes the **total number of matching datasets** (e.g. "Found 2788 dataset(s)").
   If the total exceeds 50, **do not attempt to browse further pages**. Instead, stop and reply
@@ -254,6 +237,11 @@ class DataGouvMCPAgent(BaseAgent):
         tool_map = {t.name: t for t in all_tools}
 
         _chosen_dataset_id: str | None = inp.context.get("chosen_dataset_id")
+        _intent: dict = inp.context.get("intent") or {}
+        _intent_action: str = _intent.get("action", "display")
+        _intent_concept: str = _intent.get("dataset_concept", "")
+        _intent_filters: list = _intent.get("filters") or []
+        _intent_geo: str = _intent.get("geo_scope", "")
 
         if _chosen_dataset_id:
             human_content = (
@@ -264,7 +252,32 @@ class DataGouvMCPAgent(BaseAgent):
                 "fetch_resource_file pour télécharger le fichier CSV et/ou GeoJSON disponibles."
             )
         else:
+            # Build context hint from parsed intent
+            _ctx_parts: list[str] = []
+            if _intent_action == "search":
+                _ctx_parts.append(
+                    "[INTENT] action=search → cherche uniquement les métadonnées, "
+                    "ne télécharge pas les fichiers."
+                )
+            elif _intent_action == "preview":
+                _ctx_parts.append(
+                    "[INTENT] action=preview → utilise query_resource_data avec page_size=20 "
+                    "pour un aperçu, ne télécharge pas le fichier complet."
+                )
+            elif _intent_action == "filter" and _intent_filters:
+                _filter_desc = "; ".join(
+                    f'{f["column"]}={f["value"]} ({f.get("op","contains")})'
+                    for f in _intent_filters
+                )
+                _ctx_parts.append(
+                    f"[INTENT] action=filter → applique les filtres : {_filter_desc}."
+                )
+            if _intent_geo:
+                _ctx_parts.append(f"[INTENT] geo_scope={_intent_geo!r}")
+
             human_content = inp.query
+            if _ctx_parts:
+                human_content = inp.query + "\n\n" + "\n".join(_ctx_parts)
 
         messages: list = [
             SystemMessage(content=self._system_prompt),
@@ -279,6 +292,41 @@ class DataGouvMCPAgent(BaseAgent):
         _fetched_urls: set[str] = set()
         # Map url → format for successfully fetched resources
         _fetched_url_formats: dict[str, str] = {}
+
+        # ── Pre-search via query expansion ────────────────────────────────────
+        # Build a single combined search query from:
+        #   1. The dataset concept extracted by IntentParserAgent (if available),
+        #      or the stripped raw query as fallback.
+        #   2. The geographic scope from the intent (appended if not already in concept).
+        #   3. Synonym-expanded extra terms from query_expander.
+        if not _chosen_dataset_id:
+            _extra_terms = expand_query(inp.query)
+            search_tool = tool_map.get("search_datasets")
+            if search_tool:
+                import uuid as _uuid
+                # Prefer the parsed concept over the raw query
+                _base = _intent_concept if _intent_concept else strip_action_prefix(inp.query)
+                # Append geo scope if not already part of the concept
+                if _intent_geo and _intent_geo.lower() not in _base.lower():
+                    _base = f"{_base} {_intent_geo}"
+                _combined_query = (_base + " " + " ".join(_extra_terms)).strip()
+                logger.info(
+                    "DataGouvMCPAgent: pre-search (combined) → '%s'", _combined_query
+                )
+                _tid = str(_uuid.uuid4())[:8]
+                try:
+                    _res = await search_tool.ainvoke({"query": _combined_query, "page_size": 10})
+                    _content = _res if isinstance(_res, str) else json.dumps(_res, ensure_ascii=False, default=str)
+                except Exception as exc:
+                    _content = f"Search error: {exc}"
+                _fake_ai = AIMessage(
+                    content="",
+                    tool_calls=[{"id": _tid, "name": "search_datasets", "args": {}}],
+                )
+                messages.append(_fake_ai)
+                messages.append(ToolMessage(content=_content, tool_call_id=_tid))
+                search_call_ids.add(_tid)
+                logger.info("DataGouvMCPAgent: pre-search → %d chars", len(_content))
 
         try:
             for _ in range(self.max_iterations):
@@ -374,10 +422,12 @@ class DataGouvMCPAgent(BaseAgent):
                     messages.append(ToolMessage(content=tool_content, tool_call_id=tc_id))
 
                     # ── Inline disambiguation after search_datasets ───────────
-                    # Check immediately after EACH search call so the choice
-                    # panel reaches the user before any further (slow) LLM
-                    # iterations.  If the user has already identified a dataset
-                    # (UUID or exact quoted title in the query) we skip.
+                    # 1. Extract all candidates from the search response.
+                    # 2. Run semantic similarity against the user query —
+                    #    if one dataset clearly dominates (high cosine score +
+                    #    enough margin over #2) auto-select it without asking.
+                    # 3. Otherwise show the ranked list to the user via the
+                    #    choice panel (same as before).
                     if tc_name == "search_datasets":
                         _inline_candidates = extract_dataset_candidates(messages, search_call_ids)
                         if (
@@ -386,6 +436,40 @@ class DataGouvMCPAgent(BaseAgent):
                             and not _chosen_dataset_id
                         ):
                             _inline_total = extract_search_total(messages, search_call_ids)
+
+                            # ── Semantic similarity ranking ───────────────────
+                            logger.info(
+                                "DataGouvMCPAgent: running similarity on %d candidates for query: %s",
+                                len(_inline_candidates),
+                                inp.query[:80],
+                            )
+                            _sim_result = await rank_by_similarity(
+                                inp.query,
+                                _inline_candidates,
+                                text_fields=("title", "description", "tags"),
+                            )
+                            if _sim_result.auto_selected:
+                                # One dataset clearly dominates → auto-select
+                                _auto = _sim_result.auto_selected
+                                _auto_query = (
+                                    f"Je veux travailler avec le dataset : \"{_auto.get('title', '')}\""
+                                    + (f" (ID: {_auto['id']})" if _auto.get("id") else "")
+                                )
+                                logger.info(
+                                    "DataGouvMCPAgent: similarity auto-selected '%s' (score=%.3f)",
+                                    _auto.get("title", _auto.get("id")),
+                                    _auto.get("_score", 0),
+                                )
+                                return await self._run(AgentInput(
+                                    query=_auto_query,
+                                    session_id=inp.session_id,
+                                    context={**inp.context, "chosen_dataset_id": _auto.get("id", "")},
+                                ))
+
+                            # ── Present ranked list to user ───────────────────
+                            # Use the similarity-sorted order so the most
+                            # relevant dataset appears first in the panel.
+                            _ranked_candidates = _sim_result.ranked or _inline_candidates
                             _inline_items = [
                                 ChoiceItem(
                                     id=c.get("id", ""),
@@ -394,7 +478,7 @@ class DataGouvMCPAgent(BaseAgent):
                                     url=c.get("url", ""),
                                     organization=c.get("organization", ""),
                                 )
-                                for c in _inline_candidates
+                                for c in _ranked_candidates
                             ]
                             _inline_result = await self.request_choice(
                                 session_id=inp.session_id,

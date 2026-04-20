@@ -120,6 +120,7 @@ def parse_text_search_results(text: str) -> list[dict]:
                 "organization": "",
                 "description": "",
                 "url": "",
+                "tags": "",
             }
             continue
         if current is None:
@@ -133,8 +134,10 @@ def parse_text_search_results(text: str) -> list[dict]:
             current["organization"] = s[13:].strip()
         elif s.startswith("URL:"):
             current["url"] = s[4:].strip()
-        elif s.startswith("Tags:") and not current["description"]:
-            current["description"] = s[5:].strip()
+        elif s.startswith("Tags:"):
+            current["tags"] = s[5:].strip()
+            if not current["description"]:
+                current["description"] = current["tags"]
 
     if current is not None:
         results.append(current)
@@ -187,7 +190,7 @@ def extract_dataset_candidates(messages: list, search_ids: set[str]) -> list[dic
     candidates: list[dict] = []
     seen_ids: set[str] = set()
 
-    def _add(ds_id: str, title: str, description: str, url: str, org: str) -> None:
+    def _add(ds_id: str, title: str, description: str, url: str, org: str, tags: str = "") -> None:
         if not ds_id and not title:
             return
         if ds_id and ds_id in seen_ids:
@@ -200,6 +203,7 @@ def extract_dataset_candidates(messages: list, search_ids: set[str]) -> list[dic
             "description": " ".join(description.split())[:_MAX_DESC_LEN],
             "url": url,
             "organization": org,
+            "tags": tags,
         })
 
     for msg in messages:
@@ -218,7 +222,7 @@ def extract_dataset_candidates(messages: list, search_ids: set[str]) -> list[dic
                     data = ast.literal_eval(raw)
                 except Exception:
                     for ds in parse_text_search_results(raw):
-                        _add(ds["id"], ds["title"], ds["description"], ds["url"], ds["organization"])
+                        _add(ds["id"], ds["title"], ds["description"], ds["url"], ds["organization"], ds.get("tags", ""))
                     continue
 
         # MCP text wrapper: [{"type": "text", "text": "..."}]
@@ -231,7 +235,7 @@ def extract_dataset_candidates(messages: list, search_ids: set[str]) -> list[dic
             for block in data:
                 text_content = block.get("text", "") if isinstance(block, dict) else ""
                 for ds in parse_text_search_results(text_content):
-                    _add(ds["id"], ds["title"], ds["description"], ds["url"], ds["organization"])
+                    _add(ds["id"], ds["title"], ds["description"], ds["url"], ds["organization"], ds.get("tags", ""))
             continue
 
         # Standard data.gouv.fr JSON: {"data": [...]} or plain list
@@ -248,12 +252,15 @@ def extract_dataset_candidates(messages: list, search_ids: set[str]) -> list[dic
                 continue
             org = ds.get("organization") or {}
             org_name = org.get("name", "") if isinstance(org, dict) else str(org)
+            raw_tags = ds.get("tags") or []
+            tags_str = ", ".join(raw_tags) if isinstance(raw_tags, list) else str(raw_tags)
             _add(
                 str(ds.get("id", "")),
                 str(ds.get("title", "")),
                 ds.get("description") or "",
                 ds.get("page", ds.get("url", "")),
                 org_name,
+                tags_str,
             )
 
     return candidates

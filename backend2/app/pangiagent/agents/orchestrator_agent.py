@@ -58,6 +58,7 @@ from app.pangiagent.router import DynamicRouter
 from app.pangiagent.state import OrchestratorState
 from app.pangiagent.agents.ambiguity_agent import AmbiguityAgent
 from app.pangiagent.agents.title_agent import TitleAgent
+from app.pangiagent.agents.intent_parser_agent import IntentParserAgent
 
 if TYPE_CHECKING:
     from app.pangiagent.agents.base_agent import BaseAgent
@@ -350,6 +351,7 @@ def build_graph(
     agents: "dict[str, BaseAgent]",
     output_agents: "dict[str, BaseAgent] | None" = None,
     synthesis_agent: "BaseAgent | None" = None,
+    intent_agent: "BaseAgent | None" = None,
 ):
     """Build and compile the orchestrator StateGraph.
 
@@ -389,6 +391,14 @@ def build_graph(
     synthesis_agent:
         Optional agent that synthesises all results into the final user-facing
         answer (``SynthesisAgent``).  When provided it becomes the last node.
+    intent_agent:
+        Optional agent that parses the user query into structured intent
+        (``IntentParserAgent``).  When provided, an ``intent_node`` is inserted
+        between ``title_node`` and ``ambiguity_node`` and the parsed intent is
+        merged into ``state["context"]["intent"]`` for downstream agents.
+        Defaults to a fresh ``IntentParserAgent`` when *None* is passed so that
+        intent parsing is always active; pass a pre-configured instance to
+        inject custom guardrails or a different model.
 
     Returns
     -------
@@ -409,6 +419,10 @@ def build_graph(
     workflow.add_node("router_node", router_node)
     workflow.add_node("merge_node", merge_node)
 
+    # ── Intent node (optional, between title and ambiguity) ───────────────
+    _effective_intent_agent: BaseAgent = intent_agent or IntentParserAgent()
+    workflow.add_node("intent_node", _effective_intent_agent.make_node())
+
     # ── Synthesis node (final step, optional) ─────────────────────────────
     _end_target = END
     if synthesis_agent is not None:
@@ -428,7 +442,8 @@ def build_graph(
     # ── Sequential backbone ────────────────────────────────────────────────
     workflow.set_entry_point("memory_node")
     workflow.add_edge("memory_node", "title_node")
-    workflow.add_edge("title_node", "ambiguity_node")
+    workflow.add_edge("title_node", "intent_node")
+    workflow.add_edge("intent_node", "ambiguity_node")
 
     workflow.add_conditional_edges(
         "ambiguity_node",

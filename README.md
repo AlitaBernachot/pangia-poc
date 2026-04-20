@@ -915,6 +915,7 @@ backend2/
         └── agents/
             ├── base_agent.py           Abstract BaseAgent: guardrails, prompt loading, as_subgraph()
             ├── ambiguity_agent.py      AmbiguityAgent — LLM ambiguity scorer for HITL
+            ├── intent_parser_agent.py  IntentParserAgent — structured intent extraction (action, concept, filters, geo)
             ├── orchestrator_agent.py   build_graph() — orchestrator StateGraph + Mermaid output
             ├── smart_dispatcher_agent.py SmartDispatcherAgent — keyword + semantic router (no LLM)
             ├── rag_agent.py            RAGAgent (LangChain + OpenAI)
