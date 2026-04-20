@@ -24,6 +24,7 @@ This is the second-generation backend for PangIA. It adds guardrails, structured
     - [Agent inheritance hierarchy](#agent-inheritance-hierarchy)
     - [Lifecycle hooks](#lifecycle-hooks)
     - [Prompt loading](#prompt-loading)
+    - [Source-augmented prompts](#source-augmented-prompts)
     - [Subgraph compilation](#subgraph-compilation)
     - [Agent-level choice requests (`request_choice`)](#agent-level-choice-requests-request_choice)
   - [HITL — ambiguity clarification](#hitl--ambiguity-clarification)
@@ -44,6 +45,7 @@ This is the second-generation backend for PangIA. It adds guardrails, structured
     - [DataVizAgent](#datavizagent)
     - [MapVizAgent](#mapvizagent)
   - [Synthesis agent](#synthesis-agent)
+  - [DB client library (`libs/client/`)](#db-client-library-libsclient)
   - [data.gouv.fr MCP agent](#datagouvfr-mcp-agent)
     - [Capabilities](#capabilities)
     - [Dataset disambiguation via `request_choice`](#dataset-disambiguation-via-request_choice)
@@ -295,6 +297,53 @@ Never override `run()` — put all logic in `_run()`.
 2. Fall back to the hardcoded `_DEFAULT_PROMPT` class attribute.
 
 The YAML file is LRU-cached per process; edit it and restart the container to apply changes without rebuilding.
+
+### Source-augmented prompts
+
+Connector agents that query a specific data source (PostGIS, Neo4j, GraphDB, …) can call `BaseAgent.get_source_augmented_prompt(default)` instead of `get_prompt(default)`.
+
+This method extends the base prompt with an optional `prompt` block defined directly in the source registry entry (`config/source_registry.yml`).  The block is appended under a `## Source context` heading, making it visible to the LLM at query-generation time without being hardcoded into the agent class.
+
+**Resolution order:**
+
+1. Base prompt via `get_prompt()` (YAML file or `_DEFAULT_PROMPT`).
+2. `prompt` field from the matching `SourceEntry` in `source_registry.yml` — appended as `\n\n## Source context\n\n<prompt>`.
+
+**Typical use — injecting a database schema:**
+
+```yaml
+# config/source_registry.yml
+- id: postgis_agent
+  connector: postgis_agent
+  label: MyPostGIS
+  prompt: |
+    ## Database schema
+
+    ### my_table — Description (POINT, SRID 4326)
+    | column | type | description |
+    |--------|------|-------------|
+    | id     | serial | primary key |
+    | nom    | text   | name        |
+    | geom   | point  | WGS-84      |
+```
+
+```python
+# In the agent __init__:
+self._system_prompt = self.get_source_augmented_prompt(_DEFAULT_PROMPT)
+```
+
+The resulting system prompt that the LLM receives is:
+
+```
+<base prompt from config/prompts/postgis_agent.yaml or _DEFAULT_PROMPT>
+
+## Source context
+
+## Database schema
+...
+```
+
+This keeps the agent class generic (reusable for any PostGIS database) while the schema travels as configuration data from the registry → `SourceEntry.prompt` → LLM system prompt.
 
 ### Subgraph compilation
 

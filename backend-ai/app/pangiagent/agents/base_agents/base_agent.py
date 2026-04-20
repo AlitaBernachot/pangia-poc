@@ -156,6 +156,38 @@ class BaseAgent(ABC):
         """
         return _load_prompt_file(self.name) or default
 
+    def get_source_augmented_prompt(self, default: str) -> str:
+        """Return the system prompt augmented with the source registry ``prompt`` block.
+
+        Extends :meth:`get_prompt` with an optional extra section taken from
+        the :class:`~app.pangiagent.source_registry.SourceEntry` whose
+        ``connector`` matches ``self.name``.  If that entry defines a
+        ``prompt`` field, it is appended to the base prompt separated by a
+        blank line and a ``## Source context`` heading.
+
+        Resolution order:
+        1. Base prompt via :meth:`get_prompt` (YAML file or *default*).
+        2. Optional ``prompt`` from the matching :class:`SourceEntry`.
+
+        Use this method instead of :meth:`get_prompt` in connector agents that
+        need to receive schema / context information that is specific to the
+        deployed data source.
+
+        Parameters
+        ----------
+        default:
+            Hardcoded fallback string passed through to :meth:`get_prompt`.
+        """
+        base = self.get_prompt(default)
+        try:
+            from app.pangiagent.source_registry import get_entry  # noqa: PLC0415
+            entry = get_entry(self.name)
+            if entry and entry.prompt:
+                return f"{base}\n\n## Source context\n\n{entry.prompt.strip()}"
+        except Exception:
+            logger.debug("BaseAgent: could not load source registry entry for '%s'", self.name)
+        return base
+
     # ── Intent helpers (populated by IntentParserAgent before fan-out) ────────
 
     def get_intent(self, inp: AgentInput) -> dict:

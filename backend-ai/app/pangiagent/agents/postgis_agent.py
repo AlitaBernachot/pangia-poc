@@ -45,7 +45,7 @@ class PostGISAgent(BaseAgent):
     def __init__(self, **kwargs) -> None:
         super().__init__(name=self.name, **kwargs)
         self._llm = build_llm(get_agent_model_config(self.name))
-        self._system_prompt = self.get_prompt(_DEFAULT_PROMPT)
+        self._system_prompt = self.get_source_augmented_prompt(_DEFAULT_PROMPT)
 
     def get_capabilities(self) -> str:
         return (

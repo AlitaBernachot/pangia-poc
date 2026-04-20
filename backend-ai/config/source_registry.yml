@@ -68,7 +68,7 @@ sources:
   - id: postgis_agent
     connector: postgis_agent
     active: true
-    label: PostGIS
+    label: MyPostGIS
     description: >
       PostGIS spatial SQL agent. Answers geographic questions using PostgreSQL
       with PostGIS extension. Generates SQL queries with spatial functions such
@@ -115,6 +115,43 @@ sources:
       - "Liste les zones de risque de niveau élevé dans le département 13."
       - "Quels musées sont dans un rayon de 2 km du Louvre ?"
       - "Quelle commune a la plus grande population parmi celles de la région Occitanie ?"
+    prompt: |
+      ## Database schema (MyPostGIS)
+
+      ### lieux_interet — Points of interest (POINT, SRID 4326)
+      | column      | type   | description                                   |
+      |-------------|--------|-----------------------------------------------|
+      | id          | serial | primary key                                   |
+      | nom         | text   | name                                          |
+      | categorie   | text   | musee, hopital, parc, restaurant, monument    |
+      | adresse     | text   | street address                                |
+      | ville       | text   | city name                                     |
+      | code_postal | text   | postal code                                   |
+      | geom        | point  | WGS-84 coordinates (SRID 4326)                |
+
+      ### communes — Municipalities (MULTIPOLYGON, SRID 4326)
+      | column         | type         | description                        |
+      |----------------|--------------|------------------------------------|
+      | id             | serial       | primary key                        |
+      | code_insee     | text         | INSEE code (unique)                |
+      | nom            | text         | municipality name                  |
+      | departement    | text         | department name and number         |
+      | region         | text         | region name                        |
+      | population     | integer      | population count                   |
+      | superficie_km2 | numeric      | area in km²                        |
+      | geom           | multipolygon | boundary polygon (SRID 4326)       |
+
+      ### zones_risque — Risk zones (POLYGON, SRID 4326)
+      | column      | type    | description                                       |
+      |-------------|---------|---------------------------------------------------|
+      | id          | serial  | primary key                                       |
+      | code        | text    | unique zone code                                  |
+      | nom         | text    | zone name                                         |
+      | type_risque | text    | inondation, incendie, sismique, pollution          |
+      | niveau      | text    | faible, modere, eleve, critique                   |
+      | commune     | text    | associated municipality name                      |
+      | departement | text    | department number/name                            |
+      | geom        | polygon | zone boundary (SRID 4326)                         |
 
   - id: rdf_agent
     connector: rdf_agent

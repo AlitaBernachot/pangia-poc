@@ -60,6 +60,8 @@ class SourceEntry(BaseModel):
     capabilities: list[str] = Field(default_factory=list)
     geo_scope: str | None = None
     example_questions: list[str] = Field(default_factory=list)
+    prompt: str | None = None
+    """Optional schema / context block injected into the connector agent's system prompt."""
 
 
 # ── YAML loader ────────────────────────────────────────────────────────────────
