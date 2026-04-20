@@ -60,6 +60,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         "hitl_request_id": "",
         "hitl_questions": [],
         "hitl_status": "",
+        "intent": {},
     }
 
     # Run the graph in an independent background Task so that the long

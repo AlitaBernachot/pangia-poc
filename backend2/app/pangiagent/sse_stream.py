@@ -58,6 +58,21 @@ def _node_name(event: dict) -> str:
     return event.get("metadata", {}).get("langgraph_node", "")
 
 
+def _parent_agent(event: dict) -> str:
+    """Return the sub-agent name for events emitted *inside* a compiled subgraph.
+
+    When a sub-agent is compiled as a nested subgraph, LangGraph events carry
+    ``checkpoint_ns`` of the form ``"datagouv_mcp_agent:execute_node:…"``.
+    The first segment is the sub-agent node name in the orchestrator graph.
+    Returns "" when the event does not originate from a registered sub-agent.
+    """
+    ns: str = event.get("metadata", {}).get("checkpoint_ns", "")
+    if not ns:
+        return ""
+    root = ns.split(":")[0]
+    return root if root in _AGENT_NODE_NAMES else ""
+
+
 def _output(event: dict) -> dict:
     data = event.get("data", {})
     out = data.get("output", {})
@@ -135,6 +150,13 @@ async def run_graph_to_queue(
                         "short_term": stm,
                     }))
 
+            # ── intent_node end → emit parsed intent for frontend debug/display ──
+            elif kind == "on_chain_end" and node == "intent_node":
+                out = _output(event)
+                intent = out.get("intent") or (out.get("context") or {}).get("intent")
+                if intent:
+                    await queue.put(_sse({"type": "intent_parsed", "intent": intent}))
+
             # ── ambiguity_node end → emit hitl_request before wait starts ───
             elif kind == "on_chain_end" and node == "ambiguity_node":
                 out = _output(event)
@@ -175,6 +197,41 @@ async def run_graph_to_queue(
             # ── sub-agent subgraph start ──────────────────────────────────────
             elif kind == "on_chain_start" and node in _AGENT_NODE_NAMES:
                 await queue.put(_sse({"type": "agent_start", "agent": node}))
+
+            # ── LLM token streaming inside a sub-agent ────────────────────────
+            elif kind == "on_chat_model_stream" and node in _AGENT_NODE_NAMES:
+                chunk = event.get("data", {}).get("chunk")
+                if chunk is not None:
+                    token: str = ""
+                    if hasattr(chunk, "content"):
+                        c = chunk.content
+                        if isinstance(c, str):
+                            token = c
+                        elif isinstance(c, list):
+                            # Anthropic-style: list of content blocks
+                            for block in c:
+                                if isinstance(block, dict) and block.get("type") == "text":
+                                    token += block.get("text", "")
+                    if token:
+                        await queue.put(_sse({"type": "agent_token", "agent": node, "content": token}))
+            elif kind == "on_chat_model_stream":
+                # Events from inside a compiled subgraph have execute_node as node name —
+                # use checkpoint_ns to find the parent sub-agent.
+                agent_from_ns = _parent_agent(event)
+                if agent_from_ns:
+                    chunk = event.get("data", {}).get("chunk")
+                    if chunk is not None:
+                        token = ""
+                        if hasattr(chunk, "content"):
+                            c = chunk.content
+                            if isinstance(c, str):
+                                token = c
+                            elif isinstance(c, list):
+                                for block in c:
+                                    if isinstance(block, dict) and block.get("type") == "text":
+                                        token += block.get("text", "")
+                        if token:
+                            await queue.put(_sse({"type": "agent_token", "agent": agent_from_ns, "content": token}))
 
             # ── sub-agent subgraph end ────────────────────────────────────────
             elif kind == "on_chain_end" and node in _AGENT_NODE_NAMES:
