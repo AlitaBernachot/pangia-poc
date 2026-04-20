@@ -47,7 +47,7 @@ from typing import TYPE_CHECKING, Any, Callable, Coroutine
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.models import AgentInput, AgentOutput
-from app.pangiagent.agents.base_agent import BaseAgent
+from app.pangiagent.agents.base_agents.base_agent import BaseAgent
 from app.pangiagent.model_config import build_llm, get_agent_model_config
 from libs.filereader import find_coord_columns, find_wkt_geom_column
 

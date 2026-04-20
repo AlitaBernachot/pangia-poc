@@ -97,7 +97,7 @@ class OrchestratorState(TypedDict):
     choice_query: str   # rewritten query after choice is resolved
 
     # ── Intent (parsed by intent_node before routing) ─────────────────────────
-    # {"action": str, "dataset_concept": str, "filters": list, "geo_scope": str}
+    # {"action": str, "entity_concept": str, "filters": list, "geo_scope": str}
     intent: Annotated[dict[str, Any], _keep_last]
 
     # ── Post-processing output (humanoutput / dataviz / mapviz nodes) ─────────

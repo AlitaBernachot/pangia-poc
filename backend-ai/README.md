@@ -68,9 +68,10 @@ backend-ai/
 ├── Dockerfile                      Python 3.12-slim image, exposes port 8086
 ├── requirements.txt
 ├── init.sql                        PostgreSQL DDL (audit_logs, long_term_memory)
+├── init_postgis.sql                PostGIS demo data (lieux_interet, communes, zones_risque)
 ├── config/
 │   ├── source_registry.yml         Declarative connector manifest (used by SmartDispatcher)
-│   └── prompts/                    One YAML file per agent — overrides hardcoded _DEFAULT_PROMPT
+│   └── prompts/                    One YAML file per agent — overrides hardcoded defaults
 │       ├── ambiguity_agent.yaml
 │       ├── datagouv_mcp_agent.yaml
 │       ├── dataviz_agent.yaml
@@ -78,13 +79,25 @@ backend-ai/
 │       ├── geonetwork_mcp_agent.yaml
 │       ├── humanoutput_agent.yaml
 │       ├── mapviz_agent.yaml
-│       ├── neo4j_agent.yaml
-│       ├── postgis_agent.yaml
-│       ├── rag_agent.yaml
-│       ├── rdf_agent.yaml
+│       ├── neo4j_agent.yaml        Step-1 (query generation) prompt
+│       ├── postgis_agent.yaml      Step-1 (query generation) prompt
+│       ├── rag_agent.yaml          Step-2 (synthesis) prompt
+│       ├── rdf_agent.yaml          Step-1 (query generation) prompt
 │       ├── summary_agent.yaml
 │       ├── synthesis_agent.yaml
-│       └── vector_chroma_agent.yaml
+│       └── vector_chroma_agent.yaml  Step-2 (synthesis) prompt
+├── libs/
+│   ├── datagouv.py
+│   ├── filereader.py
+│   ├── query_expander.py
+│   ├── similarity.py
+│   └── client/                     DB client package — one module per data store
+│       ├── __init__.py             Re-exports all public client functions
+│       ├── chroma_client.py        ChromaDB async HTTP client (similarity_search, add_documents)
+│       ├── graphdb_client.py       GraphDB/Ontotext SPARQL client (run_sparql_select, run_sparql_construct)
+│       ├── neo4j_client.py         Neo4j async driver (run_readonly_query, run_query)
+│       ├── postgis_client.py       asyncpg connection pool (run_spatial_query, run_write_query)
+│       └── redis_client.py         Redis async client (load_session, save_session)
 └── app/
     ├── main.py                     FastAPI app factory + lifespan (CORS, router mount)
     ├── config.py                   Pydantic settings (all env-var driven, see below)
@@ -112,21 +125,23 @@ backend-ai/
         ├── graph.py                AGENTS + OUTPUT_AGENTS + SYNTHESIS_AGENT registry; ORCHESTRATOR_GRAPH
         ├── mermaid_graph/          Auto-generated LangGraph Mermaid diagrams (written at startup)
         └── agents/
-            ├── base_agent.py           BaseAgent (abstract) — guardrails, prompt loading, subgraph, request_choice
-            ├── base_react_agent.py     BaseReActAgent — intermediate base for tool-using agents (ReAct loop)
-            ├── base_add_sources_agent.py BaseAddSourcesAgent — mixin: add_source / merge_sources / _generate_sources
+            ├── base_agents/                Base agent package (abstract classes + mixins)
+            │   ├── __init__.py             Re-exports BaseAgent, BaseReActAgent, BaseAddSourcesAgent
+            │   ├── base_agent.py           BaseAgent (abstract) — guardrails, prompt loading, subgraph, request_choice
+            │   ├── base_react_agent.py     BaseReActAgent — intermediate base for tool-using agents (ReAct loop)
+            │   └── base_add_sources_agent.py BaseAddSourcesAgent — mixin: add_source / merge_sources / _generate_sources
             ├── ambiguity_agent.py      AmbiguityAgent — LLM ambiguity scorer (utility, not fanned-out)
             ├── title_agent.py          TitleAgent — generates a 4-6 word session title (utility, not fanned-out)
             ├── intent_parser_agent.py  IntentParserAgent — parses query into structured intent (utility, not fanned-out)
             ├── orchestrator_agent.py   build_graph() — assembles the full LangGraph StateGraph
             ├── smart_dispatcher_agent.py SmartDispatcherAgent — keyword + semantic routing, no LLM
             ├── calculator_agent.py     CalculatorAgent — safe AST arithmetic evaluator
-            ├── rag_agent.py            RAGAgent — LangChain retrieval-augmented generation
+            ├── rag_agent.py            RAGAgent — ChromaDB retrieval + LLM answer synthesis
             ├── summary_agent.py        SummaryAgent — custom 2-node subgraph (enrich → execute)
-            ├── neo4j_agent.py          Neo4jAgent — Cypher query generation
-            ├── postgis_agent.py        PostGISAgent — spatial SQL (ST_* functions)
-            ├── rdf_agent.py            RDFAgent — SPARQL query generation (GraphDB/Ontotext)
-            ├── vector_chroma_agent.py  VectorChromaAgent — semantic search via ChromaDB
+            ├── neo4j_agent.py          Neo4jAgent — LLM generates Cypher → executed → LLM synthesises
+            ├── postgis_agent.py        PostGISAgent — LLM generates SQL → executed → LLM synthesises
+            ├── rdf_agent.py            RDFAgent — LLM generates SPARQL → executed → LLM synthesises
+            ├── vector_chroma_agent.py  VectorChromaAgent — ChromaDB similarity search → LLM synthesises
             ├── datagouv_mcp_agent.py   DataGouvMCPAgent — French open-data catalogue (data.gouv.fr)
             ├── geonetwork_mcp_agent.py GeoNetworkMCPAgent — geospatial metadata catalogue
             ├── humanoutput_agent.py    HumanOutputAgent — post-processing: decides needs_map / needs_dataviz
@@ -149,7 +164,7 @@ memory_node            ← loads LTM (pgvector) + STM (Redis) into context
 title_node             ← generates a short session title (first turn only, non-blocking)
     │
     ▼
-intent_node            ← IntentParserAgent: extracts action, dataset_concept, filters, geo_scope
+intent_node            ← IntentParserAgent: extracts action, entity_concept, filters, geo_scope
     │                      into state["context"]["intent"] for downstream agents
     │
     ▼
@@ -194,13 +209,13 @@ The Mermaid diagram is written to `app/pangiagent/mermaid_graph/orchestrator_gra
 | `title_agent` | `TitleAgent` | Generates 4-6 word session title on first turn | No (utility node) |
 | `intent_parser_agent` | `IntentParserAgent` | Parses query into structured intent (action, concept, filters, geo_scope) | No (utility node) |
 | `smart_dispatcher_agent` | `SmartDispatcherAgent` | Keyword + semantic router; no LLM | No (utility, inside `router_node`) |
-| `rag_agent` | `RAGAgent` | LangChain RAG | ✓ |
+| `rag_agent` | `RAGAgent` | Retrieves docs from ChromaDB → LLM synthesis | ✓ |
 | `calculator_agent` | `CalculatorAgent` | Safe AST arithmetic | ✓ |
 | `summary_agent` | `SummaryAgent` | Summarisation (custom 2-node subgraph) | ✓ |
-| `neo4j_agent` | `Neo4jAgent` | Cypher / Neo4j knowledge graph | ✓ |
-| `postgis_agent` | `PostGISAgent` | Spatial SQL / PostGIS | ✓ |
-| `rdf_agent` | `RDFAgent` | SPARQL / GraphDB | ✓ |
-| `vector_chroma_agent` | `VectorChromaAgent` | Semantic search / ChromaDB | ✓ |
+| `neo4j_agent` | `Neo4jAgent` | LLM → Cypher → Neo4j execute → LLM synthesis | ✓ |
+| `postgis_agent` | `PostGISAgent` | LLM → SQL → PostGIS execute → LLM synthesis | ✓ |
+| `rdf_agent` | `RDFAgent` | LLM → SPARQL → GraphDB execute → LLM synthesis | ✓ |
+| `vector_chroma_agent` | `VectorChromaAgent` | ChromaDB similarity search → LLM synthesis | ✓ |
 | `datagouv_mcp_agent` | `DataGouvMCPAgent` | French open-data (data.gouv.fr MCP) | ✓ |
 | `geonetwork_mcp_agent` | `GeoNetworkMCPAgent` | Geospatial metadata (GeoNetwork MCP) | ✓ |
 | `humanoutput_agent` | `HumanOutputAgent` | Decides needs_map / needs_dataviz | No (post-processing) |
@@ -247,7 +262,7 @@ Provides:
 - `_generate_sources(output, **context)` — no-op hook; override to populate sources after the core logic.
 
 ```python
-from app.pangiagent.agents.base_agent import BaseAgent
+from app.pangiagent.agents.base_agents.base_agent import BaseAgent
 
 class MyAgent(BaseAgent):
     name = "my_agent"
@@ -300,7 +315,7 @@ Override `as_subgraph()` to define a multi-node subgraph (example: `SummaryAgent
 `BaseAgent` exposes a reusable `request_choice()` coroutine that any agent can call when it needs the user to pick one item from a list **before continuing its work**.
 
 ```python
-from app.pangiagent.agents.base_agent import BaseAgent, ChoiceResult
+from app.pangiagent.agents.base_agents.base_agent import BaseAgent, ChoiceResult
 from app.models import ChoiceItem
 
 class MyAgent(BaseAgent):
@@ -576,6 +591,24 @@ Key rules (enforced in the prompt):
 - Preserve any Markdown links `[text](url)` that appear in the agent results — copy them verbatim.
 - If no links are present in the agent results, do **not** invent download links.
 - Answer in the same language as the user's question.
+
+---
+
+## DB client library (`libs/client/`)
+
+The `libs/client/` package provides thin, async DB clients used by the connector agents. Each module is self-contained with lazy imports and a module-level singleton (pool / driver / connection) to avoid reconnecting on every request.
+
+| Module | Data store | Key functions |
+|---|---|---|
+| `chroma_client.py` | ChromaDB | `similarity_search(query, n_results)`, `add_documents(texts, metadatas)` |
+| `graphdb_client.py` | GraphDB (Ontotext) | `run_sparql_select(sparql)`, `run_sparql_construct(sparql)`, `ensure_repository()` |
+| `neo4j_client.py` | Neo4j | `run_readonly_query(cypher, params)`, `run_query(cypher, params)` |
+| `postgis_client.py` | PostGIS (asyncpg) | `run_spatial_query(sql, params)`, `run_write_query(sql, params)` |
+| `redis_client.py` | Redis | `load_session(session_id)`, `save_session(session_id, messages)` |
+
+All read paths are protected: `run_spatial_query` runs inside a `readonly=True` asyncpg transaction; `run_readonly_query` uses a Neo4j read transaction. Writes are only available via explicit write functions.
+
+**DSN note:** `postgis_client` automatically strips the SQLAlchemy `+asyncpg` driver prefix from `POSTGIS_DSN` before passing it to asyncpg's `create_pool`.
 
 ---
 

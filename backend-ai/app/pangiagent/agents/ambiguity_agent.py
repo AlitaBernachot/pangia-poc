@@ -17,7 +17,7 @@ import logging
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.pangiagent.agents.base_agent import _load_prompt_file
+from app.pangiagent.agents.base_agents.base_agent import _load_prompt_file
 from app.pangiagent.model_config import build_llm, get_agent_model_config
 from app.config import get_settings
 

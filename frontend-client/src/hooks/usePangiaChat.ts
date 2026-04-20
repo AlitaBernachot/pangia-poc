@@ -33,7 +33,9 @@ export function usePangiaChat() {
         label: s.label,
       }))
       setAgents(list)
-      setSelectedSources(list.map((a) => a.key))
+      // TODO: temporary — only pre-select datagouv until other connectors are fully wired
+      const datagouv = list.find((a) => a.key === 'datagouv_mcp_agent')
+      setSelectedSources(datagouv ? [datagouv.key] : list.map((a) => a.key))
     } catch {
       // backend not available yet — no-op
     }

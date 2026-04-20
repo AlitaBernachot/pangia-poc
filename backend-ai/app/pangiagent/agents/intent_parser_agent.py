@@ -20,7 +20,7 @@ Parsed intent schema
 
     {
         "action":          "display" | "filter" | "search" | "preview" | "compare",
-        "dataset_concept": str,   # canonical dataset concept to search for
+        "entity_concept": str,   # canonical dataset concept to search for
         "filters":         list[{"column": str, "value": str, "op": str}],
         "geo_scope":       str    # geographic scope, or "" if none
     }
@@ -47,7 +47,7 @@ from typing import TYPE_CHECKING, Any
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.models import AgentInput, AgentOutput
-from app.pangiagent.agents.base_agent import BaseAgent
+from app.pangiagent.agents.base_agents.base_agent import BaseAgent
 from app.pangiagent.model_config import build_llm, get_agent_model_config
 
 if TYPE_CHECKING:
@@ -62,7 +62,7 @@ Your sole job is to read a user query and return a single JSON object describing
 ## Output format (strict JSON, no markdown, no explanation)
 {
   "action":          "<action>",
-  "dataset_concept": "<concept>",
+  "entity_concept": "<concept>",
   "filters":         [{"column": "<col>", "value": "<val>", "op": "<op>"}],
   "geo_scope":       "<scope>",
   "needs_map":       <true|false>
@@ -83,7 +83,7 @@ IMPORTANT: queries that ask WHERE something IS ("où se trouve/sont/trouvent",
 "localisation de", "position de", "carte des", "sur la carte", "show on map",
 "where is/are") are ALWAYS `display`, never `search`.
 
-### dataset_concept  (required)
+### entity_concept  (required)
 The canonical name of the dataset or data topic to look for, stripped of action verbs
 and conversational preambles.  Keep geographic scope words if they are part of the
 dataset name (e.g. "qualité de l'air" not "affiche la qualité de l'air en France").
@@ -109,25 +109,25 @@ Set to `false` for purely tabular or statistical queries.
 ## Examples
 
 Query: "Affiche les prix des carburants en France"
-→ {"action": "display", "dataset_concept": "prix des carburants", "filters": [], "geo_scope": "France", "needs_map": false}
+→ {"action": "display", "entity_concept": "prix des carburants", "filters": [], "geo_scope": "France", "needs_map": false}
 
 Query: "Montre les stations ouvertes en Bretagne"
-→ {"action": "filter", "dataset_concept": "stations-service", "filters": [{"column": "statut", "value": "ouvert", "op": "contains"}], "geo_scope": "Bretagne", "needs_map": true}
+→ {"action": "filter", "entity_concept": "stations-service", "filters": [{"column": "statut", "value": "ouvert", "op": "contains"}], "geo_scope": "Bretagne", "needs_map": true}
 
 Query: "Donne-moi un aperçu des données sur la qualité de l'air"
-→ {"action": "preview", "dataset_concept": "qualité de l'air", "filters": [], "geo_scope": "", "needs_map": false}
+→ {"action": "preview", "entity_concept": "qualité de l'air", "filters": [], "geo_scope": "", "needs_map": false}
 
 Query: "Quels datasets existent sur les risques d'inondation en Nouvelle-Aquitaine ?"
-→ {"action": "search", "dataset_concept": "risques inondation", "filters": [], "geo_scope": "Nouvelle-Aquitaine", "needs_map": false}
+→ {"action": "search", "entity_concept": "risques inondation", "filters": [], "geo_scope": "Nouvelle-Aquitaine", "needs_map": false}
 
 Query: "Où se trouvent les webcams dans Orléans ?"
-→ {"action": "display", "dataset_concept": "webcams", "filters": [], "geo_scope": "Orléans", "needs_map": true}
+→ {"action": "display", "entity_concept": "webcams", "filters": [], "geo_scope": "Orléans", "needs_map": true}
 
 Query: "Compare les accidents de la route en 2022 et 2023"
-→ {"action": "compare", "dataset_concept": "accidents de la route", "filters": [], "geo_scope": "", "needs_map": false}
+→ {"action": "compare", "entity_concept": "accidents de la route", "filters": [], "geo_scope": "", "needs_map": false}
 
 Query: "Show all bike-sharing stations in Lyon"
-→ {"action": "display", "dataset_concept": "vélos en libre-service", "filters": [], "geo_scope": "Lyon", "needs_map": true}
+→ {"action": "display", "entity_concept": "vélos en libre-service", "filters": [], "geo_scope": "Lyon", "needs_map": true}
 
 ## Rules
 - Return ONLY the raw JSON object — no markdown fences, no explanation.
@@ -175,7 +175,7 @@ def _parse_response(raw: str) -> dict[str, Any]:
 
     return {
         "action": action,
-        "dataset_concept": str(obj.get("dataset_concept", "")).strip(),
+        "entity_concept": str(obj.get("entity_concept", "")).strip(),
         "filters": clean_filters,
         "geo_scope": str(obj.get("geo_scope", "")).strip(),
         "needs_map": bool(obj.get("needs_map", False)),
@@ -217,7 +217,7 @@ class IntentParserAgent(BaseAgent):
         """Parse *query* and return a structured intent dict.
 
         Returns a best-effort dict even on LLM or parsing errors (fallback to
-        ``action=display``, ``dataset_concept=query``).
+        ``action=display``, ``entity_concept=query``).
         """
         try:
             llm = build_llm(get_agent_model_config(self.name))
@@ -231,7 +231,7 @@ class IntentParserAgent(BaseAgent):
             logger.info(
                 "IntentParserAgent: action=%r concept=%r filters=%s geo=%r",
                 parsed["action"],
-                parsed["dataset_concept"],
+                parsed["entity_concept"],
                 parsed["filters"],
                 parsed["geo_scope"],
             )
@@ -240,7 +240,7 @@ class IntentParserAgent(BaseAgent):
             logger.exception("IntentParserAgent: failed to parse intent for query %r", query)
             return {
                 "action": "display",
-                "dataset_concept": query,
+                "entity_concept": query,
                 "filters": [],
                 "geo_scope": "",
             }

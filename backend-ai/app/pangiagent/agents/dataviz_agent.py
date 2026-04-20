@@ -31,7 +31,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import tool
 
 from app.models import AgentInput, AgentOutput
-from app.pangiagent.agents.base_react_agent import BaseReActAgent
+from app.pangiagent.agents.base_agents.base_react_agent import BaseReActAgent
 from app.pangiagent.model_config import build_llm, get_agent_model_config
 
 if TYPE_CHECKING:

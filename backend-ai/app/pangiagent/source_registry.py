@@ -207,8 +207,12 @@ async def semantic_search_sources(query: str) -> dict[str, float]:
 
 
 def get_registry() -> list[SourceEntry]:
-    """Return only the active source registry entries."""
-    return [e for e in SOURCE_REGISTRY if e.active]
+    """Return only the active source registry entries.
+
+    Re-reads the YAML file on every call so that changes to
+    ``config/source_registry.yml`` take effect without a server restart.
+    """
+    return [e for e in _load_registry() if e.active]
 
 
 def get_suggestions() -> list[str]:
@@ -218,7 +222,7 @@ def get_suggestions() -> list[str]:
 
 def get_entry(source_id: str) -> SourceEntry | None:
     """Look up a single registry entry by its ``id`` field."""
-    for entry in SOURCE_REGISTRY:
+    for entry in _load_registry():
         if entry.id == source_id:
             return entry
     return None

@@ -33,7 +33,7 @@ import json
 import logging
 
 from app.models import AgentInput, AgentOutput
-from app.pangiagent.agents.base_agent import BaseAgent
+from app.pangiagent.agents.base_agents.base_agent import BaseAgent
 from app.pangiagent.source_registry import semantic_search_sources, get_registry
 
 logger = logging.getLogger(__name__)

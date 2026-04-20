@@ -9,7 +9,7 @@ prompt: |
   ## Output format (strict JSON, no markdown, no explanation)
   {
     "action":          "<action>",
-    "dataset_concept": "<concept>",
+    "entity_concept": "<concept>",
     "filters":         [{"column": "<col>", "value": "<val>", "op": "<op>"}],
     "geo_scope":       "<scope>",
     "needs_map":       <true|false>
@@ -30,7 +30,7 @@ prompt: |
   "localisation de", "position de", "carte des", "sur la carte", "show on map",
   "where is/are") are ALWAYS `display`, never `search`.
 
-  ### dataset_concept  (required)
+  ### entity_concept  (required)
   The canonical name of the dataset or data topic to look for, stripped of action verbs
   and conversational preambles.  Keep geographic scope words if they are part of the
   dataset name (e.g. "qualité de l'air" not "affiche la qualité de l'air en France").
@@ -56,25 +56,25 @@ prompt: |
   ## Examples
 
   Query: "Affiche les prix des carburants en France"
-  → {"action": "display", "dataset_concept": "prix des carburants", "filters": [], "geo_scope": "France", "needs_map": false}
+  → {"action": "display", "entity_concept": "prix des carburants", "filters": [], "geo_scope": "France", "needs_map": false}
 
   Query: "Montre les stations ouvertes en Bretagne"
-  → {"action": "filter", "dataset_concept": "stations-service", "filters": [{"column": "statut", "value": "ouvert", "op": "contains"}], "geo_scope": "Bretagne", "needs_map": true}
+  → {"action": "filter", "entity_concept": "stations-service", "filters": [{"column": "statut", "value": "ouvert", "op": "contains"}], "geo_scope": "Bretagne", "needs_map": true}
 
   Query: "Donne-moi un aperçu des données sur la qualité de l'air"
-  → {"action": "preview", "dataset_concept": "qualité de l'air", "filters": [], "geo_scope": "", "needs_map": false}
+  → {"action": "preview", "entity_concept": "qualité de l'air", "filters": [], "geo_scope": "", "needs_map": false}
 
   Query: "Quels datasets existent sur les risques d'inondation en Nouvelle-Aquitaine ?"
-  → {"action": "search", "dataset_concept": "risques inondation", "filters": [], "geo_scope": "Nouvelle-Aquitaine", "needs_map": false}
+  → {"action": "search", "entity_concept": "risques inondation", "filters": [], "geo_scope": "Nouvelle-Aquitaine", "needs_map": false}
 
   Query: "Où se trouvent les webcams dans Orléans ?"
-  → {"action": "display", "dataset_concept": "webcams", "filters": [], "geo_scope": "Orléans", "needs_map": true}
+  → {"action": "display", "entity_concept": "webcams", "filters": [], "geo_scope": "Orléans", "needs_map": true}
 
   Query: "Compare les accidents de la route en 2022 et 2023"
-  → {"action": "compare", "dataset_concept": "accidents de la route", "filters": [], "geo_scope": "", "needs_map": false}
+  → {"action": "compare", "entity_concept": "accidents de la route", "filters": [], "geo_scope": "", "needs_map": false}
 
   Query: "Show all bike-sharing stations in Lyon"
-  → {"action": "display", "dataset_concept": "vélos en libre-service", "filters": [], "geo_scope": "Lyon", "needs_map": true}
+  → {"action": "display", "entity_concept": "vélos en libre-service", "filters": [], "geo_scope": "Lyon", "needs_map": true}
 
   ## Rules
   - Return ONLY the raw JSON object — no markdown fences, no explanation.

@@ -1,0 +1,159 @@
+# SPDX-FileCopyrightText: 2026 AlitaBernachot
+#
+# SPDX-License-Identifier: MIT
+
+"""
+GraphDB (Ontotext) SPARQL client.
+
+Uses httpx for async HTTP requests to the SPARQL endpoint.
+"""
+import asyncio
+import json
+import logging
+from urllib.parse import quote
+
+import httpx
+
+from app.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+# Maximum number of attempts when creating the GraphDB repository.
+_REPO_CREATE_MAX_ATTEMPTS = 5
+_REPO_CREATE_RETRY_DELAY_S = 3
+
+
+def _sparql_url() -> str:
+    settings = get_settings()
+    repo = settings.graphdb_repository
+    base = settings.graphdb_url.rstrip("/")
+    return f"{base}/repositories/{repo}"
+
+
+async def run_sparql_select(sparql: str) -> str:
+    """Execute a SPARQL SELECT query; returns JSON-formatted bindings."""
+    url = _sparql_url()
+    headers = {"Accept": "application/sparql-results+json"}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(
+            url,
+            data={"query": sparql},
+            headers=headers,
+        )
+        response.raise_for_status()
+        data = response.json()
+
+    bindings = data.get("results", {}).get("bindings", [])
+    if not bindings:
+        return "SPARQL SELECT returned no results."
+
+    rows = [
+        {k: v.get("value", "") for k, v in row.items()}
+        for row in bindings
+    ]
+    return json.dumps(rows, indent=2, ensure_ascii=False)
+
+
+async def run_sparql_construct(sparql: str) -> str:
+    """Execute a SPARQL CONSTRUCT query; returns Turtle-formatted triples."""
+    url = _sparql_url()
+    headers = {"Accept": "text/turtle"}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(
+            url,
+            data={"query": sparql},
+            headers=headers,
+        )
+        response.raise_for_status()
+        text = response.text
+
+    return text if text.strip() else "SPARQL CONSTRUCT returned no triples."
+
+
+async def ensure_repository() -> None:
+    """Create the GraphDB repository if it does not already exist.
+
+    Retries up to ``_REPO_CREATE_MAX_ATTEMPTS`` times with a fixed delay
+    to tolerate transient HTTP 500 errors during GraphDB warm-up.
+    """
+    settings = get_settings()
+    base = settings.graphdb_url.rstrip("/")
+    repo = settings.graphdb_repository
+
+    ttl_config = (
+        "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n"
+        "@prefix rep: <http://www.openrdf.org/config/repository#> .\n"
+        "@prefix sr: <http://www.openrdf.org/config/repository/sail#> .\n"
+        "@prefix sail: <http://www.openrdf.org/config/sail#> .\n"
+        "@prefix graphdb: <http://www.ontotext.com/config/graphdb#> .\n\n"
+        "[] a rep:Repository ;\n"
+        f'   rep:repositoryID "{repo}" ;\n'
+        '   rdfs:label "PangIA GeoIA" ;\n'
+        "   rep:repositoryImpl [\n"
+        '       rep:repositoryType "graphdb:SailRepository" ;\n'
+        "       sr:sailImpl [\n"
+        '           sail:sailType "graphdb:Sail" ;\n'
+        '           graphdb:ruleset "rdfsplus-optimized"\n'
+        "       ]\n"
+        "   ] .\n"
+    )
+
+    last_response: httpx.Response | None = None
+
+    for attempt in range(1, _REPO_CREATE_MAX_ATTEMPTS + 1):
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.get(f"{base}/rest/repositories/{repo}")
+            if r.status_code == 200:
+                return
+
+            response = await client.post(
+                f"{base}/rest/repositories",
+                files={"config": ("config.ttl", ttl_config.encode(), "text/turtle")},
+            )
+
+            if response.is_success:
+                logger.info(
+                    "GraphDB repository '%s' created (attempt %d/%d).",
+                    repo, attempt, _REPO_CREATE_MAX_ATTEMPTS,
+                )
+                return
+
+            verify = await client.get(f"{base}/rest/repositories/{repo}")
+            if verify.status_code == 200:
+                return
+
+            last_response = response
+
+        if attempt < _REPO_CREATE_MAX_ATTEMPTS:
+            logger.warning(
+                "GraphDB repo creation failed (attempt %d/%d, HTTP %s) — retrying in %ds.",
+                attempt, _REPO_CREATE_MAX_ATTEMPTS,
+                last_response.status_code if last_response else "N/A",
+                _REPO_CREATE_RETRY_DELAY_S,
+            )
+            await asyncio.sleep(_REPO_CREATE_RETRY_DELAY_S)
+
+    if last_response is not None:
+        last_response.raise_for_status()
+    raise RuntimeError(
+        f"GraphDB repository '{repo}' could not be created after "
+        f"{_REPO_CREATE_MAX_ATTEMPTS} attempts."
+    )
+
+
+async def load_turtle_into_graph(turtle_content: str, named_graph: str) -> None:
+    """Replace a named graph with the provided Turtle RDF content (idempotent)."""
+    settings = get_settings()
+    base = settings.graphdb_url.rstrip("/")
+    repo = settings.graphdb_repository
+
+    encoded_ctx = quote(f"<{named_graph}>", safe="")
+    url = f"{base}/repositories/{repo}/statements?context={encoded_ctx}"
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.put(
+            url,
+            content=turtle_content.encode("utf-8"),
+            headers={"Content-Type": "text/turtle"},
+        )
+        response.raise_for_status()

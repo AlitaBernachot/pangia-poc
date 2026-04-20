@@ -14,6 +14,10 @@ applyTo: "backend-ai/app/pangiagent/agents/*.py"
 Every agent file **must** be placed in `backend-ai/app/pangiagent/agents/`.
 Do not add agent files directly under `backend-ai/app/` or any other directory.
 
+Base classes and mixins live in the `base_agents/` sub-package:
+`backend-ai/app/pangiagent/agents/base_agents/`.
+Do **not** add new base classes directly in `agents/`.
+
 ## Inheritance
 
 ### Base class hierarchy
@@ -39,7 +43,7 @@ object
 **`BaseAgent`** — mandatory base for all fanned-out agents:
 
 ```python
-from app.pangiagent.agents.base_agent import BaseAgent
+from app.pangiagent.agents.base_agents.base_agent import BaseAgent
 ```
 
 Provides:
@@ -51,7 +55,7 @@ Provides:
 **`BaseReActAgent`** — use instead of `BaseAgent` when your agent needs a tool-calling loop:
 
 ```python
-from app.pangiagent.agents.base_react_agent import BaseReActAgent
+from app.pangiagent.agents.base_agents.base_react_agent import BaseReActAgent
 
 class MyAgent(BaseReActAgent):
     ...
@@ -64,8 +68,8 @@ Provides in addition to `BaseAgent`:
 **`BaseAddSourcesAgent`** — pure mixin for agents that expose structured sources (`AgentSource`) to the synthesis layer. No `BaseAgent` dependency; combine via multiple inheritance:
 
 ```python
-from app.pangiagent.agents.base_react_agent import BaseReActAgent
-from app.pangiagent.agents.base_add_sources_agent import BaseAddSourcesAgent
+from app.pangiagent.agents.base_agents.base_react_agent import BaseReActAgent
+from app.pangiagent.agents.base_agents.base_add_sources_agent import BaseAddSourcesAgent
 
 class MyAgent(BaseReActAgent, BaseAddSourcesAgent):
     ...

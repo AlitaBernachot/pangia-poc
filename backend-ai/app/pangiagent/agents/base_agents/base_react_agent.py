@@ -11,7 +11,7 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, ToolMessage
 
-from app.pangiagent.agents.base_agent import BaseAgent
+from app.pangiagent.agents.base_agents.base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
 

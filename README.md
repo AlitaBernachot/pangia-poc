@@ -45,6 +45,7 @@ A minimal AI agent chat application with a **multi-agent architecture**:
     - [Human Output Agent](#human-output-agent)
     - [Data Visualisation Agent](#data-visualisation-agent)
     - [Map Agent](#map-agent)
+    - [Synthesis Agent](#synthesis-agent)
   - [Quick Start](#quick-start)
     - [1. Configure environment](#1-configure-environment)
     - [2. Start all services](#2-start-all-services)
@@ -913,9 +914,11 @@ backend-ai/
         │   ├── rag_agent_graph.mmd
         │   └── calculator_agent_graph.mmd
         └── agents/
-            ├── base_agent.py           Abstract BaseAgent: guardrails, prompt loading, as_subgraph()
-            ├── base_react_agent.py     BaseReActAgent — intermediate base for tool-using agents (ReAct loop)
-            ├── base_add_sources_agent.py BaseAddSourcesAgent — mixin: structured source tracking
+            ├── base_agents/                Base agent package (abstract classes + mixins)
+            │   ├── __init__.py             Re-exports BaseAgent, BaseReActAgent, BaseAddSourcesAgent
+            │   ├── base_agent.py           Abstract BaseAgent: guardrails, prompt loading, as_subgraph()
+            │   ├── base_react_agent.py     BaseReActAgent — intermediate base for tool-using agents (ReAct loop)
+            │   └── base_add_sources_agent.py BaseAddSourcesAgent — mixin: structured source tracking
             ├── ambiguity_agent.py      AmbiguityAgent — LLM ambiguity scorer for HITL
             ├── intent_parser_agent.py  IntentParserAgent — structured intent extraction (action, concept, filters, geo)
             ├── orchestrator_agent.py   build_graph() — orchestrator StateGraph + Mermaid output

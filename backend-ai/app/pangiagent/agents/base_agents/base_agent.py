@@ -161,7 +161,7 @@ class BaseAgent(ABC):
     def get_intent(self, inp: AgentInput) -> dict:
         """Extract and normalise the structured intent from ``inp.context["intent"]``.
 
-        Returns a dict with guaranteed keys: ``action``, ``dataset_concept``,
+        Returns a dict with guaranteed keys: ``action``, ``entity_concept``,
         ``filters``, ``geo_scope``.  Populated by ``IntentParserAgent`` in
         ``intent_node`` before the agent fan-out; returns sensible defaults
         when no intent was parsed.
@@ -170,14 +170,14 @@ class BaseAgent(ABC):
 
             intent = self.get_intent(inp)
             action = intent["action"]        # "display" | "filter" | "search" | "preview" | "compare"
-            concept = intent["dataset_concept"]
+            concept = intent["entity_concept"]
             filters = intent["filters"]      # list[{"column", "value", "op"}]
             geo = intent["geo_scope"]
         """
         raw: dict = inp.context.get("intent") or {}
         return {
             "action": str(raw.get("action", "display")).lower().strip(),
-            "dataset_concept": str(raw.get("dataset_concept", "")).strip(),
+            "entity_concept": str(raw.get("entity_concept", "")).strip(),
             "filters": list(raw.get("filters") or []),
             "geo_scope": str(raw.get("geo_scope", "")).strip(),
             "needs_map": bool(raw.get("needs_map", False)),

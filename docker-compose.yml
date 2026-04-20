@@ -136,6 +136,7 @@ services:
       - POSTGRES_DB=${POSTGIS_DB:-pangia}
     volumes:
       - postgis_data:/var/lib/postgresql/data
+      - ./backend-ai/init_postgis.sql:/docker-entrypoint-initdb.d/init_postgis.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGIS_USER:-pangia} -d ${POSTGIS_DB:-pangia}"]
       interval: 10s

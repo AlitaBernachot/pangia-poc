@@ -16,8 +16,8 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 
 from app.config import get_settings
 from app.models import AgentInput, AgentOutput, ChoiceItem
-from app.pangiagent.agents.base_add_sources_agent import BaseAddSourcesAgent
-from app.pangiagent.agents.base_react_agent import BaseReActAgent
+from app.pangiagent.agents.base_agents.base_add_sources_agent import BaseAddSourcesAgent
+from app.pangiagent.agents.base_agents.base_react_agent import BaseReActAgent
 from app.pangiagent.model_config import build_llm, get_agent_model_config
 from libs.filereader import fetch_and_parse
 from libs.datagouv import (
@@ -352,7 +352,7 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
             if search_tool:
                 import uuid as _uuid
                 # Prefer the parsed concept over the raw query
-                _base = intent["dataset_concept"] if intent["dataset_concept"] else strip_action_prefix(inp.query)
+                _base = intent["entity_concept"] if intent["entity_concept"] else strip_action_prefix(inp.query)
                 # Append geo scope if not already part of the concept
                 if intent["geo_scope"] and intent["geo_scope"].lower() not in _base.lower():
                     _base = f'{_base} {intent["geo_scope"]}'

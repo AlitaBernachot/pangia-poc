@@ -67,7 +67,7 @@ sources:
 
   - id: postgis_agent
     connector: postgis_agent
-    active: false
+    active: true
     label: PostGIS
     description: >
       PostGIS spatial SQL agent. Answers geographic questions using PostgreSQL
@@ -108,11 +108,13 @@ sources:
       - geometry
     geo_scope: null
     example_questions:
-      - "Find all buildings within 500 metres of the river Seine."
-      - "What is the area of the Île-de-France region in km²?"
-      - "Which municipalities intersect with the flood zone polygon?"
-      - "Calculate the distance between Lyon and Marseille centroids."
-      - "List all points of interest inside a given bounding box."
+      - "Quels lieux d'intérêt se trouvent à moins de 500 mètres du centre de Paris ?"
+      - "Quelle est la superficie de la commune de Lyon en km² ?"
+      - "Quelles communes intersectent une zone de risque d'inondation ?"
+      - "Quels hôpitaux sont situés dans une zone à risque critique ?"
+      - "Liste les zones de risque de niveau élevé dans le département 13."
+      - "Quels musées sont dans un rayon de 2 km du Louvre ?"
+      - "Quelle commune a la plus grande population parmi celles de la région Occitanie ?"
 
   - id: rdf_agent
     connector: rdf_agent
