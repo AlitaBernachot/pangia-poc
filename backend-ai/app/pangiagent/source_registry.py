@@ -213,7 +213,7 @@ def get_registry() -> list[SourceEntry]:
 
 def get_suggestions() -> list[str]:
     """Return the suggestion chips defined in ``config/source_registry.yml``."""
-    return _SUGGESTIONS
+    return _load_suggestions()
 
 
 def get_entry(source_id: str) -> SourceEntry | None:

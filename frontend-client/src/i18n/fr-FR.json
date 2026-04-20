@@ -16,7 +16,7 @@
     "subtitle": "Votre IA géospatiale intelligente. Posez des questions sur les données géographiques, les cartes, l'analyse spatiale, et bien plus encore."
   },
   "promptInput": {
-    "placeholder": "Posez n'importe quelle question sur les données géospatiales…",
+    "placeholder": "Comment puis-je vous aider ?",
     "dropFiles": "Déposez les fichiers ici",
     "attach": "Joindre",
     "attachFiles": "Joindre des fichiers",

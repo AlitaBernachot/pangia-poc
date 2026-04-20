@@ -180,6 +180,7 @@ class BaseAgent(ABC):
             "dataset_concept": str(raw.get("dataset_concept", "")).strip(),
             "filters": list(raw.get("filters") or []),
             "geo_scope": str(raw.get("geo_scope", "")).strip(),
+            "needs_map": bool(raw.get("needs_map", False)),
         }
 
     async def _run_by_action(self, inp: AgentInput) -> AgentOutput:

@@ -64,7 +64,8 @@ Your sole job is to read a user query and return a single JSON object describing
   "action":          "<action>",
   "dataset_concept": "<concept>",
   "filters":         [{"column": "<col>", "value": "<val>", "op": "<op>"}],
-  "geo_scope":       "<scope>"
+  "geo_scope":       "<scope>",
+  "needs_map":       <true|false>
 }
 
 ## Field definitions
@@ -77,6 +78,10 @@ Your sole job is to read a user query and return a single JSON object describing
 | preview   | User wants a sample / overview / aperçu / quelques exemples              |
 | search    | User wants to discover / list / find what datasets exist on a topic      |
 | compare   | User wants to compare two or more datasets or values                     |
+
+IMPORTANT: queries that ask WHERE something IS ("où se trouve/sont/trouvent",
+"localisation de", "position de", "carte des", "sur la carte", "show on map",
+"where is/are") are ALWAYS `display`, never `search`.
 
 ### dataset_concept  (required)
 The canonical name of the dataset or data topic to look for, stripped of action verbs
@@ -93,25 +98,36 @@ The geographic scope of the query (country, region, city, etc.).
 Use the name as expressed by the user.  Leave empty if the query is not geographically
 restricted.
 
+### needs_map  (default: false)
+Set to `true` when the query explicitly or implicitly asks for geographic locations:
+- "où se trouve/sont/trouvent", "localisation", "position", "carte", "map"
+- "show on a map", "where is/are", "sur la carte"
+- datasets whose concept implies point/polygon data (cameras, stations, parcelles, …)
+  AND the user wants to see their locations.
+Set to `false` for purely tabular or statistical queries.
+
 ## Examples
 
 Query: "Affiche les prix des carburants en France"
-→ {"action": "display", "dataset_concept": "prix des carburants", "filters": [], "geo_scope": "France"}
+→ {"action": "display", "dataset_concept": "prix des carburants", "filters": [], "geo_scope": "France", "needs_map": false}
 
 Query: "Montre les stations ouvertes en Bretagne"
-→ {"action": "filter", "dataset_concept": "stations-service", "filters": [{"column": "statut", "value": "ouvert", "op": "contains"}], "geo_scope": "Bretagne"}
+→ {"action": "filter", "dataset_concept": "stations-service", "filters": [{"column": "statut", "value": "ouvert", "op": "contains"}], "geo_scope": "Bretagne", "needs_map": true}
 
 Query: "Donne-moi un aperçu des données sur la qualité de l'air"
-→ {"action": "preview", "dataset_concept": "qualité de l'air", "filters": [], "geo_scope": ""}
+→ {"action": "preview", "dataset_concept": "qualité de l'air", "filters": [], "geo_scope": "", "needs_map": false}
 
 Query: "Quels datasets existent sur les risques d'inondation en Nouvelle-Aquitaine ?"
-→ {"action": "search", "dataset_concept": "risques inondation", "filters": [], "geo_scope": "Nouvelle-Aquitaine"}
+→ {"action": "search", "dataset_concept": "risques inondation", "filters": [], "geo_scope": "Nouvelle-Aquitaine", "needs_map": false}
+
+Query: "Où se trouvent les webcams dans Orléans ?"
+→ {"action": "display", "dataset_concept": "webcams", "filters": [], "geo_scope": "Orléans", "needs_map": true}
 
 Query: "Compare les accidents de la route en 2022 et 2023"
-→ {"action": "compare", "dataset_concept": "accidents de la route", "filters": [], "geo_scope": ""}
+→ {"action": "compare", "dataset_concept": "accidents de la route", "filters": [], "geo_scope": "", "needs_map": false}
 
 Query: "Show all bike-sharing stations in Lyon"
-→ {"action": "display", "dataset_concept": "vélos en libre-service", "filters": [], "geo_scope": "Lyon"}
+→ {"action": "display", "dataset_concept": "vélos en libre-service", "filters": [], "geo_scope": "Lyon", "needs_map": true}
 
 ## Rules
 - Return ONLY the raw JSON object — no markdown fences, no explanation.
@@ -162,6 +178,7 @@ def _parse_response(raw: str) -> dict[str, Any]:
         "dataset_concept": str(obj.get("dataset_concept", "")).strip(),
         "filters": clean_filters,
         "geo_scope": str(obj.get("geo_scope", "")).strip(),
+        "needs_map": bool(obj.get("needs_map", False)),
     }
 
 

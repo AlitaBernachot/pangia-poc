@@ -145,6 +145,10 @@ class HumanOutputAgent(BaseAgent):
         existing_geojson: dict | None = inp.context.get("geojson")
         user_query = inp.query
 
+        # Intent signal: IntentParserAgent may have already determined needs_map
+        intent: dict = inp.context.get("intent") or {}
+        intent_needs_map: bool | None = intent.get("needs_map")  # None = not set
+
         # Fast-path: pre-built rich data overrides heuristics
         has_prebuilt_dataviz = bool(
             existing_dataviz
@@ -159,6 +163,9 @@ class HumanOutputAgent(BaseAgent):
             columns = tables[0].get("columns", []) if tables else []
             lat_col, lon_col = find_coord_columns(columns)
             needs_map = existing_geojson is not None or (lat_col is not None and lon_col is not None)
+            # Let intent override: if user explicitly asked for a map, honour it
+            if intent_needs_map is True:
+                needs_map = True
             return {
                 "needs_map": needs_map,
                 "needs_dataviz": bool(has_prebuilt_dataviz),
@@ -171,6 +178,8 @@ class HumanOutputAgent(BaseAgent):
             needs_map = bool(
                 _COORD_HINT_RE.search(combined_other) or _GEO_KEYWORD_RE.search(combined_other)
             )
+            if intent_needs_map is True:
+                needs_map = True
             return {"needs_map": needs_map, "needs_dataviz": False}
 
         sub_text = "\n\n".join(

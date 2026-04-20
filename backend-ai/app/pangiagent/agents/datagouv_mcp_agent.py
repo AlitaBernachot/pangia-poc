@@ -223,6 +223,12 @@ class DataGouvMCPAgent(BaseAgent):
             parts.append(f"[INTENT] applique les filtres : {filter_desc}.")
         if intent["geo_scope"]:
             parts.append(f"[INTENT] geo_scope={intent['geo_scope']!r}")
+        if intent.get("needs_map"):
+            parts.append(
+                "[INTENT] needs_map=true → l'utilisateur veut voir les localisations sur une carte. "
+                "Récupère impérativement les ressources GeoJSON ou les colonnes de coordonnées (lat/lon) "
+                "disponibles dans ce dataset en plus du fichier CSV."
+            )
         return await self._do_react(inp, intent, "\n".join(parts))
 
     async def _run_filter(self, inp: AgentInput, intent: dict) -> AgentOutput:

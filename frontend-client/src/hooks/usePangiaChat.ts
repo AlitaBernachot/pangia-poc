@@ -170,14 +170,22 @@ export function usePangiaChat() {
                 return { ...m, agentActivity: activities }
               })
             } else if (type === 'agent_end') {
-              // V2 agent_end — update activity panel
+              // V2 agent_end — mark streaming done.
+              // Keep the streamed content already accumulated via agent_token
+              // (which is the full response); only fall back to the answer
+              // field if no streaming happened (answer is truncated to 500 chars).
               const agent = event.agent as string
               const answer = (event.answer as string | undefined) ?? ''
               updateAssistant((m) => {
                 const activities = [...(m.agentActivity ?? [])]
                 const idx = activities.findIndex((a) => a.agent === agent)
                 if (idx >= 0) {
-                  activities[idx] = { ...activities[idx], content: answer ?? activities[idx].content, streaming: false }
+                  const streamed = activities[idx].content
+                  activities[idx] = {
+                    ...activities[idx],
+                    content: streamed.length > answer.length ? streamed : answer,
+                    streaming: false,
+                  }
                 } else {
                   activities.push({ agent, content: answer, streaming: false, tools: [] })
                 }

@@ -16,7 +16,7 @@
     "subtitle": "Your intelligent geospatial AI. Ask questions about geographic data, maps, spatial analysis, and more."
   },
   "promptInput": {
-    "placeholder": "Ask anything about geospatial data…",
+    "placeholder": "How can I help you?",
     "dropFiles": "Drop files here",
     "attach": "Attach",
     "attachFiles": "Attach files",

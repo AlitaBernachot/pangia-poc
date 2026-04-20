@@ -393,6 +393,7 @@ sources:
 
 # ── Suggestion chips shown in the frontend UI ─────────────────────────────────
 suggestions:
+  - "Où se trouvent les webcams dans Orléans ?"
   - "Affiche les données des élections municipales de 2026"
   - "Quels datasets open data existent sur la qualité de l'air en France ?"
   - "Montre les stations de vélos en libre-service à Paris"
