@@ -15,8 +15,8 @@ Supported providers
 - ``anthropic``   – Anthropic Claude models (requires ``langchain-anthropic``)
 - ``mistral``     – Mistral AI models (requires ``langchain-mistralai``)
 - ``ollama``      – Locally-hosted models via Ollama (requires ``langchain-ollama``)
-- ``openrouter``  – OpenRouter proxy — OpenAI-compatible, routes to 200+ models
-                    (requires ``langchain-openai``; set ``OPENROUTER_API_KEY``)
+- ``openrouter``  – OpenRouter proxy — routes to 200+ models via native client
+                    (requires ``langchain-openrouter``; set ``OPENROUTER_API_KEY``)
 - ``googleai``    – Google Gemma local model via Kaggle
                     (requires ``langchain-google-vertexai``;
                     set ``KAGGLE_USERNAME`` and ``KAGGLE_KEY``)
@@ -80,15 +80,12 @@ except ImportError:
 # OpenAI is a required dependency — no guard needed.
 PROVIDER_CLASS_MAP["openai"] = ChatOpenAI
 
-# OpenRouter uses the OpenAI-compatible API via ChatOpenAI; no extra package.
-PROVIDER_CLASS_MAP["openrouter"] = ChatOpenAI
+try:
+    from langchain_openrouter import ChatOpenRouter  # type: ignore[import]
 
-
-# ---------------------------------------------------------------------------
-# Factory
-# ---------------------------------------------------------------------------
-
-_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+    PROVIDER_CLASS_MAP["openrouter"] = ChatOpenRouter
+except ImportError:
+    pass
 
 
 def build_llm(config: "ModelConfig", *, streaming: bool = False) -> BaseChatModel:
@@ -126,19 +123,12 @@ def build_llm(config: "ModelConfig", *, streaming: bool = False) -> BaseChatMode
             kaggle_envs["KAGGLE_KEY"] = config.api_key
         return cls(model=config.model, kaggle_envs=kaggle_envs)  # type: ignore[return-value]
 
-    # ── OpenRouter — OpenAI-compatible with a fixed base URL ───────────────
+    # ── All other providers (OpenAI, Anthropic, Mistral, Ollama, OpenRouter) ─
     kwargs: dict[str, Any] = {
         "model": config.model,
         "temperature": config.temperature,
         "streaming": streaming,
     }
-    if provider == "openrouter":
-        kwargs["base_url"] = _OPENROUTER_BASE_URL
-        if config.api_key is not None:
-            kwargs["api_key"] = config.api_key
-        return cls(**kwargs)  # type: ignore[return-value]
-
-    # ── All other providers ────────────────────────────────────────────────
     if config.api_key is not None:
         kwargs["api_key"] = config.api_key
     if config.base_url is not None:
