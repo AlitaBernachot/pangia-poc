@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     mistral_api_key: str = ""
 
+    # OpenRouter (OpenAI-compatible proxy — set MODEL_PROVIDER=openrouter)
+    openrouter_api_key: str = ""
+
+    # Google AI — Gemma local model via Kaggle (set MODEL_PROVIDER=googleai)
+    kaggle_username: str = ""
+    kaggle_key: str = ""
+
     # PostgreSQL (audit + long-term memory)
     postgres_dsn: str = "postgresql+asyncpg://pangia2:pangia2-password@postgres2:5432/pangia2"
 

@@ -2,73 +2,47 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""Multi-provider LLM configuration for PangIA agents.
+"""Per-agent model configuration resolver for PangIA agents.
 
-This module centralises all LLM instantiation logic so that:
+This module handles per-agent LLM configuration resolution from environment
+variables.  All provider-specific code (imports, class registry, and the LLM
+factory) lives in :mod:`app.pangiagent.provider_config`.
 
-* Any agent can switch provider (OpenAI, Anthropic, Mistral, Ollama) via
-  environment variables without touching agent code.
-* Per-agent model overrides are supported by naming env vars after the agent
-  (e.g. ``RAG_AGENT_MODEL_NAME``).
-* Optional provider packages (Anthropic, Mistral, Ollama) are imported
-  lazily so that a missing package only raises an error when that specific
-  provider is actually requested.
+Supported providers
+-------------------
+See :mod:`app.pangiagent.provider_config` for the full list.  To add a new
+provider, edit that module — not this one.
 
 Public API
 ----------
 ``AgentModelConfig``
-    Pydantic model grouping all LLM construction parameters.
+    Pydantic model grouping all LLM construction parameters for one agent.
 
-``PROVIDER_CLASS_MAP``
-    ``dict[str, type[BaseChatModel]]`` used by :func:`build_llm`.
-
-``build_llm(config)``
-    Instantiate and return the correct ``BaseChatModel`` for *config*.
+``PROVIDER_CLASS_MAP`` / ``build_llm``
+    Re-exported from :mod:`app.pangiagent.provider_config` for backwards
+    compatibility; prefer importing directly from that module in new code.
 
 ``get_agent_model_config(agent_name)``
-    Build an :class:`AgentModelConfig` from :func:`~app.config.get_settings`,
-    honouring per-agent overrides before falling back to global defaults.
+    Build an :class:`AgentModelConfig` from application settings, honouring
+    per-agent overrides before falling back to global defaults.
+
+``get_agent_max_iterations(agent_key)``
+    Return the maximum ReAct loop iterations for *agent_key*.
 """
 from __future__ import annotations
 
-from typing import Any
-
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 
-from app.config import get_settings
+# Re-export for backwards compatibility so existing imports keep working.
+from app.pangiagent.provider_config import PROVIDER_CLASS_MAP, build_llm  # noqa: F401
 
-# ---------------------------------------------------------------------------
-# Optional provider imports — guarded so startup never fails due to a missing
-# optional dependency.
-# ---------------------------------------------------------------------------
-
-try:
-    from langchain_anthropic import ChatAnthropic  # type: ignore[import-untyped]
-except ImportError:
-    ChatAnthropic = None  # type: ignore[assignment,misc]
-
-try:
-    from langchain_mistralai import ChatMistralAI  # type: ignore[import-untyped]
-except ImportError:
-    ChatMistralAI = None  # type: ignore[assignment,misc]
-
-try:
-    from langchain_ollama import ChatOllama  # type: ignore[import-untyped]
-except ImportError:
-    ChatOllama = None  # type: ignore[assignment,misc]
-
-# ---------------------------------------------------------------------------
-# Provider registry
-# ---------------------------------------------------------------------------
-
-PROVIDER_CLASS_MAP: dict[str, type[BaseChatModel] | None] = {
-    "openai": ChatOpenAI,
-    "anthropic": ChatAnthropic,
-    "mistral": ChatMistralAI,
-    "ollama": ChatOllama,
-}
+__all__ = [
+    "AgentModelConfig",
+    "PROVIDER_CLASS_MAP",
+    "build_llm",
+    "get_agent_model_config",
+    "get_agent_max_iterations",
+]
 
 
 # ---------------------------------------------------------------------------
@@ -80,61 +54,27 @@ class AgentModelConfig(BaseModel):
     """All parameters required to instantiate a chat LLM for one agent."""
 
     provider: str
+    """Provider name — must be a key in :data:`~app.pangiagent.provider_config.PROVIDER_CLASS_MAP`."""
+
     model: str
+    """Model identifier passed to the provider (e.g. ``"gpt-4o-mini"``)."""
+
     temperature: float
+    """Sampling temperature (0.0 = deterministic)."""
+
     api_key: str | None = None
+    """Provider API key.  When ``None`` the provider's default env-var is used."""
+
     base_url: str | None = None
+    """Optional custom API base URL (e.g. for Ollama or proxy setups)."""
+
+    kaggle_username: str | None = None
+    """Kaggle username — required when ``provider='googleai'``."""
 
 
 # ---------------------------------------------------------------------------
 # Factory helpers
 # ---------------------------------------------------------------------------
-
-
-def build_llm(config: AgentModelConfig) -> BaseChatModel:
-    """Instantiate and return the ``BaseChatModel`` described by *config*.
-
-    Parameters
-    ----------
-    config:
-        An :class:`AgentModelConfig` obtained from
-        :func:`get_agent_model_config`.
-
-    Returns
-    -------
-    BaseChatModel
-        A ready-to-use LangChain chat model instance.
-
-    Raises
-    ------
-    ValueError
-        If *config.provider* is not a key in :data:`PROVIDER_CLASS_MAP` or
-        if the corresponding package has not been installed.
-    """
-    provider = config.provider.lower()
-    if provider not in PROVIDER_CLASS_MAP:
-        raise ValueError(
-            f"Unknown LLM provider '{provider}'. "
-            f"Supported providers: {sorted(PROVIDER_CLASS_MAP)}"
-        )
-
-    cls = PROVIDER_CLASS_MAP[provider]
-    if cls is None:
-        raise ValueError(
-            f"Provider '{provider}' is registered but its package is not "
-            "installed. Install the corresponding langchain integration package."
-        )
-
-    kwargs: dict[str, Any] = {
-        "model": config.model,
-        "temperature": config.temperature,
-    }
-    if config.api_key:
-        kwargs["api_key"] = config.api_key
-    if config.base_url:
-        kwargs["base_url"] = config.base_url
-
-    return cls(**kwargs)  # type: ignore[return-value]
 
 
 def get_agent_max_iterations(agent_key: str) -> int:
@@ -148,6 +88,8 @@ def get_agent_max_iterations(agent_key: str) -> int:
     agent_key:
         Snake-case agent name, e.g. ``"neo4j_agent"``.
     """
+    from app.config import get_settings  # noqa: PLC0415
+
     settings = get_settings()
     per_agent: int = getattr(settings, f"{agent_key}_max_iterations", 0)
     return per_agent if per_agent > 0 else settings.agent_max_iterations
@@ -163,8 +105,8 @@ def get_agent_model_config(agent_name: str) -> AgentModelConfig:
     2. Global defaults (``MODEL_PROVIDER``, ``MODEL_NAME``,
        ``OPENAI_TEMPERATURE``).
 
-    The correct *api_key* and *base_url* are selected automatically based on
-    the resolved provider.
+    The correct *api_key*, *base_url*, and *kaggle_username* are selected
+    automatically based on the resolved provider.
 
     Parameters
     ----------
@@ -175,10 +117,10 @@ def get_agent_model_config(agent_name: str) -> AgentModelConfig:
     -------
     AgentModelConfig
     """
+    from app.config import get_settings  # noqa: PLC0415
+
     settings = get_settings()
 
-    # Per-agent override field names follow the pattern "{agent_name}_model_*"
-    # so that they map to env vars like RAG_AGENT_MODEL_PROVIDER.
     provider: str = (
         getattr(settings, f"{agent_name}_model_provider", None)
         or settings.model_provider
@@ -194,26 +136,24 @@ def get_agent_model_config(agent_name: str) -> AgentModelConfig:
         else settings.openai_temperature
     )
 
-    # Pick api_key and base_url based on the resolved provider.
     provider_lower = provider.lower()
-    api_key: str | None
-    base_url: str | None
+    api_key: str | None = None
+    base_url: str | None = None
+    kaggle_username: str | None = None
 
     if provider_lower == "openai":
         api_key = settings.openai_api_key or None
-        base_url = None
     elif provider_lower == "anthropic":
         api_key = getattr(settings, "anthropic_api_key", None) or None
-        base_url = None
     elif provider_lower == "mistral":
         api_key = getattr(settings, "mistral_api_key", None) or None
-        base_url = None
     elif provider_lower == "ollama":
-        api_key = None
         base_url = getattr(settings, "ollama_base_url", None) or None
-    else:
-        api_key = None
-        base_url = None
+    elif provider_lower == "openrouter":
+        api_key = getattr(settings, "openrouter_api_key", None) or None
+    elif provider_lower == "googleai":
+        api_key = getattr(settings, "kaggle_key", None) or None
+        kaggle_username = getattr(settings, "kaggle_username", None) or None
 
     return AgentModelConfig(
         provider=provider,
@@ -221,4 +161,5 @@ def get_agent_model_config(agent_name: str) -> AgentModelConfig:
         temperature=temperature,
         api_key=api_key,
         base_url=base_url,
+        kaggle_username=kaggle_username,
     )

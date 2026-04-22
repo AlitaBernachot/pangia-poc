@@ -24,6 +24,13 @@ class Settings(BaseSettings):
     openai_model: str = ""  # Deprecated – prefer MODEL_NAME
     openai_temperature: float = 0.0
 
+    # OpenRouter (OpenAI-compatible proxy — set MODEL_PROVIDER=openrouter)
+    openrouter_api_key: str = ""
+
+    # Google AI — Gemma local model via Kaggle (set MODEL_PROVIDER=googleai)
+    kaggle_username: str = ""
+    kaggle_key: str = ""
+
     # Neo4j (Knowledge Graph agent)
     neo4j_uri: str = "bolt://localhost:7687"
     neo4j_username: str = "neo4j"
