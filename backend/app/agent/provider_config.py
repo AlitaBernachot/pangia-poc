@@ -120,9 +120,9 @@ def build_llm(config: "ModelConfig", *, streaming: bool = False) -> BaseChatMode
     # ── Google AI — GemmaLocalKaggle has a different constructor ───────────
     if provider == "googleai":
         kaggle_envs: dict[str, str] = {}
-        if config.kaggle_username:
+        if config.kaggle_username is not None:
             kaggle_envs["KAGGLE_USERNAME"] = config.kaggle_username
-        if config.api_key:
+        if config.api_key is not None:
             kaggle_envs["KAGGLE_KEY"] = config.api_key
         return cls(model=config.model, kaggle_envs=kaggle_envs)  # type: ignore[return-value]
 

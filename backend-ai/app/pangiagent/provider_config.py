@@ -124,9 +124,9 @@ def build_llm(config: "AgentModelConfig") -> BaseChatModel:
     # ── Google AI — GemmaLocalKaggle has a different constructor ───────────
     if provider == "googleai":
         kaggle_envs: dict[str, str] = {}
-        if config.kaggle_username:
+        if config.kaggle_username is not None:
             kaggle_envs["KAGGLE_USERNAME"] = config.kaggle_username
-        if config.api_key:
+        if config.api_key is not None:
             kaggle_envs["KAGGLE_KEY"] = config.api_key
         return cls(model=config.model, kaggle_envs=kaggle_envs)  # type: ignore[return-value]
 
@@ -137,14 +137,14 @@ def build_llm(config: "AgentModelConfig") -> BaseChatModel:
     }
     if provider == "openrouter":
         kwargs["base_url"] = _OPENROUTER_BASE_URL
-        if config.api_key:
+        if config.api_key is not None:
             kwargs["api_key"] = config.api_key
         return cls(**kwargs)  # type: ignore[return-value]
 
     # ── All other providers ────────────────────────────────────────────────
-    if config.api_key:
+    if config.api_key is not None:
         kwargs["api_key"] = config.api_key
-    if config.base_url:
+    if config.base_url is not None:
         kwargs["base_url"] = config.base_url
 
     return cls(**kwargs)  # type: ignore[return-value]
