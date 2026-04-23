@@ -207,7 +207,15 @@ def _wrap_agent(agent: "BaseAgent") -> Any:
                 )
                 break
 
-        inp = AgentInput(query=query, session_id=session_id, context={})
+        inp = AgentInput(
+            query=query,
+            session_id=session_id,
+            # NOTE: context (long-term memory facts, short-term memory, parsed intent)
+            # is not populated here because memory_node / intent_node no longer run as
+            # graph nodes in the deepagents architecture.  Memory integration via
+            # deepagents middleware is planned as a follow-up improvement.
+            context={},
+        )
         output = await _agent.run(inp)
         content = (
             output.answer
@@ -306,7 +314,10 @@ def build_deep_graph():
     subagents: list[CompiledSubAgent] = [
         CompiledSubAgent(
             name=name,
-            description=_AGENT_DESCRIPTIONS[name],
+            description=_AGENT_DESCRIPTIONS.get(
+                name,
+                f"Agent for {name.replace('_', ' ')}.",
+            ),
             runnable=_wrap_agent(agent),
         )
         for name, agent in agent_instances.items()

@@ -139,8 +139,10 @@ async def run_graph_to_queue(
                     "type": "agent_end",
                     "agent": completed_agent,
                     "answer": answer_preview,
-                    "confidence": 0.8,
-                    "duration_ms": 0,
+                    # confidence and duration are not available from deepagents'
+                    # task tool result; retained for frontend schema compatibility.
+                    "confidence": None,
+                    "duration_ms": None,
                     "violations": [],
                     "error": None,
                 }))
