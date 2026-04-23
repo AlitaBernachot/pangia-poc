@@ -10,12 +10,12 @@ import uuid
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from langchain_core.messages import HumanMessage
 
 from app.pangiagent.graph import ORCHESTRATOR_GRAPH
 from app.pangiagent.hitl import get_hitl_manager
 from app.pangiagent.source_registry import get_registry
 from app.pangiagent.sse_stream import drain_queue_to_sse, run_graph_to_queue
-from app.pangiagent.state import OrchestratorState
 from app.models import ChatRequest, HITLResponse, ChoiceResponse
 
 router = APIRouter()
@@ -46,26 +46,31 @@ async def list_sources():
 async def chat(body: ChatRequest) -> StreamingResponse:
     session_id = body.session_id or str(uuid.uuid4())
 
-    initial_state: OrchestratorState = {
-        "query": body.message,
-        "session_id": session_id,
-        "context": {},
-        "selected_sources": body.selected_sources or [],
-        "agents_to_call": [],
-        "execution_reasoning": "",
-        "sub_results": {},
-        "final_answer": "",
-        "confidence": 0.0,
-        "session_title": "",
-        "hitl_request_id": "",
-        "hitl_questions": [],
-        "hitl_status": "",
-        "intent": {},
+    # Build the message content. When the user pre-selected specific data
+    # sources, append a hint so the orchestrator restricts its delegation.
+    message_content = body.message
+    if body.selected_sources:
+        sources_hint = (
+            "\n\n[Use only these data sources: "
+            + ", ".join(body.selected_sources)
+            + "]"
+        )
+        message_content += sources_hint
+
+    # deepagents expects a messages-based initial state.
+    # The session_id is threaded via additional_kwargs so that sub-agents
+    # can use it for HITL choice requests (dataset disambiguation, etc.).
+    initial_state = {
+        "messages": [
+            HumanMessage(
+                content=message_content,
+                additional_kwargs={"session_id": session_id},
+            )
+        ]
     }
 
-    # Run the graph in an independent background Task so that the long
-    # hitl_wait_node pause is NOT cancelled when the HTTP connection's anyio
-    # cancel scope is torn down (e.g. client disconnect / proxy timeout).
+    # Run the graph in an independent background Task so that long-running
+    # sub-agent calls are NOT cancelled when the HTTP connection is closed.
     queue: asyncio.Queue[str | None] = asyncio.Queue()
     asyncio.create_task(
         run_graph_to_queue(
