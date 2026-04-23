@@ -4,12 +4,27 @@ SPDX-FileCopyrightText: 2026 AlitaBernachot
 SPDX-License-Identifier: MIT
 -->
 
-# Backend V2 — PangIA Second-Generation Multi-Agent System
+# Backend-AI — PangIA Multi-Agent System (deepagents edition)
 
 > **Port:** `8086`  
-> **Stack:** FastAPI · asyncio · LangChain · LangGraph · PostgreSQL/pgvector · Redis
+> **Stack:** FastAPI · asyncio · LangChain · LangGraph · **deepagents** · PostgreSQL/pgvector · Redis
 
-This is the second-generation backend for PangIA. It adds guardrails, structured HITL (human-in-the-loop), reusable agent-level disambiguation, long-term memory, audit trails, and a clean inheritance-based agent hierarchy on top of the V1 concepts.
+This is the backend for PangIA. It adds guardrails, agent-level HITL disambiguation (choice requests), long-term memory, audit trails, and a clean inheritance-based agent hierarchy.
+
+The orchestration layer was migrated from a home-made LangGraph fan-out/merge graph to
+[**langchain deepagents**](https://github.com/langchain-ai/deepagents) — a batteries-included agent harness built on LangGraph.
+
+### What changed in the deepagents migration
+
+| Before (home-made) | After (deepagents) |
+|---|---|
+| Custom `build_graph()` in `orchestrator_agent.py` | `create_deep_agent()` in `deep_graph.py` |
+| `SmartDispatcherAgent` + `DynamicRouter` | deepagents `task` tool (LLM routes by description) |
+| `BaseReActAgent._react_loop` | deepagents built-in tool-calling loop |
+| `OrchestratorState` (custom TypedDict) | `AgentState` (messages-based, LangGraph standard) |
+| Parallel fan-out via `Send` | Sequential `task` tool delegation |
+
+Each connector agent is wrapped as a `CompiledSubAgent` — a messages-compatible LangGraph subgraph — preserving all existing guardrails, prompt-loading, and HITL choice requests unchanged.
 
 ---
 
@@ -115,91 +130,76 @@ backend-ai/
     │       │                       GET /api/sources
     │       └── suggestions.py      GET /api/suggestions
     └── pangiagent/
-        ├── state.py                OrchestratorState + SubAgentState TypedDicts
+        ├── state.py                SubAgentState TypedDict (used inside wrapper subgraphs)
         ├── audit.py                AuditService — async SHA-256 hash-chain writer
         ├── memory.py               ShortTermMemory (Redis) + LongTermMemory (pgvector)
         ├── guardrails.py           check_toxic_input, check_output_length, check_ambiguous_intent
-        ├── router.py               DynamicRouter — LLM → ExecutionPlan (fallback when SmartDispatcher disabled)
         ├── source_registry.py      SourceRegistry loader + ChromaDB bootstrap
         ├── hitl.py                 HITLManager — asyncio.Future-based suspend/resume + per-session notification queues
-        ├── sse_stream.py           run_graph_to_queue / drain_queue_to_sse
+        ├── sse_stream.py           run_graph_to_queue / drain_queue_to_sse (adapted for messages-based state)
         ├── model_config.py         Per-agent LLM provider/model resolution
-        ├── graph.py                AGENTS + OUTPUT_AGENTS + SYNTHESIS_AGENT registry; ORCHESTRATOR_GRAPH
-        ├── mermaid_graph/          Auto-generated LangGraph Mermaid diagrams (written at startup)
+        ├── graph.py                ORCHESTRATOR_GRAPH — re-exports from deep_graph.py
+        ├── deep_graph.py           build_deep_graph() — deepagents-based orchestrator (new)
+        ├── tools/                  Domain tool functions (LangChain @tool) for SubAgent specs
+        │   └── __init__.py
+        ├── mermaid_graph/          Legacy diagrams (no longer auto-generated)
         └── agents/
             ├── base_agents/                Base agent package (abstract classes + mixins)
             │   ├── __init__.py             Re-exports BaseAgent, BaseReActAgent, BaseAddSourcesAgent
             │   ├── base_agent.py           BaseAgent (abstract) — guardrails, prompt loading, subgraph, request_choice
             │   ├── base_react_agent.py     BaseReActAgent — intermediate base for tool-using agents (ReAct loop)
             │   └── base_add_sources_agent.py BaseAddSourcesAgent — mixin: add_source / merge_sources / _generate_sources
-            ├── ambiguity_agent.py      AmbiguityAgent — LLM ambiguity scorer (utility, not fanned-out)
-            ├── title_agent.py          TitleAgent — generates a 4-6 word session title (utility, not fanned-out)
-            ├── intent_parser_agent.py  IntentParserAgent — parses query into structured intent (utility, not fanned-out)
-            ├── orchestrator_agent.py   build_graph() — assembles the full LangGraph StateGraph
-            ├── smart_dispatcher_agent.py SmartDispatcherAgent — keyword + semantic routing, no LLM
-            ├── calculator_agent.py     CalculatorAgent — safe AST arithmetic evaluator
-            ├── rag_agent.py            RAGAgent — ChromaDB retrieval + LLM answer synthesis
-            ├── summary_agent.py        SummaryAgent — custom 2-node subgraph (enrich → execute)
-            ├── neo4j_agent.py          Neo4jAgent — LLM generates Cypher → executed → LLM synthesises
-            ├── postgis_agent.py        PostGISAgent — LLM generates SQL → executed → LLM synthesises
-            ├── rdf_agent.py            RDFAgent — LLM generates SPARQL → executed → LLM synthesises
-            ├── vector_chroma_agent.py  VectorChromaAgent — ChromaDB similarity search → LLM synthesises
-            ├── datagouv_mcp_agent.py   DataGouvMCPAgent — French open-data catalogue (data.gouv.fr)
-            ├── geonetwork_mcp_agent.py GeoNetworkMCPAgent — geospatial metadata catalogue
-            ├── humanoutput_agent.py    HumanOutputAgent — post-processing: decides needs_map / needs_dataviz
-            ├── dataviz_agent.py        DataVizAgent — post-processing: chart / KPI / table structures
-            ├── mapviz_agent.py         MapVizAgent — post-processing: GeoJSON extraction
-            └── synthesis_agent.py      SynthesisAgent — final node: rewrites raw results into a clean answer
+            ├── ambiguity_agent.py      AmbiguityAgent — LLM ambiguity scorer (utility)
+            ├── title_agent.py          TitleAgent — generates a 4-6 word session title (utility)
+            ├── intent_parser_agent.py  IntentParserAgent — parses query into structured intent (utility)
+            ├── calculator_agent.py     CalculatorAgent — safe AST arithmetic evaluator (CompiledSubAgent)
+            ├── rag_agent.py            RAGAgent — ChromaDB retrieval + LLM answer synthesis (CompiledSubAgent)
+            ├── summary_agent.py        SummaryAgent — summarisation + concise answer (CompiledSubAgent)
+            ├── neo4j_agent.py          Neo4jAgent — LLM → Cypher → Neo4j → answer (CompiledSubAgent)
+            ├── postgis_agent.py        PostGISAgent — LLM → SQL → PostGIS → answer (CompiledSubAgent)
+            ├── rdf_agent.py            RDFAgent — LLM → SPARQL → GraphDB → answer (CompiledSubAgent)
+            ├── vector_chroma_agent.py  VectorChromaAgent — ChromaDB similarity search → answer (CompiledSubAgent)
+            ├── datagouv_mcp_agent.py   DataGouvMCPAgent — French open-data catalogue (CompiledSubAgent)
+            ├── geonetwork_mcp_agent.py GeoNetworkMCPAgent — geospatial metadata catalogue (CompiledSubAgent)
+            ├── humanoutput_agent.py    HumanOutputAgent — post-processing (legacy, kept for reference)
+            ├── dataviz_agent.py        DataVizAgent — post-processing (legacy, kept for reference)
+            ├── mapviz_agent.py         MapVizAgent — post-processing (legacy, kept for reference)
+            └── synthesis_agent.py      SynthesisAgent — synthesis (legacy, kept for reference)
 ```
 
 ---
 
 ## Orchestrator graph topology
 
+The orchestrator is built with [`create_deep_agent`](https://github.com/langchain-ai/deepagents) from the `deepagents` library. It replaces the previous home-made LangGraph fan-out/merge graph.
+
 ```
-__start__
+User query
     │
     ▼
-memory_node            ← loads LTM (pgvector) + STM (Redis) into context
-    │
+Main deep agent (LLM)
+    │  decides which sub-agent(s) to call based on the query
+    ├──[task: neo4j_agent]──────► Neo4jAgent._run()  ─────► ToolMessage result
+    ├──[task: postgis_agent]────► PostGISAgent._run() ─────► ToolMessage result
+    ├──[task: rag_agent]────────► RAGAgent._run()     ─────► ToolMessage result
+    ├──[task: datagouv_mcp_agent]► DataGouvMCPAgent._run() ► ToolMessage result
+    └──[... other sub-agents ...]
+    │  synthesises all results
     ▼
-title_node             ← generates a short session title (first turn only, non-blocking)
-    │
-    ▼
-intent_node            ← IntentParserAgent: extracts action, entity_concept, filters, geo_scope
-    │                      into state["context"]["intent"] for downstream agents
-    │
-    ▼
-ambiguity_node         ← LLM scores query ambiguity (0–1)
-    │
-    ├──[pending]──► hitl_wait_node   ← suspends graph; awaits human clarification
-    │                   │
-    │            [timeout]──► __end__  (final_answer = timeout message)
-    │            [resolved]──► router_node
-    │
-    └──[clear]──► router_node        ← SmartDispatcher (or LLM DynamicRouter)
-                      │
-                [Send fan-out — parallel]
-                │       │       │
-           agent_1  agent_2  agent_N  …  (each is a compiled subgraph)
-                │       │       │
-                └───────┴───────┘
-                        ▼
-                   merge_node        ← collects sub_results, builds raw final_answer
-                        │
-                  humanoutput_node   ← LLM decides needs_map / needs_dataviz
-                        │
-              ┌─────────┴─────────┐
-         dataviz_node?       mapviz_node?   (conditional on output_decision)
-              │                   │
-              └─────────┬─────────┘
-                        ▼
-                 synthesis_node     ← rewrites raw results into a clean user-facing Markdown answer
-                        │
-                    __end__
+Final answer (AI message)
 ```
 
-The Mermaid diagram is written to `app/pangiagent/mermaid_graph/orchestrator_graph.mmd` at startup.
+Each connector agent is wrapped as a `CompiledSubAgent` — a single-node LangGraph subgraph with a `messages`-compatible state schema.  The main deep agent uses the built-in `task` tool to delegate queries and receives the sub-agent's answer as a `ToolMessage`.
+
+The home-made components that were replaced:
+
+| Removed | Replaced by |
+|---|---|
+| `agents/orchestrator_agent.py` | `deep_graph.build_deep_graph()` |
+| `agents/smart_dispatcher_agent.py` | deepagents `task` tool routing |
+| `router.py` (DynamicRouter) | deepagents `task` tool routing |
+| `BaseReActAgent._react_loop` | deepagents built-in tool-calling loop |
+| `OrchestratorState` | `AgentState` (messages-based) |
 
 ---
 
@@ -217,13 +217,24 @@ The Mermaid diagram is written to `app/pangiagent/mermaid_graph/orchestrator_gra
 | `neo4j_agent` | `Neo4jAgent` | LLM → Cypher → Neo4j execute → LLM synthesis | ✓ |
 | `postgis_agent` | `PostGISAgent` | LLM → SQL → PostGIS execute → LLM synthesis | ✓ |
 | `rdf_agent` | `RDFAgent` | LLM → SPARQL → GraphDB execute → LLM synthesis | ✓ |
-| `vector_chroma_agent` | `VectorChromaAgent` | ChromaDB similarity search → LLM synthesis | ✓ |
-| `datagouv_mcp_agent` | `DataGouvMCPAgent` | French open-data (data.gouv.fr MCP) | ✓ |
-| `geonetwork_mcp_agent` | `GeoNetworkMCPAgent` | Geospatial metadata (GeoNetwork MCP) | ✓ |
-| `humanoutput_agent` | `HumanOutputAgent` | Decides needs_map / needs_dataviz | No (post-processing) |
-| `dataviz_agent` | `DataVizAgent` | Builds chart / KPI / table structures | No (post-processing) |
-| `mapviz_agent` | `MapVizAgent` | Extracts GeoJSON FeatureCollection | No (post-processing) |
-| `synthesis_agent` | `SynthesisAgent` | Rewrites all results into a clean answer | No (final node) |
+| Agent | Class | Role | deepagents role |
+|---|---|---|---|
+| `rag_agent` | `RAGAgent` | ChromaDB retrieval + LLM synthesis | `CompiledSubAgent` |
+| `calculator_agent` | `CalculatorAgent` | Safe AST arithmetic | `CompiledSubAgent` |
+| `summary_agent` | `SummaryAgent` | Summarisation + concise answer | `CompiledSubAgent` |
+| `neo4j_agent` | `Neo4jAgent` | LLM → Cypher → Neo4j → answer | `CompiledSubAgent` |
+| `postgis_agent` | `PostGISAgent` | LLM → SQL → PostGIS → answer | `CompiledSubAgent` |
+| `rdf_agent` | `RDFAgent` | LLM → SPARQL → GraphDB → answer | `CompiledSubAgent` |
+| `vector_chroma_agent` | `VectorChromaAgent` | ChromaDB similarity search → answer | `CompiledSubAgent` |
+| `datagouv_mcp_agent` | `DataGouvMCPAgent` | French open-data (data.gouv.fr MCP) | `CompiledSubAgent` |
+| `geonetwork_mcp_agent` | `GeoNetworkMCPAgent` | Geospatial metadata (GeoNetwork) | `CompiledSubAgent` |
+| `ambiguity_agent` | `AmbiguityAgent` | LLM ambiguity scorer (utility) | — (legacy, kept) |
+| `title_agent` | `TitleAgent` | Session title generator (utility) | — (legacy, kept) |
+| `intent_parser_agent` | `IntentParserAgent` | Structured intent extraction (utility) | — (legacy, kept) |
+| `humanoutput_agent` | `HumanOutputAgent` | Post-processing: needs_map / needs_dataviz | — (legacy, kept) |
+| `dataviz_agent` | `DataVizAgent` | Post-processing: chart structures | — (legacy, kept) |
+| `mapviz_agent` | `MapVizAgent` | Post-processing: GeoJSON extraction | — (legacy, kept) |
+| `synthesis_agent` | `SynthesisAgent` | Final answer rewriting | — (legacy, kept) |
 
 ---
 
@@ -560,34 +571,13 @@ Every significant event (`request_start`, `memory_access`, `hitl_*`, `routing`, 
 
 ## Routing
 
-Two strategies, toggled by `SMART_DISPATCHER_ENABLED`:
+Routing is handled by the deepagents main agent: it reads each `CompiledSubAgent`'s `description` field and uses the `task` tool to delegate to the most appropriate sub-agent(s).
 
-### SmartDispatcherAgent (default, no LLM)
+The `source_registry.yml` is kept for the `/api/sources` endpoint (used by the frontend to show available data sources) but is no longer used for routing decisions.
 
-Scores every registered source by combining:
-
-1. **Keyword scoring** — +2 per topic / entity_type from `source_registry.yml` found in the query.
-2. **Semantic scoring** — cosine similarity from ChromaDB source-registry collection (max +1).
-
-Agents with composite score ≥ `DISPATCH_THRESHOLD` (2.0) are selected. Falls back to the highest scorer if nothing clears the threshold.
-
-### DynamicRouter (LLM-based fallback)
-
-When `SMART_DISPATCHER_ENABLED=false`, calls an LLM with a structured-output prompt to produce an `ExecutionPlan` with parallel groups.
-
-### Source registry
-
-`config/source_registry.yml` — add an entry here to register a new connector.
-
-| Field | Description |
-|---|---|
-| `id` / `connector` | Agent key matching the `AGENTS` registry key |
-| `description` | Embeddable text for ChromaDB |
-| `topics` | Keywords for deterministic scoring |
-| `entity_types` | Entity types stored in this source |
-| `capabilities` | Standardised tags (e.g. `spatial_query`, `open_data`) |
-| `geo_scope` | Geographic coverage (`null` = global) |
-| `example_questions` | Representative questions |
+> **Legacy note:** `SmartDispatcherAgent` (keyword + semantic scoring) and `DynamicRouter`
+> (LLM-based `ExecutionPlan`) have been removed. The `SMART_DISPATCHER_ENABLED` config flag
+> is kept for backward compatibility but has no effect.
 
 ---
 
@@ -804,8 +794,8 @@ After fetching files, the agent appends a `**Téléchargement :**` Markdown bloc
 | `GRAPHDB_URL` | `http://graphdb:7200` | Ontotext GraphDB URL |
 | `GRAPHDB_REPOSITORY` | `pangia` | GraphDB repository name |
 | `DATA_GOUV_MCP_URL` | `https://mcp.data.gouv.fr/mcp` | data.gouv.fr MCP endpoint |
-| `SMART_DISPATCHER_ENABLED` | `true` | `true` = SmartDispatcher (no LLM); `false` = DynamicRouter (LLM) |
-| `AGENT_MAX_ITERATIONS` | `10` | Global ReAct loop iteration limit |
+| `SMART_DISPATCHER_ENABLED` | `true` | Kept for backward compat; has no effect in deepagents mode |
+| `AGENT_MAX_ITERATIONS` | `10` | Max ReAct iterations for sub-agents (used by DataGouvMCPAgent) |
 | `<AGENT>_MAX_ITERATIONS` | `0` | Per-agent override (0 = use global) |
 | `PHOENIX_COLLECTOR_ENDPOINT` | `http://localhost:6006/v1/traces` | Arize Phoenix OTLP endpoint |
 | `PHOENIX_PROJECT_NAME` | `pangia` | Phoenix project name |
@@ -841,13 +831,13 @@ prompt: |
 ## Adding a new agent
 
 1. **Create** `app/pangiagent/agents/<name>_agent.py`.
-2. **Inherit** from `BaseAgent`, implement `get_capabilities()` and `_run()`.
+2. **Inherit** from `BaseAgent` (or `BaseReActAgent` for tool-using agents), implement `get_capabilities()` and `_run()`.
 3. **Add a prompt file** `config/prompts/<name>_agent.yaml`.
-4. **Register** in `app/pangiagent/graph.py` under `AGENTS`.
-5. **Add a source entry** in `config/source_registry.yml` with appropriate `capabilities`, `topics`, and `example_questions`.
+4. **Instantiate** the agent in `app/pangiagent/deep_graph.py` inside `build_deep_graph()` and add it to `agent_instances`.
+5. **Add a description** for the new agent in `_AGENT_DESCRIPTIONS` in `deep_graph.py`.
 6. **Update** `README.md` (this file) to document the new agent.
 
-For post-processing agents (not fanned out), override `make_node()` instead and register under `OUTPUT_AGENTS`.
+> **Note:** You no longer need to register agents in `source_registry.yml` for routing — deepagents routes via the `description` field in `_AGENT_DESCRIPTIONS`. The source registry is only used for the `/api/sources` endpoint.
 
 ---
 

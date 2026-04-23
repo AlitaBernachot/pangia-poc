@@ -3,34 +3,30 @@
 # SPDX-License-Identifier: MIT
 
 """
-SSE streaming layer for the V2 orchestrator graph.
+SSE streaming layer for the deepagents orchestrator graph.
 
-``run_graph_to_queue`` drives the compiled LangGraph graph via
-``astream_events(version="v2")`` inside a **background asyncio Task**
-that is *not* bound to the HTTP connection's cancel scope.  SSE chunks
-are pushed into an ``asyncio.Queue`` so that the HTTP handler can drain
-them independently.  This decoupling is essential for ``hitl_wait_node``,
-which needs to survive for minutes while waiting for human input even if
-the original SSE connection is interrupted.
+``run_graph_to_queue`` drives the compiled deepagents LangGraph graph via
+``astream_events(version="v2")`` inside a **background asyncio Task** that is
+*not* bound to the HTTP connection's cancel scope.  SSE chunks are pushed into
+an ``asyncio.Queue`` so that the HTTP handler can drain them independently.
 
-``drain_queue_to_sse`` is the async generator used by the HTTP handler to
-pull chunks from the queue and yield them as SSE.
+``drain_queue_to_sse`` is the async generator used by the HTTP handler to pull
+chunks from the queue and yield them as SSE.
 
-SSE event types emitted:
+The deepagents graph uses a messages-based state (``AgentState``).  Events are
+mapped to the SSE event types that the frontend already understands:
+
+SSE event types emitted
+-----------------------
     status          – "Processing your request…"
-    memory_access   – LTM facts / STM data loaded
-    hitl_request    – ambiguous query; frontend should show HITL modal
-    hitl_resolved   – human responded; continuing with clarified query
-    hitl_timeout    – no human response within timeout
-    routing_plan    – LLM selected these agents (+ reasoning)
-    agent_start     – a sub-agent subgraph began
-    agent_end       – a sub-agent subgraph completed (answer, confidence, …)
-    final_answer    – merged answer from all agents
-    output_decision – humanoutput decision: {needs_map, needs_dataviz}
-    dataviz         – chart / KPI / table payload from dataviz_node
-    geojson         – GeoJSON FeatureCollection from mapviz_node
+    agent_start     – the main agent called `task` with a sub-agent
+    agent_token     – LLM token streamed during sub-agent or main agent turn
+    agent_end       – the `task` tool completed for a sub-agent
+    final_answer    – the main agent's last non-tool AI message
     done            – stream complete
     error           – unhandled exception
+    choice_request  – sub-agent needs the user to pick a dataset
+                      (forwarded from HITLManager notifications)
 """
 from __future__ import annotations
 
@@ -39,60 +35,49 @@ import json
 import logging
 from typing import Any, AsyncGenerator
 
+from langchain_core.messages import AIMessage
+
 from app.pangiagent.audit import get_audit
-from app.pangiagent.agents.orchestrator_agent import _AGENT_NODE_NAMES
 from app.pangiagent.hitl import get_hitl_manager
-from app.pangiagent.state import OrchestratorState
 
 logger = logging.getLogger(__name__)
 
 _MAX_AGENT_ANSWER_PREVIEW = 500  # chars sent in agent_end SSE event
-_QUEUE_SENTINEL = None  # signals end-of-stream to drain_queue_to_sse
+_QUEUE_SENTINEL = None           # signals end-of-stream to drain_queue_to_sse
 
 
 def _sse(data: dict) -> str:
     return f"data: {json.dumps(data)}\n\n"
 
 
-def _node_name(event: dict) -> str:
-    return event.get("metadata", {}).get("langgraph_node", "")
-
-
-def _parent_agent(event: dict) -> str:
-    """Return the sub-agent name for events emitted *inside* a compiled subgraph.
-
-    When a sub-agent is compiled as a nested subgraph, LangGraph events carry
-    ``checkpoint_ns`` of the form ``"datagouv_mcp_agent:execute_node:…"``.
-    The first segment is the sub-agent node name in the orchestrator graph.
-    Returns "" when the event does not originate from a registered sub-agent.
-    """
-    ns: str = event.get("metadata", {}).get("checkpoint_ns", "")
-    if not ns:
-        return ""
-    root = ns.split(":")[0]
-    return root if root in _AGENT_NODE_NAMES else ""
-
-
-def _output(event: dict) -> dict:
-    data = event.get("data", {})
-    out = data.get("output", {})
-    return out if isinstance(out, dict) else {}
-
-
 async def run_graph_to_queue(
     graph,
-    initial_state: OrchestratorState,
+    initial_state: dict,
     queue: asyncio.Queue,
     original_query: str,
     session_id: str,
 ) -> None:
-    """Run the orchestrator graph and push SSE chunks into *queue*.
+    """Run the deepagents orchestrator graph and push SSE chunks into *queue*.
 
-    Intended to be launched as an independent ``asyncio.Task`` so that the
-    graph execution (including the long ``hitl_wait_node`` pause) is *not*
-    cancelled when the HTTP connection's cancel scope is torn down.
+    Intended to be launched as an independent ``asyncio.Task`` so that graph
+    execution is *not* cancelled when the HTTP connection's anyio cancel scope
+    is torn down.
 
     A ``None`` sentinel is always pushed last to signal completion.
+
+    Parameters
+    ----------
+    graph:
+        The compiled deepagents graph returned by
+        :func:`~app.pangiagent.deep_graph.build_deep_graph`.
+    initial_state:
+        ``{"messages": [HumanMessage(...)]}`` — the standard deepagents input.
+    queue:
+        ``asyncio.Queue`` consumed by :func:`drain_queue_to_sse`.
+    original_query:
+        Raw user query string used only for audit logging.
+    session_id:
+        Current session identifier.
     """
     audit = get_audit()
     await audit.log(session_id, "request_start", {"query": original_query})
@@ -100,6 +85,7 @@ async def run_graph_to_queue(
     await queue.put(_sse({"type": "status", "message": "Processing your request…"}))
 
     # Subscribe to choice_request notifications fired from inside sub-agents
+    # (e.g. dataset disambiguation in DataGouvMCPAgent).
     hitl_manager = get_hitl_manager()
     notif_queue: asyncio.Queue = asyncio.Queue()
     hitl_manager.subscribe(session_id, notif_queue)
@@ -125,81 +111,43 @@ async def run_graph_to_queue(
 
     notif_task = asyncio.create_task(_forward_notifications())
 
+    # Track the current sub-agent being executed via the `task` tool.
+    _current_subagent: str = ""
+    # Accumulate the last non-tool AI message for the final_answer event.
+    _last_ai_content: str = ""
+
     try:
         async for event in graph.astream_events(initial_state, version="v2"):
             kind: str = event.get("event", "")
-            node: str = _node_name(event)
+            name: str = event.get("name", "")
 
-            # ── title_node end → session_title ──────────────────────────────
-            if kind == "on_chain_end" and node == "title_node":
-                out = _output(event)
-                title = out.get("session_title", "")
-                if title:
-                    await queue.put(_sse({"type": "session_title", "title": title}))
+            # ── Sub-agent delegation start ────────────────────────────────────
+            # deepagents uses a `task` tool to call sub-agents.
+            if kind == "on_tool_start" and name == "task":
+                inputs: dict[str, Any] = event.get("data", {}).get("input", {})
+                agent_name: str = inputs.get("agent", "")
+                if agent_name:
+                    _current_subagent = agent_name
+                    await queue.put(_sse({"type": "agent_start", "agent": agent_name}))
 
-            # ── memory_node end ──────────────────────────────────────────────
-            if kind == "on_chain_end" and node == "memory_node":
-                out = _output(event)
-                ctx: dict[str, Any] = out.get("context", {})
-                facts = ctx.get("long_term_facts", [])
-                stm = ctx.get("short_term", {})
-                if facts or stm:
-                    await queue.put(_sse({
-                        "type": "memory_access",
-                        "long_term_facts": facts,
-                        "short_term": stm,
-                    }))
+            # ── Sub-agent delegation end ──────────────────────────────────────
+            elif kind == "on_tool_end" and name == "task":
+                completed_agent = _current_subagent or "unknown"
+                output: Any = event.get("data", {}).get("output", "")
+                answer_preview = str(output)[:_MAX_AGENT_ANSWER_PREVIEW] if output else ""
+                await queue.put(_sse({
+                    "type": "agent_end",
+                    "agent": completed_agent,
+                    "answer": answer_preview,
+                    "confidence": 0.8,
+                    "duration_ms": 0,
+                    "violations": [],
+                    "error": None,
+                }))
+                _current_subagent = ""
 
-            # ── intent_node end → emit parsed intent for frontend debug/display ──
-            elif kind == "on_chain_end" and node == "intent_node":
-                out = _output(event)
-                intent = out.get("intent") or (out.get("context") or {}).get("intent")
-                if intent:
-                    await queue.put(_sse({"type": "intent_parsed", "intent": intent}))
-
-            # ── ambiguity_node end → emit hitl_request before wait starts ───
-            elif kind == "on_chain_end" and node == "ambiguity_node":
-                out = _output(event)
-                if out.get("hitl_status") == "pending":
-                    await queue.put(_sse({
-                        "type": "hitl_request",
-                        "request_id": out.get("hitl_request_id", ""),
-                        "questions": out.get("hitl_questions", []),
-                        "original_query": original_query,
-                    }))
-
-            # ── hitl_wait_node end → resolved or timeout ─────────────────────
-            elif kind == "on_chain_end" and node == "hitl_wait_node":
-                out = _output(event)
-                status = out.get("hitl_status", "")
-                if status == "resolved":
-                    await queue.put(_sse({
-                        "type": "hitl_resolved",
-                        "clarified_query": out.get("query", ""),
-                    }))
-                elif status == "timeout":
-                    await queue.put(_sse({
-                        "type": "hitl_timeout",
-                        "message": out.get("final_answer", ""),
-                    }))
-
-            # ── router_node end → routing_plan ───────────────────────────────
-            elif kind == "on_chain_end" and node == "router_node":
-                out = _output(event)
-                agents = out.get("agents_to_call", [])
-                if agents:
-                    await queue.put(_sse({
-                        "type": "routing_plan",
-                        "agents": agents,
-                        "reasoning": out.get("execution_reasoning", ""),
-                    }))
-
-            # ── sub-agent subgraph start ──────────────────────────────────────
-            elif kind == "on_chain_start" and node in _AGENT_NODE_NAMES:
-                await queue.put(_sse({"type": "agent_start", "agent": node}))
-
-            # ── LLM token streaming inside a sub-agent ────────────────────────
-            elif kind == "on_chat_model_stream" and node in _AGENT_NODE_NAMES:
+            # ── LLM token streaming ───────────────────────────────────────────
+            elif kind == "on_chat_model_stream":
                 chunk = event.get("data", {}).get("chunk")
                 if chunk is not None:
                     token: str = ""
@@ -208,106 +156,57 @@ async def run_graph_to_queue(
                         if isinstance(c, str):
                             token = c
                         elif isinstance(c, list):
-                            # Anthropic-style: list of content blocks
                             for block in c:
                                 if isinstance(block, dict) and block.get("type") == "text":
                                     token += block.get("text", "")
                     if token:
-                        await queue.put(_sse({"type": "agent_token", "agent": node, "content": token}))
-            elif kind == "on_chat_model_stream":
-                # Events from inside a compiled subgraph have execute_node as node name —
-                # use checkpoint_ns to find the parent sub-agent.
-                agent_from_ns = _parent_agent(event)
-                if agent_from_ns:
-                    chunk = event.get("data", {}).get("chunk")
-                    if chunk is not None:
-                        token = ""
-                        if hasattr(chunk, "content"):
-                            c = chunk.content
-                            if isinstance(c, str):
-                                token = c
-                            elif isinstance(c, list):
-                                for block in c:
-                                    if isinstance(block, dict) and block.get("type") == "text":
-                                        token += block.get("text", "")
-                        if token:
-                            await queue.put(_sse({"type": "agent_token", "agent": agent_from_ns, "content": token}))
+                        agent_label = _current_subagent or "orchestrator"
+                        await queue.put(_sse({
+                            "type": "agent_token",
+                            "agent": agent_label,
+                            "content": token,
+                        }))
 
-            # ── sub-agent subgraph end ────────────────────────────────────────
-            elif kind == "on_chain_end" and node in _AGENT_NODE_NAMES:
-                out = _output(event)
-                sub_results: dict[str, Any] = out.get("sub_results", {})
-                for agent_name, result in sub_results.items():
-                    await queue.put(_sse({
-                        "type": "agent_end",
-                        "agent": agent_name,
-                        "answer": (result.get("answer") or "")[:_MAX_AGENT_ANSWER_PREVIEW],
-                        "confidence": result.get("confidence", 0.0),
-                        "duration_ms": result.get("duration_ms", 0),
-                        "violations": result.get("violations", []),
-                        "error": result.get("error"),
-                    }))
-                    # ── Rich-data extras forwarded from AgentOutput.state ──────
-                    if "dataviz" in result:
-                        await queue.put(_sse({"type": "dataviz", "data": result["dataviz"]}))
-                    if "geojson" in result:
-                        await queue.put(_sse({"type": "geojson", "data": result["geojson"]}))
-
-            # ── merge_node end → final_answer (fallback when no synthesis node) ──
-            # When a synthesis_node is wired, it will emit the real final_answer
-            # later.  We still emit here so single-agent / no-output-agents setups
-            # work without a synthesis step (synthesis_node will overwrite it).
-            elif kind == "on_chain_end" and node == "merge_node":
-                out = _output(event)
-                answer = out.get("final_answer", "")
-                if answer:
-                    await queue.put(_sse({
-                        "type": "final_answer",
-                        "answer": answer,
-                        "confidence": out.get("confidence", 0.0),
-                    }))
-
-            # ── synthesis_node end → final_answer (replaces merge_node answer) ─
-            elif kind == "on_chain_end" and node == "synthesis_node":
-                out = _output(event)
-                answer = out.get("final_answer", "")
-                if answer:
-                    await queue.put(_sse({
-                        "type": "final_answer",
-                        "answer": answer,
-                        "confidence": 0.9,
-                    }))
-
-            # ── humanoutput_node end → output_decision ────────────────────────
-            elif kind == "on_chain_end" and node == "humanoutput_node":
-                out = _output(event)
-                decision = out.get("output_decision")
-                if decision:
-                    await queue.put(_sse({"type": "output_decision", "data": decision}))
-
-            # ── dataviz_node end → dataviz ────────────────────────────────────
-            elif kind == "on_chain_end" and node == "dataviz_node":
-                out = _output(event)
-                dv = out.get("dataviz")
-                if dv is not None:
-                    await queue.put(_sse({"type": "dataviz", "data": dv}))
-
-            # ── mapviz_node end → geojson ─────────────────────────────────────
-            elif kind == "on_chain_end" and node == "mapviz_node":
-                out = _output(event)
-                gj = out.get("geojson")
-                if gj is not None:
-                    await queue.put(_sse({"type": "geojson", "data": gj}))
+            # ── Track the last complete AI response (for final_answer) ────────
+            # We want the last non-tool-call AI message from the main agent.
+            elif kind == "on_chat_model_end":
+                response: Any = event.get("data", {}).get("output")
+                if response and isinstance(response, AIMessage):
+                    # Only capture responses that are not tool calls (i.e., final text).
+                    if not getattr(response, "tool_calls", None):
+                        content = response.content
+                        if isinstance(content, str) and content:
+                            _last_ai_content = content
+                        elif isinstance(content, list):
+                            text_parts = [
+                                b.get("text", "")
+                                for b in content
+                                if isinstance(b, dict) and b.get("type") == "text"
+                            ]
+                            combined = "".join(text_parts)
+                            if combined:
+                                _last_ai_content = combined
 
     except Exception as exc:
         logger.exception("Unhandled error in run_graph_to_queue")
         await audit.log(session_id, "stream_error", {"error": str(exc)})
-        await queue.put(_sse({"type": "error", "message": "An internal error occurred. Please try again."}))
+        await queue.put(_sse({
+            "type": "error",
+            "message": "An internal error occurred. Please try again.",
+        }))
 
     finally:
         hitl_manager.unsubscribe(session_id, notif_queue)
         await notif_queue.put(None)  # signal the forwarder to stop
         await notif_task
+
+    # Emit the final answer after the full graph has run.
+    if _last_ai_content:
+        await queue.put(_sse({
+            "type": "final_answer",
+            "answer": _last_ai_content,
+            "confidence": 0.9,
+        }))
 
     await queue.put(_sse({"type": "done"}))
     await queue.put(_QUEUE_SENTINEL)
