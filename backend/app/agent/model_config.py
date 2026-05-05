@@ -2,59 +2,48 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""Model configuration interface for PangIA agents.
+"""Per-agent model configuration resolver for PangIA agents.
 
-Each agent can be individually configured to use a specific LLM provider and
-model name.  The configuration falls back to the global OpenAI settings when
-no agent-specific values are provided.
+This module handles per-agent LLM configuration resolution from environment
+variables.  All provider-specific code (imports, class registry, and the LLM
+factory) lives in :mod:`app.agent.provider_config`.
 
 Supported providers
 -------------------
-- ``openai``    – OpenAI chat models (default; requires ``langchain-openai``)
-- ``anthropic`` – Anthropic Claude models (requires ``langchain-anthropic``)
-- ``mistral``   – Mistral AI models (requires ``langchain-mistralai``)
-- ``ollama``    – Locally-hosted models via Ollama (requires ``langchain-ollama``)
+See :mod:`app.agent.provider_config` for the full list.  To add a new
+provider, edit that module — not this one.
 
-Adding a new provider
----------------------
-1. Install the corresponding ``langchain-<provider>`` package.
-2. Import the chat-model class and add it to ``PROVIDER_CLASS_MAP``.
-3. Set the ``<AGENT>_MODEL_PROVIDER`` env variable for the desired agent(s).
+Public API
+----------
+``ModelConfig``
+    Pydantic model grouping all LLM construction parameters for one agent.
+
+``build_llm`` / ``PROVIDER_CLASS_MAP``
+    Re-exported from :mod:`app.agent.provider_config` for backwards
+    compatibility; prefer importing directly from that module in new code.
+
+``get_agent_model_config(agent_key)``
+    Build a :class:`ModelConfig` from application settings, honouring
+    per-agent overrides before falling back to global defaults.
+
+``get_agent_max_iterations(agent_key)``
+    Return the maximum ReAct loop iterations for *agent_key*.
 """
 from __future__ import annotations
 
-from langchain_core.language_models import BaseChatModel
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 
-# ─── Provider registry ────────────────────────────────────────────────────────
+# Re-export for backwards compatibility so existing imports keep working.
+from app.agent.provider_config import PROVIDER_CLASS_MAP, build_llm  # noqa: F401
 
-# Maps provider name → LangChain chat-model class.
-# Only providers whose packages are installed are registered automatically.
-PROVIDER_CLASS_MAP: dict[str, type[BaseChatModel]] = {
-    "openai": ChatOpenAI,
-}
-
-try:
-    from langchain_anthropic import ChatAnthropic  # type: ignore[import]
-
-    PROVIDER_CLASS_MAP["anthropic"] = ChatAnthropic
-except ImportError:
-    pass
-
-try:
-    from langchain_mistralai import ChatMistralAI  # type: ignore[import]
-
-    PROVIDER_CLASS_MAP["mistral"] = ChatMistralAI
-except ImportError:
-    pass
-
-try:
-    from langchain_ollama import ChatOllama  # type: ignore[import]
-
-    PROVIDER_CLASS_MAP["ollama"] = ChatOllama
-except ImportError:
-    pass
+__all__ = [
+    "ModelConfig",
+    "PROVIDER_CLASS_MAP",
+    "build_llm",
+    "AGENT_NAMES",
+    "get_agent_model_config",
+    "get_agent_max_iterations",
+]
 
 
 # ─── ModelConfig interface ────────────────────────────────────────────────────
@@ -64,7 +53,7 @@ class ModelConfig(BaseModel):
     """Configuration for a single LLM instance used by an agent."""
 
     provider: str = "openai"
-    """Provider name – must be a key in :data:`PROVIDER_CLASS_MAP`."""
+    """Provider name – must be a key in :data:`~app.agent.provider_config.PROVIDER_CLASS_MAP`."""
 
     model: str
     """Model identifier passed to the provider (e.g. ``"gpt-4o-mini"``)."""
@@ -78,46 +67,8 @@ class ModelConfig(BaseModel):
     base_url: str | None = None
     """Optional custom API base URL (e.g. for Ollama or proxy setups)."""
 
-
-# ─── Factory ─────────────────────────────────────────────────────────────────
-
-
-def build_llm(config: ModelConfig, *, streaming: bool = False) -> BaseChatModel:
-    """Instantiate and return the appropriate LangChain chat model.
-
-    Parameters
-    ----------
-    config:
-        A :class:`ModelConfig` specifying the provider, model, and
-        connection details.
-    streaming:
-        When ``True``, the returned model will stream tokens back to the
-        caller (used by sub-agents and the merge node).
-
-    Raises
-    ------
-    ValueError
-        If ``config.provider`` is not registered in :data:`PROVIDER_CLASS_MAP`.
-    """
-    cls = PROVIDER_CLASS_MAP.get(config.provider)
-    if cls is None:
-        supported = ", ".join(sorted(PROVIDER_CLASS_MAP))
-        raise ValueError(
-            f"Unknown model provider {config.provider!r}. "
-            f"Supported providers: {supported}."
-        )
-
-    kwargs: dict = {
-        "model": config.model,
-        "temperature": config.temperature,
-        "streaming": streaming,
-    }
-    if config.api_key is not None:
-        kwargs["api_key"] = config.api_key
-    if config.base_url is not None:
-        kwargs["base_url"] = config.base_url
-
-    return cls(**kwargs)
+    kaggle_username: str | None = None
+    """Kaggle username — required when ``provider='googleai'``."""
 
 
 # ─── Per-agent config resolver ────────────────────────────────────────────────
@@ -162,6 +113,9 @@ def get_agent_model_config(agent_key: str) -> ModelConfig:
     from the application settings.  Empty or missing values fall back to the
     global ``model_provider`` / ``model_name`` settings.
 
+    The correct *api_key*, *base_url*, and *kaggle_username* are selected
+    automatically based on the resolved provider.
+
     Parameters
     ----------
     agent_key:
@@ -172,19 +126,42 @@ def get_agent_model_config(agent_key: str) -> ModelConfig:
 
     settings = get_settings()
 
-    provider = getattr(settings, f"{agent_key}_model_provider", "") or settings.model_provider
-    model = getattr(settings, f"{agent_key}_model_name", "") or settings.model_name or settings.openai_model or "gpt-4o-mini"
+    provider: str = (
+        getattr(settings, f"{agent_key}_model_provider", "") or settings.model_provider
+    )
+    model: str = (
+        getattr(settings, f"{agent_key}_model_name", "")
+        or settings.model_name
+        or getattr(settings, "openai_model", "")
+        or "gpt-4o-mini"
+    )
 
+    provider_lower = provider.lower()
+    api_key: str | None = None
     base_url: str | None = None
-    if provider == "ollama":
-        base_url = settings.ollama_base_url or None
+    kaggle_username: str | None = None
+
+    if provider_lower == "openai":
+        api_key = settings.openai_api_key or None
+    elif provider_lower == "anthropic":
+        api_key = getattr(settings, "anthropic_api_key", None) or None
+    elif provider_lower == "mistral":
+        api_key = getattr(settings, "mistral_api_key", None) or None
+    elif provider_lower == "ollama":
+        base_url = getattr(settings, "ollama_base_url", None) or None
+    elif provider_lower == "openrouter":
+        api_key = getattr(settings, "openrouter_api_key", None) or None
+    elif provider_lower == "googleai":
+        api_key = getattr(settings, "kaggle_key", None) or None
+        kaggle_username = getattr(settings, "kaggle_username", None) or None
 
     return ModelConfig(
         provider=provider,
         model=model,
         temperature=settings.openai_temperature,
-        api_key=settings.openai_api_key if settings.openai_api_key else None,
+        api_key=api_key,
         base_url=base_url,
+        kaggle_username=kaggle_username,
     )
 
 
