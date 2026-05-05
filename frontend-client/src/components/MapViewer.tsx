@@ -2,9 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { AlertTriangle, Map, Maximize2, Minimize2 } from 'lucide-react'
 import type { OgcLayer } from '../types'
 
 // Fix default marker icon paths broken by bundlers
@@ -38,6 +39,23 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
   const ogcLayerRefs = useRef<L.GeoJSON[]>([])
   const [ogcFeatureCount, setOgcFeatureCount] = useState(0)
   const [ogcError, setOgcError] = useState<string | null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen((fs) => {
+      // Leaflet needs one tick to measure the resized container
+      setTimeout(() => mapRef.current?.invalidateSize(), 50)
+      return !fs
+    })
+  }, [])
+
+  // ESC to exit fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') toggleFullscreen() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isFullscreen, toggleFullscreen])
 
   // Initialise map once
   useEffect(() => {
@@ -194,7 +212,7 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
         if (bounds.isValid()) mapRef.current!.fitBounds(bounds, { padding: [32, 32], maxZoom: 14 })
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') return
-        if (mounted) setOgcError(`Impossible de charger la couche "${layer.name}": ${err instanceof Error ? err.message : err}`)
+        if (mounted) setOgcError(`Impossible de charger la couche « ${layer.title || layer.name || 'WFS'} »`)
       }
     }
 
@@ -224,47 +242,51 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
     URL.revokeObjectURL(url)
   }
 
+  const containerClass = isFullscreen
+    ? 'fixed inset-0 z-[9999] flex flex-col bg-[#0f0f1a]'
+    : 'rounded-xl overflow-hidden border border-white/10 mt-2 w-full'
+
   return (
-    <div className="rounded-xl overflow-hidden border border-white/10 mt-2 w-full">
+    <div className={containerClass}>
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 bg-white/5 border-b border-white/10">
-        <span className="text-sm">🗺️</span>
+        <Map size={14} className="text-white/50" />
         <span className="text-xs font-medium text-white/70">Interactive Map</span>
         <span className="text-xs text-white/30">
           {featureCount} feature{featureCount !== 1 ? 's' : ''}
           {totalLayers > 0 && ` · ${totalLayers} OGC layer${totalLayers !== 1 ? 's' : ''}`}
         </span>
-        {geojson && (
+        <div className="ml-auto flex items-center gap-1.5">
+          {geojson && (
+            <button
+              type="button"
+              onClick={downloadGeoJson}
+              className="text-xs text-white/50 hover:text-white/80 px-2 py-1 rounded border border-white/10 hover:border-white/20 transition-colors cursor-pointer"
+            >
+              ↓ GeoJSON
+            </button>
+          )}
           <button
             type="button"
-            onClick={downloadGeoJson}
-            className="ml-auto text-xs text-white/50 hover:text-white/80 px-2 py-1 rounded border border-white/10 hover:border-white/20 transition-colors cursor-pointer"
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'Réduire la carte' : 'Agrandir la carte'}
+            className="flex items-center justify-center w-7 h-7 rounded border border-white/10 hover:border-white/25 text-white/50 hover:text-white/85 hover:bg-white/5 transition-colors cursor-pointer"
           >
-            ↓ GeoJSON
+            {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
           </button>
-        )}
-      </div>
-      {/* OGC layer names */}
-      {totalLayers > 0 && (
-        <div className="flex flex-wrap gap-1.5 px-3 py-1.5 bg-white/3 border-b border-white/10">
-          {ogcLayers!.map((l, i) => (
-            <span
-              key={l.url}
-              className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ background: `${OGC_COLORS[i % OGC_COLORS.length]}22`, color: OGC_COLORS[i % OGC_COLORS.length] }}
-            >
-              {l.title ?? l.name}
-            </span>
-          ))}
         </div>
-      )}
+      </div>
       {ogcError && (
-        <div className="px-3 py-1.5 text-xs text-amber-400 bg-amber-900/20 border-b border-amber-800/30">
-          {ogcError}
+        <div className="flex items-start gap-2 px-3 py-2 text-xs text-red-300 bg-red-950/40 border-b border-red-800/30">
+          <AlertTriangle size={13} className="mt-px shrink-0" />
+          <span>{ogcError}</span>
         </div>
       )}
       {/* Map container */}
-      <div ref={containerRef} style={{ height: 320, background: '#1a1a2e' }} />
+      <div
+        ref={containerRef}
+        style={isFullscreen ? { flex: 1, background: '#1a1a2e' } : { height: 320, background: '#1a1a2e' }}
+      />
     </div>
   )
 }

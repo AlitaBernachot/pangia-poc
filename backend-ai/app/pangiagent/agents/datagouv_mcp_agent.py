@@ -32,6 +32,105 @@ from libs.query_expander import expand_query, strip_action_prefix
 
 logger = logging.getLogger(__name__)
 
+# ─── OGC service detection ────────────────────────────────────────────────────
+
+# Regex to match WFS/WMS capability URLs (case-insensitive)
+_WFS_RE = re.compile(r'SERVICE=WFS', re.IGNORECASE)
+_WMS_RE = re.compile(r'SERVICE=WMS', re.IGNORECASE)
+_OGC_API_RE = re.compile(r'/collections(?:/[^/\s]+)?(?:/items)?', re.IGNORECASE)
+# data.gouv.fr format strings that indicate OGC services
+_OGC_FORMAT_KEYWORDS = frozenset({
+    "wfs", "wms", "wmts", "ogc", "ogc:wfs", "ogc:wms", "ogc:wmts",
+    "esri rest", "arcgis rest", "geojson api", "api features", "ogc api features",
+})
+
+
+def _extract_ogc_services(
+    tool_content: str,
+    existing: list[dict],
+) -> list[dict]:
+    """Extract WFS/WMS/OGC API service descriptors from a get_resource_info response.
+
+    Returns a list of NEW service dicts not already in *existing* (dedup by URL).
+    Each dict has keys: ``url``, ``name``, ``title``, ``type``.
+    Priority order for Leaflet: wfs > ogc_api > wms > wmts.
+    """
+    existing_urls = {e["url"] for e in existing}
+    found: list[dict] = []
+
+    # Try JSON parse first (data.gouv.fr MCP returns structured JSON for resource info)
+    try:
+        data = json.loads(tool_content)
+        resources = []
+        if isinstance(data, list):
+            resources = data
+        elif isinstance(data, dict):
+            resources = data.get("resources", [data])
+        for res in resources:
+            if not isinstance(res, dict):
+                continue
+            url = str(res.get("url") or res.get("download_url") or "").strip().rstrip(".,)")
+            if not url or url in existing_urls:
+                continue
+            fmt = str(res.get("format") or res.get("type") or "").lower().strip()
+            title = str(res.get("title") or res.get("name") or "")
+            svc_type = _classify_ogc_url(url, fmt)
+            if svc_type:
+                found.append({"url": url, "name": title or svc_type.upper(), "title": title, "type": svc_type})
+                existing_urls.add(url)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Fallback: scan raw text for WFS/WMS URLs
+    for _url in re.findall(r'https?://[^\s\'"<>\\]+', tool_content):
+        url = _url.rstrip(".,)")
+        if url in existing_urls:
+            continue
+        svc_type = _classify_ogc_url(url, "")
+        if svc_type:
+            found.append({"url": url, "name": svc_type.upper(), "title": "", "type": svc_type})
+            existing_urls.add(url)
+
+    return found
+
+
+def _classify_ogc_url(url: str, fmt: str) -> str | None:
+    """Return the OGC service type for a URL+format, or None if not OGC."""
+    fmt_lower = fmt.lower()
+    # Format string takes priority
+    if any(k in fmt_lower for k in ("wfs", "ogc:wfs")):
+        return "wfs"
+    if any(k in fmt_lower for k in ("ogc api features", "api features", "ogc_api")):
+        return "ogc_api"
+    if any(k in fmt_lower for k in ("wms", "ogc:wms")):
+        return "wms"
+    if any(k in fmt_lower for k in ("wmts", "ogc:wmts")):
+        return "wmts"
+    if fmt_lower in _OGC_FORMAT_KEYWORDS:
+        return "wfs"  # generic OGC → assume WFS as best bet
+    # URL heuristics
+    url_up = url.upper()
+    if "SERVICE=WFS" in url_up:
+        return "wfs"
+    if "SERVICE=WMS" in url_up:
+        return "wms"
+    if "SERVICE=WMTS" in url_up:
+        return "wmts"
+    if _OGC_API_RE.search(url):
+        return "ogc_api"
+    return None
+
+
+_OGC_TYPE_PRIORITY = {"wfs": 0, "ogc_api": 1, "wms": 2, "wmts": 3}
+
+
+def _best_ogc_service(services: list[dict]) -> dict | None:
+    """Return the highest-priority OGC service from *services* (WFS first)."""
+    if not services:
+        return None
+    return min(services, key=lambda s: _OGC_TYPE_PRIORITY.get(s["type"], 99))
+
+
 # ─── System prompt ────────────────────────────────────────────────────────────
 
 _DEFAULT_PROMPT = """You are the data.gouv.fr Open-Data Agent of the PangIA GeoIA platform.
@@ -46,7 +145,7 @@ You have access to:
   (CSV, JSON, GeoJSON) from a direct URL and returns all rows.
 
 ## Search rules
-- Always call `search_datasets` with `page_size=10` (never less) to get enough results.
+- Always call `search_datasets` with `page_size=20` (never less) to get enough results.
 - If the first search returns no useful result, retry with broader or translated keywords.
 
 
@@ -107,10 +206,17 @@ Veuillez me préciser le numéro ou le titre exact du dataset souhaité."
   `fetch_resource_file` **twice** — once for the tabular file, once for the GeoJSON.
   This is important: **always fetch GeoJSON resources when available** — they will be
   rendered as an interactive map in the UI.
+- **If the dataset has NO downloadable CSV/JSON/GeoJSON** but exposes a WFS, WMS, WMTS,
+  or OGC API Features service (detectable by `SERVICE=WFS`/`SERVICE=WMS` in the URL,
+  or format fields like "WFS", "OGC:WFS", "OGC API Features"):
+  - Do **not** try to download the service endpoint as a file.
+  - Instead, **report that a WFS/WMS service is available** and include the service URL
+    in your answer. The UI will render the layer directly from the service.
+  - Prefer WFS over WMS over WMTS for map display.
 - **Do NOT call `query_resource_data` at all** — the full file supersedes any preview.
 - **Do NOT list any rows or examples** in your text response.
 - **You MUST end with a short non-empty text message** containing at minimum: dataset
-  title, total record count, source URL, and licence.
+  title, total record count (or "service WFS disponible"), source URL, and licence.
 
 #### Strategy C — Filtered retrieval (user asks for records matching a condition)
 Step 1 — Discover the exact column name (skip if you can guess it).
@@ -339,6 +445,9 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
         _fetched_urls: set[str] = set()
         # Map url → format for successfully fetched resources
         _fetched_url_formats: dict[str, str] = {}
+        # WFS/WMS/OGC API services detected in get_resource_info responses
+        # Each entry: {"url": str, "name": str, "title": str, "type": "wfs"|"wms"|"ogc"}
+        _ogc_services: list[dict] = []
 
         # ── Pre-search via query expansion ────────────────────────────────────
         # Build a single combined search query from:
@@ -362,7 +471,7 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
                 )
                 _tid = str(_uuid.uuid4())[:8]
                 try:
-                    _res = await search_tool.ainvoke({"query": _combined_query, "page_size": 10})
+                    _res = await search_tool.ainvoke({"query": _combined_query, "page_size": 20})
                     _content = _res if isinstance(_res, str) else json.dumps(_res, ensure_ascii=False, default=str)
                 except Exception as exc:
                     _content = f"Search error: {exc}"
@@ -374,6 +483,105 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
                 messages.append(ToolMessage(content=_content, tool_call_id=_tid))
                 search_call_ids.add(_tid)
                 logger.info("DataGouvMCPAgent: pre-search → %d chars", len(_content))
+
+                # ── Early disambiguation from pre-search results ──────────────
+                # Instead of waiting for the LLM to call search_datasets again
+                # (which may use a narrower query and lose results), we run the
+                # disambiguation check NOW using all candidates from the pre-search.
+                _pre_candidates = extract_dataset_candidates(messages, search_call_ids)
+                _pre_total = extract_search_total(messages, search_call_ids)
+
+                # Paginate to collect all candidates when total ≤ 50
+                _MAX_SUPPLEMENT = 50
+                if (
+                    _pre_total
+                    and _pre_total <= _MAX_SUPPLEMENT
+                    and len(_pre_candidates) < _pre_total
+                ):
+                    _page = 2
+                    while len(_pre_candidates) < _pre_total and _page <= 5:
+                        _sup_tid = str(_uuid.uuid4())[:8]
+                        try:
+                            _sup_res = await search_tool.ainvoke({
+                                "query": _combined_query,
+                                "page_size": 20,
+                                "page": _page,
+                            })
+                            _sup_content = _sup_res if isinstance(_sup_res, str) else json.dumps(_sup_res, ensure_ascii=False, default=str)
+                            _sup_ai = AIMessage(content="", tool_calls=[{"id": _sup_tid, "name": "search_datasets", "args": {}}])
+                            messages.append(_sup_ai)
+                            messages.append(ToolMessage(content=_sup_content, tool_call_id=_sup_tid))
+                            search_call_ids.add(_sup_tid)
+                            _prev = len(_pre_candidates)
+                            _pre_candidates = extract_dataset_candidates(messages, search_call_ids)
+                            logger.info(
+                                "DataGouvMCPAgent: pre-search page %d → %d candidates (+%d)",
+                                _page, len(_pre_candidates), len(_pre_candidates) - _prev,
+                            )
+                            if len(_pre_candidates) == _prev:
+                                break
+                        except Exception as _sup_exc:
+                            logger.warning("DataGouvMCPAgent: pre-search page %d failed — %s", _page, _sup_exc)
+                            break
+                        _page += 1
+
+                if (
+                    len(_pre_candidates) > 1
+                    and not user_identifies_dataset(inp.query, _pre_candidates)
+                ):
+                    logger.info(
+                        "DataGouvMCPAgent: early disambiguation on %d candidates",
+                        len(_pre_candidates),
+                    )
+                    _sim_result = await rank_by_similarity(
+                        inp.query,
+                        _pre_candidates,
+                        text_fields=("title", "description", "tags"),
+                    )
+                    if _sim_result.auto_selected:
+                        _auto = _sim_result.auto_selected
+                        logger.info(
+                            "DataGouvMCPAgent: early auto-selected '%s' (score=%.3f)",
+                            _auto.get("title", _auto.get("id")),
+                            _auto.get("_score", 0),
+                        )
+                        return await self._run(AgentInput(
+                            query=(
+                                f"Je veux travailler avec le dataset : \"{_auto.get('title', '')}\""
+                                + (f" (ID: {_auto['id']})" if _auto.get("id") else "")
+                            ),
+                            session_id=inp.session_id,
+                            context={**inp.context, "chosen_dataset_id": _auto.get("id", "")},
+                        ))
+
+                    _early_items = [
+                        ChoiceItem(
+                            id=c.get("id", ""),
+                            title=c.get("title", ""),
+                            description=c.get("description", ""),
+                            url=c.get("url", ""),
+                            organization=c.get("organization", ""),
+                        )
+                        for c in (_sim_result.ranked or _pre_candidates)
+                    ]
+                    _early_result = await self.request_choice(
+                        session_id=inp.session_id,
+                        original_query=inp.query,
+                        items=_early_items,
+                        total=_pre_total,
+                    )
+                    if not _early_result.resolved:
+                        return AgentOutput(
+                            agent_name=self.name,
+                            answer="La sélection du dataset a expiré. Veuillez reformuler votre requête.",
+                            confidence=0.0,
+                            state={"choice_timeout": True},
+                        )
+                    return await self._run(AgentInput(
+                        query=_early_result.chosen_query,
+                        session_id=inp.session_id,
+                        context={**inp.context, "chosen_dataset_id": _early_result.chosen_id},
+                    ))
 
         try:
             for _ in range(self.max_iterations):
@@ -430,6 +638,15 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
                         for _url in re.findall(r'https?://[^\s\'"<>\\]+', tool_content):
                             _confirmed_urls.add(_url.rstrip(".,)"))
 
+                    # ── Detect WFS / WMS / OGC API services ───────────────────
+                    # Scan both list_dataset_resources (all resources) and
+                    # get_resource_info (detailed view). This catches WFS entries
+                    # even when the LLM only inspects Atom/shapefile resources.
+                    if tc_name in ("get_resource_info", "list_dataset_resources"):
+                        _ogc_services.extend(
+                            _extract_ogc_services(tool_content, _ogc_services)
+                        )
+
                     # ── Guard: fetch_resource_file must use a confirmed URL ────
                     if tc_name == "fetch_resource_file":
                         req_url: str = (tc.get("args") or {}).get("url", "")
@@ -468,86 +685,9 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
 
                     messages.append(ToolMessage(content=tool_content, tool_call_id=tc_id))
 
-                    # ── Inline disambiguation after search_datasets ───────────
-                    # 1. Extract all candidates from the search response.
-                    # 2. Run semantic similarity against the user query —
-                    #    if one dataset clearly dominates (high cosine score +
-                    #    enough margin over #2) auto-select it without asking.
-                    # 3. Otherwise show the ranked list to the user via the
-                    #    choice panel (same as before).
+                    # (Disambiguation now handled in the pre-search block above.)
                     if tc_name == "search_datasets":
-                        _inline_candidates = extract_dataset_candidates(messages, search_call_ids)
-                        if (
-                            len(_inline_candidates) > 1
-                            and not user_identifies_dataset(inp.query, _inline_candidates)
-                            and not _chosen_dataset_id
-                        ):
-                            _inline_total = extract_search_total(messages, search_call_ids)
-
-                            # ── Semantic similarity ranking ───────────────────
-                            logger.info(
-                                "DataGouvMCPAgent: running similarity on %d candidates for query: %s",
-                                len(_inline_candidates),
-                                inp.query[:80],
-                            )
-                            _sim_result = await rank_by_similarity(
-                                inp.query,
-                                _inline_candidates,
-                                text_fields=("title", "description", "tags"),
-                            )
-                            if _sim_result.auto_selected:
-                                # One dataset clearly dominates → auto-select
-                                _auto = _sim_result.auto_selected
-                                _auto_query = (
-                                    f"Je veux travailler avec le dataset : \"{_auto.get('title', '')}\""
-                                    + (f" (ID: {_auto['id']})" if _auto.get("id") else "")
-                                )
-                                logger.info(
-                                    "DataGouvMCPAgent: similarity auto-selected '%s' (score=%.3f)",
-                                    _auto.get("title", _auto.get("id")),
-                                    _auto.get("_score", 0),
-                                )
-                                return await self._run(AgentInput(
-                                    query=_auto_query,
-                                    session_id=inp.session_id,
-                                    context={**inp.context, "chosen_dataset_id": _auto.get("id", "")},
-                                ))
-
-                            # ── Present ranked list to user ───────────────────
-                            # Use the similarity-sorted order so the most
-                            # relevant dataset appears first in the panel.
-                            _ranked_candidates = _sim_result.ranked or _inline_candidates
-                            _inline_items = [
-                                ChoiceItem(
-                                    id=c.get("id", ""),
-                                    title=c.get("title", ""),
-                                    description=c.get("description", ""),
-                                    url=c.get("url", ""),
-                                    organization=c.get("organization", ""),
-                                )
-                                for c in _ranked_candidates
-                            ]
-                            _inline_result = await self.request_choice(
-                                session_id=inp.session_id,
-                                original_query=inp.query,
-                                items=_inline_items,
-                                total=_inline_total,
-                            )
-                            if not _inline_result.resolved:
-                                return AgentOutput(
-                                    agent_name=self.name,
-                                    answer="La sélection du dataset a expiré. Veuillez reformuler votre requête.",
-                                    confidence=0.0,
-                                    state={"choice_timeout": True},
-                                )
-                            # Re-run _run() with the chosen query and the
-                            # chosen_dataset_id so the guard and disambiguation
-                            # are both skipped in the recursive call.
-                            return await self._run(AgentInput(
-                                query=_inline_result.chosen_query,
-                                session_id=inp.session_id,
-                                context={**inp.context, "chosen_dataset_id": _inline_result.chosen_id},
-                            ))
+                        pass  # search IDs already tracked above
 
         except Exception as exc:
             logger.exception("DataGouvMCPAgent: ReAct loop error")
@@ -616,6 +756,13 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
                 f"Données récupérées depuis data.gouv.fr : {total} enregistrements "
                 f"({fmt_label}{geo_note})."
             )
+        elif not result_text and _ogc_services:
+            best = _best_ogc_service(_ogc_services)
+            svc_type = best["type"].upper() if best else "WFS"
+            result_text = (
+                f"Ce dataset ne propose pas de fichier téléchargeable (CSV/GeoJSON) "
+                f"mais expose un service {svc_type} qui sera affiché sur la carte."
+            )
         elif not result_text:
             result_text = "data.gouv.fr agent returned no result."
 
@@ -627,6 +774,19 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
             raw_gj = geojson_data.get("raw")
             if isinstance(raw_gj, dict) and raw_gj.get("type") in ("FeatureCollection", "Feature") and raw_gj.get("features"):
                 extra_state["geojson"] = raw_gj
+
+        # WFS/WMS/OGC layers (only when no GeoJSON was fetched — prefer direct data)
+        if not extra_state.get("geojson") and _ogc_services:
+            # Sort by priority: WFS first
+            sorted_svcs = sorted(_ogc_services, key=lambda s: _OGC_TYPE_PRIORITY.get(s["type"], 99))
+            extra_state["ogc_layers"] = [
+                {"url": s["url"], "name": s["name"], "title": s["title"]}
+                for s in sorted_svcs
+            ]
+            logger.info(
+                "DataGouvMCPAgent: %d OGC service(s) detected, best=%s",
+                len(sorted_svcs), sorted_svcs[0]["type"] if sorted_svcs else "none",
+            )
 
         # Tabular dataviz
         if tabular_data is not None:
@@ -658,8 +818,7 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
             messages=messages,
             search_call_ids=search_call_ids,
             chosen_dataset_id=_chosen_dataset_id,
-            fetched_url_formats=_fetched_url_formats,
-        )
+            fetched_url_formats=_fetched_url_formats,            result_text=result_text,        )
 
         return output
 
@@ -671,32 +830,57 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
         search_call_ids: set,
         chosen_dataset_id: str | None,
         fetched_url_formats: dict[str, str],
+        result_text: str = "",
         **_kwargs: Any,
     ) -> None:
-        """Populate *output* with dataset and resource sources."""
-        # 1. Dataset page (catalogue)
-        all_candidates = extract_dataset_candidates(messages, search_call_ids)
-        dataset_source: dict | None = None
-        if chosen_dataset_id:
-            dataset_source = next(
-                (c for c in all_candidates if c.get("id") == chosen_dataset_id), None
-            )
-        if dataset_source is None and all_candidates:
-            dataset_source = all_candidates[0]
-        if dataset_source and dataset_source.get("title"):
-            self.add_source(
-                output,
-                title=dataset_source["title"],
-                url=dataset_source.get("url", ""),
-                kind="dataset",
-            )
+        """Populate *output* with dataset and resource sources.
 
-        # 2. Downloaded resources
-        for res_url, res_fmt in fetched_url_formats.items():
-            self.add_source(
-                output,
-                title=res_fmt.upper(),
-                url=res_url,
-                kind="resource",
-                fmt=res_fmt.upper(),
-            )
+        Sources are only attached when actual data was fetched or a specific
+        dataset was selected.  In pure discovery / listing mode (the agent
+        simply enumerates available datasets), no source footer is added —
+        the listed datasets ARE the answer, not meta-sources of an answer.
+        """
+        all_candidates = extract_dataset_candidates(messages, search_call_ids)
+        is_data_mode = bool(chosen_dataset_id or fetched_url_formats)
+
+        if is_data_mode:
+            # 1. Dataset page(s)
+            if chosen_dataset_id:
+                dataset_source = next(
+                    (c for c in all_candidates if c.get("id") == chosen_dataset_id), None
+                )
+                if dataset_source is None and all_candidates:
+                    dataset_source = all_candidates[0]
+                if dataset_source and dataset_source.get("title"):
+                    self.add_source(
+                        output,
+                        title=dataset_source["title"],
+                        url=dataset_source.get("url", ""),
+                        kind="dataset",
+                    )
+            else:
+                # Multiple datasets may have been fetched — add those whose URL
+                # appears in the answer, or fall back to all candidates.
+                mentioned = [
+                    c for c in all_candidates
+                    if c.get("url") and c["url"] in result_text
+                ]
+                for c in (mentioned or all_candidates):
+                    if c.get("title"):
+                        self.add_source(
+                            output,
+                            title=c["title"],
+                            url=c.get("url", ""),
+                            kind="dataset",
+                        )
+
+            # 2. Downloaded resources
+            for res_url, res_fmt in fetched_url_formats.items():
+                self.add_source(
+                    output,
+                    title=res_fmt.upper(),
+                    url=res_url,
+                    kind="resource",
+                    fmt=res_fmt.upper(),
+                )
+        # else: discovery mode — no sources footer (the listing IS the answer)

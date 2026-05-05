@@ -388,7 +388,7 @@ class BaseAgent(ABC):
             # Forward any rich-data extras produced by the agent
             # (dataviz, geojson, etc.) so the SSE layer can emit the appropriate
             # frontend events.
-            for key in ("dataviz", "geojson"):
+            for key in ("dataviz", "geojson", "ogc_layers"):
                 if key in output.state:
                     value = output.state[key]
                     # Normalise dataviz table keys: LLM sometimes uses tool

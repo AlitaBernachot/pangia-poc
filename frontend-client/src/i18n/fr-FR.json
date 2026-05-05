@@ -55,7 +55,23 @@
   "agentActivity": {
     "thinking": "Réflexion en cours…",
     "done": "Terminé",
-    "waitingForChoice": "En attente du choix"
+    "waitingForChoice": "En attente du choix",
+    "descSynthesis": "Consolidation des résultats des différentes sources…",
+    "descResponse":  "Mise en forme de la réponse finale…",
+    "descDataviz":   "Construction des graphiques et visualisations…",
+    "descMap":       "Préparation des couches cartographiques…",
+    "descAnalysis":  "Analyse de l'intention et du contexte…",
+    "descRouting":   "Sélection des sources de données appropriées…",
+    "phases": {
+      "analyzing":   "Analyse en cours…",
+      "querying":    "Exploration des données…",
+      "fetching":    "Récupération des données…",
+      "locating":    "Traitement géographique…",
+      "computing":   "Calcul en cours…",
+      "processing":  "Traitement des données…",
+      "visualizing": "Préparation de la réponse…",
+      "composing":   "Rédaction en cours…"
+    }
   },
   "faq": {
     "heroTitle": "FAQ & À propos",

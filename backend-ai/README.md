@@ -49,6 +49,7 @@ This is the second-generation backend for PangIA. It adds guardrails, structured
   - [data.gouv.fr MCP agent](#datagouvfr-mcp-agent)
     - [Capabilities](#capabilities)
     - [Dataset disambiguation via `request_choice`](#dataset-disambiguation-via-request_choice)
+      - [Similarity model](#similarity-model)
     - [Download links](#download-links)
   - [SSE event types](#sse-event-types)
     - [`choice_request` event payload](#choice_request-event-payload)
@@ -679,13 +680,27 @@ Queries the French government open-data catalogue via the data.gouv.fr MCP serve
 
 When `search_datasets` returns ≥ 2 results with different titles and the user has not quoted an exact title, the agent:
 
-1. Calls `self.request_choice()` with the candidate list.
-2. **Suspends** inside its `_run()` call (other parallel agents continue).
-3. The frontend shows an interactive `DatasetChoicePanel`.
-4. User clicks "Sélectionner" → `POST /api/choice/respond`.
-5. Agent **resumes** and calls `self._run()` again with `chosen_query` targeting the selected dataset.
+1. Runs **semantic similarity ranking** (`libs/similarity.py`) against all candidates using a local `paraphrase-multilingual-MiniLM-L12-v2` model (~120 MB, pre-downloaded at Docker build time).
+   - If one candidate clearly dominates (score ≥ 0.75, or score ≥ 0.50 with a gap ≥ 0.10 over the second), it is **auto-selected** — no user prompt.
+   - Otherwise, candidates are ranked by score and the full list is presented to the user.
+2. Calls `self.request_choice()` with the ranked candidate list.
+3. **Suspends** inside its `_run()` call (other parallel agents continue).
+4. The frontend shows an interactive `DatasetChoicePanel` with all matching datasets.
+5. User clicks “Sélectionner” → `POST /api/choice/respond`.
+6. Agent **resumes** and calls `self._run()` again with `chosen_query` targeting the selected dataset.
 
 This replaces the old `pending_dataset_choice` pattern, which required a full round-trip (the graph terminated and the user had to manually retype the dataset title).
+
+#### Similarity model
+
+| Property | Value |
+|---|---|
+| Model | `paraphrase-multilingual-MiniLM-L12-v2` |
+| Source | HuggingFace (sentence-transformers) |
+| Size | ~120 MB |
+| Cache | Pre-downloaded in `Dockerfile` — no outbound call at runtime |
+| Location | `libs/similarity.py` |
+| Thresholds | `AUTO_SELECT_THRESHOLD=0.50`, `AUTO_SELECT_MARGIN=0.10`, `AUTO_SELECT_HIGH_CONFIDENCE=0.75` |
 
 ### Download links
 
@@ -706,7 +721,10 @@ After fetching files, the agent appends a `**Téléchargement :**` Markdown bloc
 | `hitl_timeout` | No response within timeout |
 | `routing_plan` | Agents selected + reasoning |
 | `agent_start` | A sub-agent subgraph began |
+| `agent_token` | LLM token streamed from inside a sub-agent |
 | `agent_end` | A sub-agent finished (answer preview, confidence, duration_ms) |
+| `tool_start` | A tool call started inside a sub-agent |
+| `tool_end` | A tool call completed inside a sub-agent |
 | `dataviz` | Chart / KPI / table payload |
 | `geojson` | GeoJSON FeatureCollection |
 | `output_decision` | `{needs_map, needs_dataviz}` from HumanOutputAgent |

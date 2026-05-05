@@ -119,9 +119,13 @@ export function ChatMessage({ message, onSubmitChoice, onPrefillPrompt, isStream
 
         {/* Agent activity panels */}
         {message.agentActivity && message.agentActivity.length > 0 && (
-          <div className="flex flex-col gap-1.5">
-            {message.agentActivity.map((activity) => (
-              <AgentActivityPanel key={activity.agent} activity={activity} />
+          <div className="flex flex-col pl-1 pt-1">
+            {message.agentActivity.map((activity, idx) => (
+              <AgentActivityPanel
+                key={activity.agent}
+                activity={activity}
+                isLast={idx === message.agentActivity!.length - 1}
+              />
             ))}
           </div>
         )}

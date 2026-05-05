@@ -320,17 +320,17 @@ def _after_humanoutput(state: OrchestratorState) -> str:
     decision = state.get("output_decision") or {}
     if decision.get("needs_dataviz"):
         return "dataviz_node"
-    # Skip mapviz_node if a real GeoJSON was already provided by a sub-agent
-    # (e.g. datagouv_mcp_agent fetched a .geojson file directly).
-    if decision.get("needs_map") and not state.get("geojson"):
+    # Skip mapviz_node if a real GeoJSON or OGC layer was already provided
+    # by a sub-agent (e.g. datagouv_mcp_agent fetched a .geojson or WFS service).
+    if decision.get("needs_map") and not state.get("geojson") and not state.get("ogc_layers"):
         return "mapviz_node"
     return END
 
 
 def _after_dataviz(state: OrchestratorState) -> str:
-    """Route after dataviz_node: run mapviz if needed and no real GeoJSON exists, else end."""
+    """Route after dataviz_node: run mapviz if needed and no real GeoJSON or OGC layer exists, else end."""
     decision = state.get("output_decision") or {}
-    return "mapviz_node" if decision.get("needs_map") and not state.get("geojson") else END
+    return "mapviz_node" if decision.get("needs_map") and not state.get("geojson") and not state.get("ogc_layers") else END
 
 
 # ── Mermaid helper ─────────────────────────────────────────────────────────────

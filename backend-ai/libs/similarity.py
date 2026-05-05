@@ -50,6 +50,8 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
+
+# FIXME: configure the model name and auto-selection thresholds from application settings
 _MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 
 # ── Thresholds ────────────────────────────────────────────────────────────────

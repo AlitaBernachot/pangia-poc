@@ -158,12 +158,18 @@ class HumanOutputAgent(BaseAgent):
                 or existing_dataviz.get("kpis")
             )
         )
-        if has_prebuilt_dataviz or existing_geojson is not None:
+        has_ogc_layers = bool(inp.context.get("has_ogc_layers"))
+        if has_prebuilt_dataviz or existing_geojson is not None or has_ogc_layers:
             tables = (existing_dataviz or {}).get("tables", [])
             columns = tables[0].get("columns", []) if tables else []
             lat_col, lon_col = find_coord_columns(columns)
             has_wkt_geom = find_wkt_geom_column(columns) is not None
-            needs_map = existing_geojson is not None or (lat_col is not None and lon_col is not None) or has_wkt_geom
+            needs_map = (
+                existing_geojson is not None
+                or has_ogc_layers
+                or (lat_col is not None and lon_col is not None)
+                or has_wkt_geom
+            )
             # Let intent override: if user explicitly asked for a map, honour it
             if intent_needs_map is True:
                 needs_map = True
@@ -173,7 +179,8 @@ class HumanOutputAgent(BaseAgent):
             }
 
         # Fast-path: data_gouv ran but produced nothing useful
-        if "data_gouv" in sub_results and not has_prebuilt_dataviz and existing_geojson is None:
+        if "data_gouv" in sub_results and not has_prebuilt_dataviz and existing_geojson is None and not has_ogc_layers:
+            other_text = "\n".join(v for k, v in sub_results.items() if k != "data_gouv")
             other_text = "\n".join(v for k, v in sub_results.items() if k != "data_gouv")
             combined_other = f"{other_text} {user_query}"
             needs_map = bool(
@@ -243,12 +250,15 @@ class HumanOutputAgent(BaseAgent):
         async def humanoutput_node(state: OrchestratorState) -> dict:
             dataviz: Any = None
             geojson: Any = None
+            ogc_layers: Any = None
             for result in (state.get("sub_results") or {}).values():
                 if isinstance(result, dict):
                     if result.get("dataviz") and dataviz is None:
                         dataviz = result["dataviz"]
                     if result.get("geojson") and geojson is None:
                         geojson = result["geojson"]
+                    if result.get("ogc_layers") and ogc_layers is None:
+                        ogc_layers = result["ogc_layers"]
 
             sub_text: dict[str, str] = {
                 k: (v.get("answer") or "") if isinstance(v, dict) else str(v)
@@ -257,7 +267,7 @@ class HumanOutputAgent(BaseAgent):
             inp = AgentInput(
                 query=state["query"],
                 session_id=state["session_id"],
-                context={"sub_results": sub_text, "dataviz": dataviz, "geojson": geojson},
+                context={"sub_results": sub_text, "dataviz": dataviz, "geojson": geojson, "has_ogc_layers": bool(ogc_layers)},
             )
             try:
                 output = await agent.run(inp)
@@ -271,6 +281,8 @@ class HumanOutputAgent(BaseAgent):
                 update["dataviz"] = dataviz
             if geojson is not None:
                 update["geojson"] = geojson
+            if ogc_layers is not None:
+                update["ogc_layers"] = ogc_layers
             return update
 
         return humanoutput_node

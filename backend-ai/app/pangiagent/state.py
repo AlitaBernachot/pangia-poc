@@ -104,3 +104,4 @@ class OrchestratorState(TypedDict):
     output_decision: dict[str, Any]   # {"needs_map": bool, "needs_dataviz": bool}
     dataviz: dict[str, Any]           # chart / KPI / table payload for frontend
     geojson: dict[str, Any]           # GeoJSON FeatureCollection for frontend
+    ogc_layers: list[dict[str, Any]]  # WFS/WMS/OGC API layers for frontend MapViewer
