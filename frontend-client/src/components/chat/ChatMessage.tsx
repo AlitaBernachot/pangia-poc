@@ -5,7 +5,7 @@
 import ReactMarkdown from 'react-markdown'
 import { ExternalLink, CheckCircle2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { type Message, type DatasetCandidate, AGENT_COLORS } from '../../types'
+import { type Message, type DatasetCandidate, AGENT_COLORS, getAgentLabel } from '../../types'
 import { AgentIcon } from '../AgentIcon'
 import { AgentActivityPanel } from './AgentActivityPanel'
 import { MapViewer } from '../MapViewer'
@@ -102,14 +102,15 @@ export function ChatMessage({ message, onSubmitChoice, onPrefillPrompt, isStream
           <div className="flex items-center flex-wrap gap-1.5">
             <span className="text-xs text-white/40 font-medium">{t('chatMessage.routingTo')}</span>
             {message.routingAgents.map((agent) => {
-              const colors = AGENT_COLORS[agent]
+              const agentLabel = getAgentLabel(agent)
+              const colors = AGENT_COLORS[agentLabel]
               return (
                 <span
                   key={agent}
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border"
                   style={colors ? { color: colors.text, borderColor: colors.border, background: colors.bg } : {}}
                 >
-                  <AgentIcon agent={agent} size={11} /> {agent}
+                  <AgentIcon agent={agentLabel} size={11} /> {agentLabel}
                 </span>
               )
             })}

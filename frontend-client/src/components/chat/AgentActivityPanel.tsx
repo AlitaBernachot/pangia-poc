@@ -4,7 +4,7 @@
 
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { type AgentActivity, AGENT_COLORS } from '../../types'
+import { type AgentActivity, AGENT_COLORS, getAgentLabel } from '../../types'
 import { AgentIcon } from '../AgentIcon'
 import { ToolIcon } from '../ToolIcon'
 import { ChevronDown, ChevronRight, CheckCheck, Lightbulb, Clock } from 'lucide-react'
@@ -16,7 +16,8 @@ interface Props {
 export function AgentActivityPanel({ activity }: Props) {
   const { t } = useTranslation()
   const [collapsed, setCollapsed] = useState(true)
-  const colors = AGENT_COLORS[activity.agent]
+  const label = getAgentLabel(activity.agent)
+  const colors = AGENT_COLORS[label]
 
   // The most recently started running tool (last in list with status 'running')
   const runningTool = [...activity.tools].reverse().find((tool) => tool.status === 'running')
@@ -34,8 +35,8 @@ export function AgentActivityPanel({ activity }: Props) {
         ) : (
           <ChevronDown size={12} className="text-white/40 shrink-0" />
         )}
-        <AgentIcon agent={activity.agent} size={13} />
-        <span className="font-medium text-white/80">{activity.agent}</span>
+        <AgentIcon agent={label} size={13} />
+        <span className="font-medium text-white/80">{label}</span>
         <span
           className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
             !activity.streaming
@@ -74,10 +75,10 @@ export function AgentActivityPanel({ activity }: Props) {
       </button>
 
       {/* Content */}
-      {!collapsed && (
+      {(!collapsed || (activity.streaming && activity.content)) && (
         <div className="px-3 pb-3 pt-2 bg-white/[0.02]">
-          {/* Tool badges */}
-          {activity.tools.length > 0 && (
+          {/* Tool badges — only when expanded */}
+          {!collapsed && activity.tools.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-2">
               {activity.tools.map((tool, i) => (
                 <span

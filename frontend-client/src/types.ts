@@ -115,6 +115,32 @@ export interface Attachment {
   size: number
 }
 
+/** Maps raw backend agent keys to human-readable display labels. */
+// FIXME: these labels are duplicated in the backend and should be defined in a shared location
+export const AGENT_LABEL_MAP: Record<string, string> = {
+  neo4j_agent:            'Neo4j',
+  rdf_agent:              'RDF/SPARQL',
+  vector_chroma_agent:    'Vector',
+  postgis_agent:          'PostGIS',
+  mapviz_agent:           'Map',
+  datagouv_mcp_agent:     'Data.gouv.fr',
+  geonetwork_mcp_agent:   'GeoNetwork',
+  dataviz_agent:          'DataViz',
+  rag_agent:              'RAG',
+  humanoutput_agent:      'Summary',
+  summary_agent:          'Summary',
+  calculator_agent:       'Calculator',
+  intent_parser_agent:    'Intent Parser',
+  smart_dispatcher_agent: 'Dispatcher',
+  merge:                  'Merge',
+}
+
+/** Returns the display label for an agent key, falling back to the raw key. */
+export function getAgentLabel(agentKey: string): string {
+  return AGENT_LABEL_MAP[agentKey] ?? agentKey
+}
+
+// FIXME: these colors are duplicated in the backend and should be defined in a shared location
 export const AGENT_COLORS: Record<string, { text: string; border: string; bg: string }> = {
   'Neo4j':        { text: '#4ade80', border: '#4ade80', bg: 'rgba(74,222,128,0.1)'  },
   'RDF/SPARQL':   { text: '#fb923c', border: '#fb923c', bg: 'rgba(251,146,60,0.1)'  },
