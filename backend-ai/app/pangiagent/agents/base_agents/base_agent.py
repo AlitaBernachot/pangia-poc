@@ -371,10 +371,22 @@ class BaseAgent(ABC):
         agent = self
 
         async def execute_node(state: SubAgentState) -> dict:
+            context: dict = dict(state.get("context") or {})
+
+            # ── Inject short-term memory as previous_turns ────────────────────
+            # memory_node loads STM into context["short_term"] each turn.
+            # We surface it as context["previous_turns"] (list, newest last)
+            # so every agent can reference the last N exchanges without
+            # knowing the STM internals.
+            stm: dict = context.get("short_term") or {}
+            history: list[dict] = stm.get("conversation_history") or []
+            if history:
+                context["previous_turns"] = history
+
             inp = AgentInput(
                 query=state["query"],
                 session_id=state["session_id"],
-                context=state.get("context", {}),  # type: ignore[arg-type]
+                context=context,  # type: ignore[arg-type]
             )
             output = await agent.run(inp)
             entry: dict = {
@@ -388,7 +400,7 @@ class BaseAgent(ABC):
             # Forward any rich-data extras produced by the agent
             # (dataviz, geojson, etc.) so the SSE layer can emit the appropriate
             # frontend events.
-            for key in ("dataviz", "geojson"):
+            for key in ("dataviz", "geojson", "ogc_layers"):
                 if key in output.state:
                     value = output.state[key]
                     # Normalise dataviz table keys: LLM sometimes uses tool

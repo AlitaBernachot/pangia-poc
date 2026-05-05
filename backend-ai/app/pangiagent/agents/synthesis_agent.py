@@ -93,16 +93,25 @@ You will be given:
 1. **Never** reproduce the raw `[agent_name]: …` format in your response.
 2. **Never** list dataset column names or individual row values in detail — the UI
    renders tables and charts separately.
-3. When structured data (CSV, table, chart) is available, mention it concisely
-   ("les données sont affichées dans le tableau ci-dessus") without repeating values.
-4. When a GeoJSON / map layer is available, mention it concisely
-   ("les webcams sont localisées sur la carte ci-dessus").
-5. Do **not** include source or download links in your response — they are appended
+3. Only mention a chart or table ("les données sont affichées dans le tableau ci-dessus")
+   if `[CONTEXT]` **explicitly** states that a data visualisation is displayed.
+   If `[CONTEXT]` does not mention a chart/table, do **not** refer to one — even if the
+   agent results contain numbers, statistics, or dataset listings.
+4. Only mention a map ("les éléments sont localisés sur la carte ci-dessus")
+   if `[CONTEXT]` **explicitly** states that a map layer is displayed.
+5. **When `[CONTEXT]` mentions a visualisation (table, chart) or a map**, do **not**
+   list individual items (locations, names, records…) in your text response — they are
+   already visible in the UI component above. Simply state the total count and refer to
+   the visual: e.g. "Les 74 parkings sont affichés dans le tableau et localisés sur la
+   carte ci-dessus." One or two sentences maximum.
+6. Do **not** include source or download links in your response — they are appended
    automatically after your text.
-6. If you cannot determine a meaningful answer from the agent results, say so clearly.
-7. Answer in the **same language as the user's question**.
-8. Be concise: 1–4 sentences is ideal. Expand only if the topic genuinely requires it.
-9. Use Markdown for emphasis (bold, italic, lists) when it improves readability.
+7. If you cannot determine a meaningful answer from the agent results, say so clearly.
+8. Answer in the **same language as the user's question**.
+9. Be concise: 1–4 sentences for factual answers. **When the answer is a list of items
+   with no visual component present, include ALL items — never truncate or summarise
+   a list by showing only a subset.**
+10. Use Markdown for emphasis (bold, italic, lists) when it improves readability.
 """
 
 
@@ -137,6 +146,8 @@ class SynthesisAgent(BaseAgent):
             context_notes.append("A data visualisation (chart/table) is displayed above the text.")
         if has_geojson:
             context_notes.append("A map layer (GeoJSON) is displayed above the text.")
+        if inp.context.get("has_ogc_layers"):
+            context_notes.append("A map layer (WFS/WMS service) is displayed above the text.")
 
         user_content = (
             f"[QUERY]\n{inp.query}\n\n"
@@ -205,8 +216,28 @@ class SynthesisAgent(BaseAgent):
                     "raw_results": raw_results,
                     "has_dataviz": bool(state.get("dataviz")),
                     "has_geojson": bool(state.get("geojson")),
+                    "has_ogc_layers": bool(state.get("ogc_layers")),
                 },
             )
+
+            has_dataviz = bool(state.get("dataviz"))
+            has_geojson = bool(state.get("geojson"))
+            has_ogc_layers = bool(state.get("ogc_layers"))
+
+            # ── Discovery / listing bypass ────────────────────────────────
+            # When there is no structured output (no dataviz, no geojson, no ogc),
+            # the sub-agent answer is already the final answer.
+            if not has_dataviz and not has_geojson and not has_ogc_layers and successful:
+                import re as _re
+                # Strip "[agent_name]: " prefixes produced by the merge step
+                clean = raw_results
+                for name, _ in successful:
+                    clean = _re.sub(rf"^\[{_re.escape(name)}\]:\s*", "", clean, flags=_re.MULTILINE)
+                clean = clean.strip()
+                if footer:
+                    clean = clean.rstrip("\n") + "\n\n" + footer
+                return {"final_answer": clean}
+
             try:
                 output = await agent.run(inp)
                 synthesised = output.answer

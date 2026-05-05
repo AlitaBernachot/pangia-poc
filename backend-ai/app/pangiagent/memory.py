@@ -39,6 +39,9 @@ async def close_redis() -> None:
 # ── Short-term memory (Redis) ─────────────────────────────────────────────────
 
 class ShortTermMemory:
+    HISTORY_KEY = "conversation_history"
+    MAX_TURNS = 3
+
     def __init__(self, session_id: str) -> None:
         self.session_id = session_id
         self._key = f"session:{session_id}:short_memory"
@@ -58,6 +61,21 @@ class ShortTermMemory:
     async def update(self, key: str, value: Any) -> None:
         data = await self.load()
         data[key] = value
+        await self.save(data)
+
+    async def append_turn(self, query: str, answer: str) -> None:
+        """Append a (query, answer) pair to the rolling conversation history.
+
+        Keeps only the last :attr:`MAX_TURNS` turns.
+        """
+        data = await self.load()
+        history: list[dict[str, str]] = data.get(self.HISTORY_KEY) or []
+        history.append({"query": query, "answer": answer[:1200]})
+        data[self.HISTORY_KEY] = history[-self.MAX_TURNS:]
+        # Keep legacy keys in sync so older code doesn't break
+        if history:
+            data["last_query"] = history[-1]["query"]
+            data["last_answer"] = history[-1]["answer"]
         await self.save(data)
 
 

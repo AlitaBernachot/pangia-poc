@@ -198,6 +198,33 @@ async def run_graph_to_queue(
             elif kind == "on_chain_start" and node in _AGENT_NODE_NAMES:
                 await queue.put(_sse({"type": "agent_start", "agent": node}))
 
+            # ── post-processing nodes start ───────────────────────────────────
+            # FIXME: this is a bit hacky — we want to emit agent_start for these nodes so they show up in the UI as separate panels, but they aren't really agents.  We should refactor the graph to make this cleaner (e.g. have a single "post_processing_node" with an output field that specifies the type).
+            elif kind == "on_chain_start" and node in (
+                "synthesis_node",
+                "humanoutput_node", "dataviz_node", "mapviz_node",
+            ):
+                await queue.put(_sse({"type": "agent_start", "agent": node}))
+
+            # ── tool lifecycle inside sub-agents ──────────────────────────────
+            elif kind == "on_tool_start":
+                agent_name = node if node in _AGENT_NODE_NAMES else _parent_agent(event)
+                if agent_name:
+                    await queue.put(_sse({
+                        "type": "tool_start",
+                        "agent": agent_name,
+                        "tool": event.get("name", ""),
+                    }))
+
+            elif kind == "on_tool_end":
+                agent_name = node if node in _AGENT_NODE_NAMES else _parent_agent(event)
+                if agent_name:
+                    await queue.put(_sse({
+                        "type": "tool_end",
+                        "agent": agent_name,
+                        "tool": event.get("name", ""),
+                    }))
+
             # ── LLM token streaming inside a sub-agent ────────────────────────
             elif kind == "on_chat_model_stream" and node in _AGENT_NODE_NAMES:
                 chunk = event.get("data", {}).get("chunk")
@@ -252,6 +279,8 @@ async def run_graph_to_queue(
                         await queue.put(_sse({"type": "dataviz", "data": result["dataviz"]}))
                     if "geojson" in result:
                         await queue.put(_sse({"type": "geojson", "data": result["geojson"]}))
+                    if "ogc_layers" in result:
+                        await queue.put(_sse({"type": "ogc_layer", "layers": result["ogc_layers"]}))
 
             # ── merge_node end → final_answer (fallback when no synthesis node) ──
             # When a synthesis_node is wired, it will emit the real final_answer
@@ -266,6 +295,7 @@ async def run_graph_to_queue(
                         "answer": answer,
                         "confidence": out.get("confidence", 0.0),
                     }))
+                # No agent_end for merge_node — it's internal and not shown in the UI
 
             # ── synthesis_node end → final_answer (replaces merge_node answer) ─
             elif kind == "on_chain_end" and node == "synthesis_node":
@@ -277,6 +307,7 @@ async def run_graph_to_queue(
                         "answer": answer,
                         "confidence": 0.9,
                     }))
+                await queue.put(_sse({"type": "agent_end", "agent": "synthesis_node", "answer": ""}))
 
             # ── humanoutput_node end → output_decision ────────────────────────
             elif kind == "on_chain_end" and node == "humanoutput_node":
@@ -284,6 +315,11 @@ async def run_graph_to_queue(
                 decision = out.get("output_decision")
                 if decision:
                     await queue.put(_sse({"type": "output_decision", "data": decision}))
+                # Forward OGC layers if humanoutput collected them from sub_results
+                layers = out.get("ogc_layers")
+                if layers:
+                    await queue.put(_sse({"type": "ogc_layer", "layers": layers}))
+                await queue.put(_sse({"type": "agent_end", "agent": "humanoutput_node", "answer": ""}))
 
             # ── dataviz_node end → dataviz ────────────────────────────────────
             elif kind == "on_chain_end" and node == "dataviz_node":
@@ -291,13 +327,18 @@ async def run_graph_to_queue(
                 dv = out.get("dataviz")
                 if dv is not None:
                     await queue.put(_sse({"type": "dataviz", "data": dv}))
+                await queue.put(_sse({"type": "agent_end", "agent": "dataviz_node", "answer": ""}))
 
-            # ── mapviz_node end → geojson ─────────────────────────────────────
+            # ── mapviz_node end → geojson + ogc_layers ────────────────────────
             elif kind == "on_chain_end" and node == "mapviz_node":
                 out = _output(event)
                 gj = out.get("geojson")
                 if gj is not None:
                     await queue.put(_sse({"type": "geojson", "data": gj}))
+                layers = out.get("ogc_layers")
+                if layers:
+                    await queue.put(_sse({"type": "ogc_layer", "layers": layers}))
+                await queue.put(_sse({"type": "agent_end", "agent": "mapviz_node", "answer": ""}))
 
     except Exception as exc:
         logger.exception("Unhandled error in run_graph_to_queue")

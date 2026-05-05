@@ -55,7 +55,23 @@
   "agentActivity": {
     "thinking": "Thinking…",
     "done": "Done",
-    "waitingForChoice": "Awaiting your choice"
+    "waitingForChoice": "Awaiting your choice",
+    "descSynthesis": "Consolidating results from all sources…",
+    "descResponse":  "Formatting the final response…",
+    "descDataviz":   "Building charts and visualizations…",
+    "descMap":       "Preparing map layers…",
+    "descAnalysis":  "Parsing intent and context…",
+    "descRouting":   "Selecting the right data sources…",
+    "phases": {
+      "analyzing":   "Analyzing…",
+      "querying":    "Diving into the data…",
+      "fetching":    "Retrieving data…",
+      "locating":    "Processing location…",
+      "computing":   "Computing…",
+      "processing":  "Processing data…",
+      "visualizing": "Preparing output…",
+      "composing":   "Composing response…"
+    }
   },
   "faq": {
     "heroTitle": "FAQ & About",
