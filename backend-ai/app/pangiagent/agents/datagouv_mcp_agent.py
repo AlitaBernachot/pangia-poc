@@ -419,6 +419,16 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
 
         _chosen_dataset_id: str | None = inp.context.get("chosen_dataset_id")
 
+        # ── Previous-turn context (injected by BaseAgent.as_subgraph) ─────────
+        _turns: list[dict] = inp.context.get("previous_turns") or []
+        _prev_ctx = ""
+        if _turns:
+            lines = ["\n\n[HISTORIQUE DE LA CONVERSATION]"]
+            for t in _turns:
+                lines.append(f"Q: {t['query']}")
+                lines.append(f"R: {t['answer']}")
+            _prev_ctx = "\n".join(lines)
+
         if _chosen_dataset_id:
             human_content = (
                 f"{inp.query}\n\n"
@@ -426,11 +436,12 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
                 "N'appelle PAS search_datasets. Appelle directement list_dataset_resources ou "
                 "get_resource_info pour récupérer les ressources de ce dataset, puis "
                 "fetch_resource_file pour télécharger le fichier CSV et/ou GeoJSON disponibles."
+                + _prev_ctx
             )
         elif ctx_hint:
-            human_content = inp.query + "\n\n" + ctx_hint
+            human_content = inp.query + "\n\n" + ctx_hint + _prev_ctx
         else:
-            human_content = inp.query
+            human_content = inp.query + _prev_ctx
 
         messages: list = [
             SystemMessage(content=self._system_prompt),

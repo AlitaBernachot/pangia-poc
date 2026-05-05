@@ -270,8 +270,7 @@ async def merge_node(state: OrchestratorState) -> dict:
 
     async def _save_stm() -> None:
         try:
-            await stm.update("last_answer", combined[:2000])
-            await stm.update("last_query", state["query"])
+            await stm.append_turn(state["query"], combined[:2000])
         except Exception:
             logger.exception("merge_node: failed to save short-term memory")
 
