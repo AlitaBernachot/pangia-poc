@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 services:
-  # ── Backend (FastAPI + LangGraph multi-agent) ──────────────────────────────
+  # ── Backend (FastAPI seeder) ───────────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -11,11 +11,6 @@ services:
     ports:
       - "8084:8084"
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
-      # Global model fallback (provider + model name used by all agents unless overridden)
-      - MODEL_PROVIDER=${MODEL_PROVIDER:-openai}
-      - MODEL_NAME=${MODEL_NAME:-gpt-4o-mini}
       # Neo4j
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USERNAME=${NEO4J_USERNAME:-neo4j}
@@ -26,28 +21,18 @@ services:
       # ChromaDB
       - CHROMA_HOST=chromadb
       - CHROMA_PORT=8000
-      - CHROMA_CLIENT_AUTH_PROVIDER=
       - ANONYMIZED_TELEMETRY=False
       # PostGIS
       - POSTGIS_DSN=postgresql://${POSTGIS_USER:-pangia}:${POSTGIS_PASSWORD:-pangia-password}@postgis:5432/${POSTGIS_DB:-pangia}
-      # Redis
-      - REDIS_URL=redis://redis:6379
       # Seeding – enabled by default so dev/demo stacks get sample data;
       # set SEED_DB=false in your .env (or override at runtime) for production.
       - SEED_DB=${SEED_DB:-true}
       # Seed theme – selects which dataset to load.  Built-in: pandemic
       - SEED_THEME=${SEED_THEME:-pandemic}
       - CORS_ORIGINS=["http://localhost:3000","http://frontend-client"]
-      # Arize Phoenix (observability)
-      - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
-      - PHOENIX_PROJECT_NAME=${PHOENIX_PROJECT_NAME:-pangia}
-      # Ollama (local LLM)
-      - OLLAMA_BASE_URL=http://ollama:11434
     volumes:
       - ./backend/app:/backend/app
-      - ./backend/libs:/backend/libs
-      - ./backend/config:/backend/config
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8084 --reload --reload-include "*.yml"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8084 --reload
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8084/api/health || exit 1"]
       interval: 10s
@@ -57,17 +42,11 @@ services:
     depends_on:
       neo4j:
         condition: service_healthy
-      redis:
-        condition: service_healthy
       graphdb:
         condition: service_healthy
       chromadb:
         condition: service_healthy
       postgis:
-        condition: service_healthy
-      phoenix:
-        condition: service_started
-      ollama:
         condition: service_healthy
     restart: unless-stopped
 

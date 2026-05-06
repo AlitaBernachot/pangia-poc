@@ -102,7 +102,7 @@ pangia-poc/
 │           ├── memory.py   Short-term (Redis) + long-term (pgvector) memory
 │           ├── hitl.py     Human-in-the-loop manager
 │           └── audit.py    SHA-256 hash-chain audit log
-├── backend/                ← Legacy backend V1 (port 8084, kept for reference)
+├── backend/                ← Database seeder (port 8084) — seeds Neo4j, PostGIS, GraphDB, ChromaDB
 ├── frontend-client/        ← React 19 + Tailwind CSS v4 chat UI
 │   └── src/
 │       ├── hooks/
