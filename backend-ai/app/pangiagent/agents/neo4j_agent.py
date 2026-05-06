@@ -61,7 +61,7 @@ class Neo4jAgent(BaseAgent):
         # Step 1 — generate Cypher
         try:
             gen_response = await self._llm.ainvoke([
-                SystemMessage(content=self._system_prompt),
+                SystemMessage(content=self.get_prompt_for_request(inp, _DEFAULT_PROMPT)),
                 HumanMessage(content=question),
             ])
             cypher = _extract_cypher(str(gen_response.content))

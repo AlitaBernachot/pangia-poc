@@ -67,7 +67,7 @@ class SummaryAgent(BaseAgent):
 
     async def _run(self, inp: AgentInput) -> AgentOutput:
         messages = [
-            SystemMessage(content=self._system_prompt),
+            SystemMessage(content=self.get_prompt_for_request(inp, self._DEFAULT_PROMPT)),
             HumanMessage(content=inp.query),
         ]
         response = await self._llm.ainvoke(messages)

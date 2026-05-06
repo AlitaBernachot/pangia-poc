@@ -22,10 +22,10 @@
 
 sources:
 
-  - id: neo4j_agent
+  - id: kg_source
     connector: neo4j_agent
     active: false
-    label: Neo4j
+    label: KnowledgeGraph
     description: >
       Neo4j knowledge graph agent. Answers questions about geographic entities,
       their spatial relationships, administrative hierarchies, and co-occurrences
@@ -64,6 +64,135 @@ sources:
       - "Find all hospitals within 5 km of a given node."
       - "Show the hierarchy of administrative units in France."
       - "Which entities co-occur with 'Loire' in the graph?"
+
+  - id: kg_brgm_source
+    connector: neo4j_agent
+    active: true
+    label: Géocatalogue BRGM
+    description: >
+      Neo4j knowledge graph agent over 800 ISO 19139 geospatial metadata records
+      harvested from the French national geocatalogue (geocatalogue.fr) via CSW.
+      The data is dominated by BRGM (Bureau de Recherches Géologiques et Minières)
+      productions: geological maps at 1/50 000 (BD Scan-Géol-50), WFS/WMS/ATOM
+      download services, and subsurface observation datasets. Also contains
+      records from SANDRE, regional urbanisme agencies (AURCA, AUDeG), and
+      DDT/DGTM services. Node labels are prefixed with "CSW_" (e.g. CSW_Metadata,
+      CSW_Keyword, CSW_Organisation). Supports keyword relationship traversal
+      including SYNONYM_OF and SEMANTICALLY_RELATED edges inferred by LLM.
+      Use it to explore which organisations produce which datasets, which
+      keywords co-occur, which formats and CRS are used, and to navigate
+      the thematic structure of French geospatial open data.
+    topics:
+      - géologie
+      - geological map
+      - carte géologique
+      - brgm
+      - sous-sol
+      - stratigraphie
+      - lithologie
+      - failles
+      - formations géologiques
+      - eaux souterraines
+      - wms
+      - wfs
+      - atom
+      - iso 19139
+      - métadonnées
+      - catalogue
+      - geocatalogue
+      - geosciences
+      - knowledge graph
+      - cypher
+    entity_types:
+      - metadata record
+      - organisation
+      - keyword
+      - topic category
+      - distribution format
+      - coordinate reference system
+      - online resource (WMS, WFS, ATOM)
+    capabilities:
+      - graph_traversal
+      - entity_search
+      - co-occurrence
+      - hierarchy
+      - relationship
+      - semantic_search
+    geo_scope: France
+    example_questions:
+      - "Quels datasets géologiques sont produits par le BRGM ?"
+      - "Quelles sont les fiches de métadonnées liées à la stratigraphie ?"
+      - "Quels mots-clés sont associés aux cartes géologiques ?"
+      - "Liste les formats de distribution disponibles dans le catalogue."
+      - "Quelles organisations produisent des données sur les eaux souterraines ?"
+      - "Quels systèmes de projection sont utilisés dans les métadonnées ?"
+      - "Quels mots-clés sont synonymes de 'géologie' dans le graphe ?"
+      - "Quels services WFS sont référencés dans le catalogue BRGM ?"
+    prompt: |
+      ## Neo4j graph schema — CSW / BRGM metadata (SOURCE_NAME = "CSW")
+
+      All node labels are prefixed with "CSW_".
+
+      ### Node labels and key properties
+
+      | Label | Key property | Other properties |
+      |---|---|---|
+      | CSW_Metadata | uuid | title, abstract, hierarchy_level, date_stamp, language, standard, bbox_* |
+      | CSW_Organisation | name | — |
+      | CSW_Keyword | value | thesaurus |
+      | CSW_TopicCategory | code | label_en, label_fr |
+      | CSW_Format | id | name, version |
+      | CSW_CRS | code | code_space |
+      | CSW_OnlineResource | url | protocol, name, function_code |
+
+      ### Relationships
+
+      | Type | From → To | Properties |
+      |---|---|---|
+      | PRODUCED_BY | CSW_Metadata → CSW_Organisation | role = "owner" |
+      | CONTACT | CSW_Metadata → CSW_Organisation | role = "pointOfContact" / "custodian" / … |
+      | HAS_KEYWORD | CSW_Metadata → CSW_Keyword | — |
+      | COVERS_TOPIC | CSW_Metadata → CSW_TopicCategory | — |
+      | DISTRIBUTED_AS | CSW_Metadata → CSW_Format | — |
+      | USES_CRS | CSW_Metadata → CSW_CRS | — |
+      | HAS_ONLINE_RESOURCE | CSW_Metadata → CSW_OnlineResource | — |
+      | SEMANTICALLY_RELATED | CSW_Keyword → CSW_Keyword | type (BROADER_TERM/NARROWER_TERM/RELATED_TO/IS_TYPE_OF/PART_OF), confidence, inferred_by |
+      | SYNONYM_OF | CSW_Keyword → CSW_Keyword | source ("llm"), confidence, inferred_by |
+      | SYNONYM_OF | CSW_TopicCategory → CSW_Keyword | source ("iso19115_label"), lang ("fr"/"en") |
+
+      ### Corpus statistics (800 records from geocatalogue.fr)
+      - Dominant organisation: BRGM (>2 000 occurrences across records)
+      - Dominant topic category: geoscientificInformation (629 records)
+      - Top keywords: géologie, failles, sous-sol, stratigraphie, lithologie, formations, contact
+      - Distribution formats: WMS, WFS, ESRI Shapefile, ATOM, GeoTIFF
+      - Main CRS: Lambert 93 / EPSG:2154, RGFG95 UTM 22N (EPSG:2972)
+
+      ### Example Cypher queries
+
+      ```cypher
+      // Datasets produced by BRGM
+      MATCH (m:CSW_Metadata)-[:PRODUCED_BY]->(o:CSW_Organisation {name: "BRGM"})
+      RETURN m.title, m.date_stamp LIMIT 10
+
+      // Keywords related to 'géologie'
+      MATCH (k:CSW_Keyword {value: "géologie"})-[r:SEMANTICALLY_RELATED|SYNONYM_OF]-(k2:CSW_Keyword)
+      RETURN k2.value, type(r), r.type LIMIT 20
+
+      // Top organisations by dataset count
+      MATCH (m:CSW_Metadata)-[:PRODUCED_BY|CONTACT]->(o:CSW_Organisation)
+      RETURN o.name, count(DISTINCT m) AS n ORDER BY n DESC LIMIT 10
+
+      // Formats available for a given keyword
+      MATCH (m:CSW_Metadata)-[:HAS_KEYWORD]->(k:CSW_Keyword {value: "géologie"})
+      MATCH (m)-[:DISTRIBUTED_AS]->(f:CSW_Format)
+      RETURN DISTINCT f.name, f.version
+
+      // Metadata covering a bounding box (France métropolitaine approx.)
+      MATCH (m:CSW_Metadata)
+      WHERE m.bbox_west >= -5 AND m.bbox_east <= 10
+        AND m.bbox_south >= 41 AND m.bbox_north <= 52
+      RETURN m.title LIMIT 10
+      ```
 
   - id: postgis_agent
     connector: postgis_agent

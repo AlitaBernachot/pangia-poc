@@ -444,7 +444,7 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
             human_content = inp.query + _prev_ctx
 
         messages: list = [
-            SystemMessage(content=self._system_prompt),
+            SystemMessage(content=self.get_prompt_for_request(inp, self._DEFAULT_PROMPT)),
             HumanMessage(content=human_content),
         ]
 
