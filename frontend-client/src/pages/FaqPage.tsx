@@ -131,7 +131,7 @@ export function FaqPage() {
                 </button>
 
                 {openIndex === i && (
-                  <div className="px-5 pb-4 text-sm text-white/55 leading-relaxed border-t border-white/6 pt-3">
+                  <div className="px-5 pb-4 text-sm text-white/55 leading-relaxed border-t border-white/6 pt-3 max-h-64 overflow-y-auto">
                     {t(`faq.answers.${answerKey}`)}
                   </div>
                 )}

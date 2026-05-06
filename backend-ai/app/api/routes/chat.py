@@ -11,7 +11,7 @@ import uuid
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
-from app.pangiagent.graph import ORCHESTRATOR_GRAPH
+from app.pangiagent.graph import get_graph
 from app.pangiagent.hitl import get_hitl_manager
 from app.pangiagent.source_registry import get_registry
 from app.pangiagent.sse_stream import drain_queue_to_sse, run_graph_to_queue
@@ -56,11 +56,13 @@ async def chat(body: ChatRequest) -> StreamingResponse:
         "sub_results": {},
         "final_answer": "",
         "confidence": 0.0,
-        "session_title": "",
         "hitl_request_id": "",
         "hitl_questions": [],
         "hitl_status": "",
         "intent": {},
+        # NOTE: "messages" intentionally absent — LangGraph checkpointer restores
+        # the persisted conversation history automatically.  Passing [] here would
+        # overwrite it via the _keep_last reducer and break multi-turn context.
     }
 
     # Run the graph in an independent background Task so that the long
@@ -69,7 +71,7 @@ async def chat(body: ChatRequest) -> StreamingResponse:
     queue: asyncio.Queue[str | None] = asyncio.Queue()
     asyncio.create_task(
         run_graph_to_queue(
-            ORCHESTRATOR_GRAPH,
+            get_graph(),
             initial_state,
             queue,
             original_query=body.message,

@@ -190,6 +190,25 @@ class HumanOutputAgent(BaseAgent):
                 needs_map = True
             return {"needs_map": needs_map, "needs_dataviz": False}
 
+        # Fast-path: tabular_data with coordinate columns → needs_map=True without LLM
+        tabular_data: dict | None = inp.context.get("tabular_data")
+        if tabular_data and not inp.context.get("geojson"):
+            td_cols = tabular_data.get("columns") or []
+            lat_col, lon_col = find_coord_columns(td_cols)
+            has_wkt_geom = find_wkt_geom_column(td_cols) is not None
+            has_combined = any(
+                c.lower().strip() in {
+                    "geo_point_2d", "coordonnees_gps", "coordonnees_geo",
+                    "geolocalisation", "geo_point", "geoloc", "position", "localisation",
+                }
+                for c in td_cols
+            )
+            if (lat_col is not None and lon_col is not None) or has_wkt_geom or has_combined:
+                return {
+                    "needs_map": True,
+                    "needs_dataviz": bool(tabular_data.get("rows")),
+                }
+
         sub_text = "\n\n".join(
             f"[{agent.upper()} RESULTS]:\n{result}"
             for agent, result in sub_results.items()
@@ -199,6 +218,8 @@ class HumanOutputAgent(BaseAgent):
 
         # Fast-path: nothing to work with
         if not combined.strip():
+            if intent_needs_map is True:
+                return {"needs_map": True, "needs_dataviz": False}
             return {"needs_map": False, "needs_dataviz": False}
 
         # Heuristic screening
@@ -210,6 +231,11 @@ class HumanOutputAgent(BaseAgent):
         )
         geo_strong = bool(_GEO_KEYWORD_RE.search(combined))
         dataviz_strong = bool(_DATAVIZ_KEYWORD_RE.search(combined))
+
+        # Intent override: if user explicitly asked for a map, honour it
+        if intent_needs_map is True:
+            has_geo_signal = True
+            geo_strong = True
 
         # Both sides have a definitive heuristic answer → skip the LLM
         if (geo_strong or not has_geo_signal) and (dataviz_strong or not has_dataviz_signal):
@@ -248,10 +274,20 @@ class HumanOutputAgent(BaseAgent):
         agent = self
 
         async def humanoutput_node(state: OrchestratorState) -> dict:
+            # Only consider sub_results from the current turn to avoid reading
+            # stale data from previous checkpointed turns (sub_results uses
+            # _merge_dicts so older entries persist in the LangGraph state).
+            agents_called = set(state.get("agents_to_call") or [])
+            current_sub_results = {
+                k: v for k, v in (state.get("sub_results") or {}).items()
+                if k in agents_called
+            }
+
             dataviz: Any = None
             geojson: Any = None
             ogc_layers: Any = None
-            for result in (state.get("sub_results") or {}).values():
+            tabular_data: Any = None
+            for result in current_sub_results.values():
                 if isinstance(result, dict):
                     if result.get("dataviz") and dataviz is None:
                         dataviz = result["dataviz"]
@@ -259,15 +295,24 @@ class HumanOutputAgent(BaseAgent):
                         geojson = result["geojson"]
                     if result.get("ogc_layers") and ogc_layers is None:
                         ogc_layers = result["ogc_layers"]
+                    if result.get("tabular_data") and tabular_data is None:
+                        tabular_data = result["tabular_data"]
 
             sub_text: dict[str, str] = {
                 k: (v.get("answer") or "") if isinstance(v, dict) else str(v)
-                for k, v in (state.get("sub_results") or {}).items()
+                for k, v in current_sub_results.items()
             }
             inp = AgentInput(
                 query=state["query"],
                 session_id=state["session_id"],
-                context={"sub_results": sub_text, "dataviz": dataviz, "geojson": geojson, "has_ogc_layers": bool(ogc_layers)},
+                context={
+                    "sub_results": sub_text,
+                    "dataviz": dataviz,
+                    "geojson": geojson,
+                    "has_ogc_layers": bool(ogc_layers),
+                    "tabular_data": tabular_data,
+                    "intent": state.get("intent"),
+                },
             )
             try:
                 output = await agent.run(inp)
@@ -276,13 +321,19 @@ class HumanOutputAgent(BaseAgent):
                 logger.exception("humanoutput_node: agent raised")
                 decision = {"needs_map": True, "needs_dataviz": True}
 
-            update: dict = {"output_decision": decision}
-            if dataviz is not None:
-                update["dataviz"] = dataviz
-            if geojson is not None:
-                update["geojson"] = geojson
-            if ogc_layers is not None:
-                update["ogc_layers"] = ogc_layers
+            # If there's tabular_data but no prebuilt dataviz, ensure needs_dataviz=True
+            if tabular_data and not dataviz:
+                decision = {**decision, "needs_dataviz": True}
+
+            # Always reset dataviz / geojson / ogc_layers for this turn.
+            # Not setting them would leave stale checkpointed values from the
+            # previous turn visible to dataviz_node and the frontend.
+            update: dict = {
+                "output_decision": decision,
+                "dataviz": dataviz,
+                "geojson": geojson,
+                "ogc_layers": ogc_layers,
+            }
             return update
 
         return humanoutput_node

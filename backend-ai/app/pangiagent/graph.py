@@ -1,7 +1,3 @@
-# SPDX-FileCopyrightText: 2026 AlitaBernachot
-#
-# SPDX-License-Identifier: MIT
-
 """Agent registry and compiled orchestrator graph.
 
 This module is the single place where:
@@ -9,14 +5,18 @@ This module is the single place where:
 - ``build_graph()`` compiles the LangGraph orchestrator (also writing
   Mermaid diagrams to ``app/pangiagent/mermaid_graph/``).
 
-Import ``AGENTS`` or ``ORCHESTRATOR_GRAPH`` from here whenever you need
-to interact with the agent layer (e.g. in API route handlers).
+Call ``await init_graph()`` once at application startup (in the FastAPI
+lifespan handler) before serving any requests.  Use ``get_graph()`` (sync)
+everywhere else to retrieve the compiled graph.
 """
 from __future__ import annotations
+
+import logging
 
 from app.pangiagent.agents.calculator_agent import CalculatorAgent
 from app.pangiagent.agents.datagouv_mcp_agent import DataGouvMCPAgent
 from app.pangiagent.agents.dataviz_agent import DataVizAgent
+from app.pangiagent.agents.followup_filter_agent import FollowupFilterAgent
 from app.pangiagent.agents.geonetwork_mcp_agent import GeoNetworkMCPAgent
 from app.pangiagent.agents.humanoutput_agent import HumanOutputAgent
 from app.pangiagent.agents.intent_parser_agent import IntentParserAgent
@@ -30,6 +30,8 @@ from app.pangiagent.agents.summary_agent import SummaryAgent
 from app.pangiagent.agents.synthesis_agent import SynthesisAgent
 from app.pangiagent.agents.vector_chroma_agent import VectorChromaAgent
 from app.pangiagent.guardrails import check_ambiguous_intent, check_output_length, check_toxic_input
+
+logger = logging.getLogger(__name__)
 
 # ── Agent registry ─────────────────────────────────────────────────────────────
 # Each agent is instantiated once with its guardrails wired in.
@@ -70,6 +72,7 @@ AGENTS = {
         pre_guardrails=[check_toxic_input],
         post_guardrails=[check_output_length],
     ),
+    "followup_filter_agent": FollowupFilterAgent(),
 }
 
 # ── Output agent registry ──────────────────────────────────────────────────────
@@ -88,12 +91,44 @@ SYNTHESIS_AGENT = SynthesisAgent()
 INTENT_AGENT = IntentParserAgent()
 
 # ── Compiled orchestrator graph ────────────────────────────────────────────────
-# Built at module import time; also writes Mermaid diagrams to
-# app/pangiagent/mermaid_graph/.
+# Initialised lazily at startup via ``init_graph()`` so that the async
+# PostgreSQL checkpointer can be created before graph compilation.
 
-ORCHESTRATOR_GRAPH = build_graph(
-    AGENTS,
-    output_agents=OUTPUT_AGENTS,
-    synthesis_agent=SYNTHESIS_AGENT,
-    intent_agent=INTENT_AGENT,
-)
+_ORCHESTRATOR_GRAPH = None
+
+
+def get_graph():
+    """Return the compiled orchestrator graph.
+
+    Raises ``RuntimeError`` when called before ``init_graph()``.
+    """
+    if _ORCHESTRATOR_GRAPH is None:
+        raise RuntimeError(
+            "Orchestrator graph not initialised — call await init_graph() at startup."
+        )
+    return _ORCHESTRATOR_GRAPH
+
+
+async def init_graph() -> None:
+    """Initialise the PostgreSQL checkpointer then compile the orchestrator graph.
+
+    Must be called once during application startup (FastAPI lifespan).
+    """
+    global _ORCHESTRATOR_GRAPH
+    if _ORCHESTRATOR_GRAPH is not None:
+        return  # already initialised
+
+    from app.pangiagent.checkpointer import init_checkpointer, get_checkpointer
+
+    await init_checkpointer()
+    checkpointer = get_checkpointer()
+
+    _ORCHESTRATOR_GRAPH = build_graph(
+        AGENTS,
+        output_agents=OUTPUT_AGENTS,
+        synthesis_agent=SYNTHESIS_AGENT,
+        intent_agent=INTENT_AGENT,
+        checkpointer=checkpointer,
+    )
+    logger.info("Orchestrator graph initialised with PostgreSQL checkpointer")
+

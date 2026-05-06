@@ -139,6 +139,8 @@ export const AGENT_LABEL_MAP: Record<string, string> = {
   humanoutput_node:       'Output Analysis',
   dataviz_node:           'DataViz',
   mapviz_node:            'Map',
+  followup_filter_node:   'Analyse contextuelle',
+  followup_filter_agent:  'Analyse contextuelle',
 }
 
 /** Agent keys that are data sources — shown as "querying" when no tool is active yet. */
@@ -175,7 +177,9 @@ export const AGENT_COLORS: Record<string, { text: string; border: string; bg: st
   'Summary':      { text: '#0284c7', border: '#0284c7', bg: 'rgba(2,132,199,0.1)'    }, // sky-600
   'Analysis':     { text: '#bae6fd', border: '#bae6fd', bg: 'rgba(186,230,253,0.08)' }, // sky-200
   'Routing':      { text: '#7ea8c9', border: '#7ea8c9', bg: 'rgba(126,168,201,0.08)' }, // muted blue-grey
-  'Calculator':   { text: '#a5f3fc', border: '#a5f3fc', bg: 'rgba(165,243,252,0.08)' }, // cyan-200
+  'Calculator':        { text: '#a5f3fc', border: '#a5f3fc', bg: 'rgba(165,243,252,0.08)' }, // cyan-200
+  'Filtre Contextuel':    { text: '#a78bfa', border: '#a78bfa', bg: 'rgba(167,139,250,0.1)'  }, // violet-400
+  'Analyse contextuelle': { text: '#a78bfa', border: '#a78bfa', bg: 'rgba(167,139,250,0.1)'  }, // violet-400
 }
 
 import {
@@ -202,8 +206,10 @@ export const AGENT_ICON_MAP: Record<string, LucideIcon> = {
   'Output Analysis': ScanEye,
   'Summary':      MessageSquare,
   'Analysis':     Crosshair,
-  'Routing':      Filter,
-  'Calculator':   Hash,
+  'Routing':           Filter,
+  'Calculator':        Hash,
+  'Filtre Contextuel':    Filter,
+  'Analyse contextuelle': ScanEye,
 }
 
 export function getAgentIcon(agent: string): LucideIcon {

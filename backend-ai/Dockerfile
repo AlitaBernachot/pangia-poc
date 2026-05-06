@@ -20,11 +20,7 @@ RUN uv pip install --system -r requirements.txt
 
 # Pre-download the multilingual sentence-embeddings model used by libs/similarity.py
 # (~120 MB, cached at build time so the container starts without an outbound download).
-RUN python -c "
-from sentence_transformers import SentenceTransformer
-SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-print('similarity model cached')
-"
+RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2'); print('similarity model cached')"
 
 COPY app/ ./app/
 COPY libs/ ./libs/

@@ -105,3 +105,9 @@ class OrchestratorState(TypedDict):
     dataviz: dict[str, Any]           # chart / KPI / table payload for frontend
     geojson: dict[str, Any]           # GeoJSON FeatureCollection for frontend
     ogc_layers: list[dict[str, Any]]  # WFS/WMS/OGC API layers for frontend MapViewer
+
+    # ── Conversation history (persisted via LangGraph checkpointer) ───────────
+    # Each element: {"query": str, "answer": str}
+    # _keep_last reducer: merge_node owns the full list and passes the already-
+    # capped slice, so no unbounded accumulation occurs.
+    messages: Annotated[list[dict[str, Any]], _keep_last]

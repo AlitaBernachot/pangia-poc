@@ -290,9 +290,9 @@ class DataVizAgent(BaseReActAgent):
         )
 
     async def _run(self, inp: AgentInput) -> AgentOutput:
-        """Core logic – reads sub_results and pre-built dataviz from context."""
+        """Core logic – reads sub_results and raw tabular_data from context."""
         sub_results: dict[str, str] = inp.context.get("sub_results", {})
-        existing_dataviz: dict[str, Any] | None = inp.context.get("dataviz")
+        tabular_data: dict[str, Any] | None = inp.context.get("tabular_data")
         user_query = inp.query
 
         _uq = str(user_query)
@@ -300,22 +300,33 @@ class DataVizAgent(BaseReActAgent):
             bool(_DISPLAY_ONLY_RE.search(_uq)) and not bool(_ANALYSIS_INTENT_RE.search(_uq))
         )
 
-        # Pre-seed tables from any pre-built dataviz (e.g. from DataGouv MCP)
+        # Build preseeded tables from raw tabular_data (from connector agents)
         preseeded_tables: list[dict[str, Any]] = []
-        if existing_dataviz and existing_dataviz.get("tables"):
-            preseeded_tables = list(existing_dataviz["tables"])
-            first_table = preseeded_tables[0]
-            cols = first_table.get("columns", [])
-            all_rows = first_table.get("rows", [])
-            total = len(all_rows)
-            sample_rows = [dict(zip(cols, r)) for r in all_rows[:50]]
-            sub_text = (
-                f"[DONNÉES COMPLÈTES – {total} lignes, colonnes: {', '.join(cols)}]\n"
-                f"Exemple (premières {len(sample_rows)} lignes): "
-                f"{json.dumps(sample_rows, ensure_ascii=False, default=str)}\n\n"
-                f"NOTE: Un tableau avec TOUTES les {total} lignes a déjà été construit. "
-                f"N'appelle PAS build_table. Appelle uniquement build_chart ou build_kpi si pertinent."
-            )
+        if tabular_data:
+            cols = tabular_data.get("columns") or []
+            all_rows = tabular_data.get("rows") or []
+            total = tabular_data.get("total_rows", len(all_rows))
+            fmt_label = tabular_data.get("format", "data").upper()
+            if cols and all_rows:
+                preseeded_tables = [{
+                    "title": f"Données complètes ({total} enregistrements) [{fmt_label}]",
+                    "columns": cols,
+                    "rows": all_rows,
+                }]
+                sample_rows = [dict(zip(cols, r)) for r in all_rows[:50]]
+                sub_text = (
+                    f"[DONNÉES COMPLÈTES – {total} lignes, colonnes: {', '.join(cols)}]\n"
+                    f"Exemple (premières {len(sample_rows)} lignes): "
+                    f"{json.dumps(sample_rows, ensure_ascii=False, default=str)}\n\n"
+                    f"NOTE: Un tableau avec TOUTES les {total} lignes a déjà été construit. "
+                    f"N'appelle PAS build_table. Appelle uniquement build_chart ou build_kpi si pertinent."
+                )
+            else:
+                sub_text = "\n\n".join(
+                    f"[{agent.upper()} RESULTS]:\n{result}"
+                    for agent, result in sub_results.items()
+                    if result and result.strip()
+                )
         else:
             sub_text = "\n\n".join(
                 f"[{agent.upper()} RESULTS]:\n{result}"
@@ -465,16 +476,31 @@ class DataVizAgent(BaseReActAgent):
         agent = self
 
         async def dataviz_node(state: OrchestratorState) -> dict:
+            # Only consider sub_results from the current turn to avoid reading
+            # stale data from previous checkpointed turns.
+            agents_called = set(state.get("agents_to_call") or [])
+            current_sub_results = {
+                k: v for k, v in (state.get("sub_results") or {}).items()
+                if k in agents_called
+            }
+
+            # Collect raw tabular_data from current-turn sub_results only
+            tabular_data: dict[str, Any] | None = None
+            for result in current_sub_results.values():
+                if isinstance(result, dict) and result.get("tabular_data"):
+                    tabular_data = result["tabular_data"]
+                    break
+
             sub_text: dict[str, str] = {
                 k: (v.get("answer") or "") if isinstance(v, dict) else str(v)
-                for k, v in (state.get("sub_results") or {}).items()
+                for k, v in current_sub_results.items()
             }
             inp = AgentInput(
                 query=state["query"],
                 session_id=state["session_id"],
                 context={
                     "sub_results": sub_text,
-                    "dataviz": state.get("dataviz"),
+                    "tabular_data": tabular_data,
                     "geojson": state.get("geojson"),
                 },
             )

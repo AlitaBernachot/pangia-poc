@@ -227,17 +227,17 @@ export function usePangiaChat() {
             } else if (type === 'ogc_layer') {
               updateAssistant((m) => ({
                 ...m,
-                ogcLayers: event.layers as OgcLayer[],
+                ogcLayers: (event.layers as OgcLayer[] | null) ?? undefined,
               }))
             } else if (type === 'geojson') {
               updateAssistant((m) => ({
                 ...m,
-                geojson: event.data as Record<string, unknown>,
+                geojson: (event.data as Record<string, unknown> | null) ?? undefined,
               }))
             } else if (type === 'dataviz') {
               updateAssistant((m) => ({
                 ...m,
-                dataviz: event.data as DataVizPayload,
+                dataviz: (event.data as DataVizPayload | null) ?? undefined,
               }))
             } else if (type === 'dataset_choice') {
               const agentName = event.agent as string

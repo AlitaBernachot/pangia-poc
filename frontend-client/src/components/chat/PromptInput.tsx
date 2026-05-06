@@ -202,9 +202,9 @@ export function PromptInput({
             {/* Attach button */}
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
+              disabled
               title={t('promptInput.attachFiles')}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-white/40 hover:text-white/70 hover:bg-white/5 transition-colors"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs text-white/20 cursor-not-allowed opacity-40"
             >
               <Paperclip size={13} />
               <span>{t('promptInput.attach')}</span>

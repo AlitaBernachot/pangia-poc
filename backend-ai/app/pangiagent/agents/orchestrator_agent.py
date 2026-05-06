@@ -40,7 +40,6 @@ and every sub-agent subgraph are written to
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 import uuid
 from pathlib import Path
@@ -52,7 +51,7 @@ from langgraph.types import Send
 from app.pangiagent.audit import get_audit
 from app.config import get_settings
 from app.pangiagent.hitl import get_hitl_manager
-from app.pangiagent.memory import LongTermMemory, ShortTermMemory
+from app.pangiagent.memory import LongTermMemory
 from app.models import AgentInput, HITLRequest
 from app.pangiagent.router import DynamicRouter
 from app.pangiagent.state import OrchestratorState
@@ -68,6 +67,11 @@ logger = logging.getLogger(__name__)
 _HITL_TIMEOUT_MSG = "Request timed out waiting for clarification."
 _NO_AGENT_ANSWER_MSG = "No agents produced a valid answer."
 
+# Maximum number of turns kept in the checkpointed messages list.
+# Older turns beyond this cap are dropped before appending the new one,
+# preventing unbounded checkpoint blob growth in long sessions.
+_MAX_HISTORY_TURNS = 20
+
 # ── Mermaid output directory ───────────────────────────────────────────────────
 # Resolves to backend-ai/app/pangiagent/mermaid_graph/
 _MERMAID_DIR = Path(__file__).parent.parent / "mermaid_graph"
@@ -82,9 +86,12 @@ _AGENT_NODE_NAMES: set[str] = set()
 # ── Orchestrator node functions ────────────────────────────────────────────────
 
 async def memory_node(state: OrchestratorState) -> dict:
-    """Load long-term and short-term memory; inject facts into context."""
+    """Load long-term memory and inject conversation history into context.
+
+    Also extracts ``sub_results`` from the last checkpointed message so that
+    ``followup_filter_agent`` can reuse raw data without re-calling any sub-agent.
+    """
     ltm = LongTermMemory()
-    stm = ShortTermMemory(state["session_id"])
 
     try:
         facts = await ltm.search(state["query"], top_k=5)
@@ -92,15 +99,37 @@ async def memory_node(state: OrchestratorState) -> dict:
         logger.exception("LTM search failed")
         facts = []
 
-    stm_data = await stm.load()
+    # Last 3 turns from checkpointed messages (may be empty on first turn)
+    history = (state.get("messages") or [])[-3:]
+    previous_turns = [{"query": t["query"], "answer": t["answer"]} for t in history]
+
+    # Scan history messages (most recent first) for non-empty sub_results.
+    # The orchestrator is agnostic of sub_result internals — followup_filter_agent
+    # is the only place that understands their structure.
+    previous_sub_results: dict[str, Any] = {}
+    for msg in reversed(history):
+        candidate = msg.get("sub_results") or {}
+        if candidate:
+            previous_sub_results = candidate
+            break
 
     audit = get_audit()
     await audit.log(
         state["session_id"],
         "memory_access",
-        {"long_term_facts": len(facts), "short_term_keys": list(stm_data.keys())},
+        {
+            "long_term_facts": len(facts),
+            "previous_turns": len(previous_turns),
+            "previous_sub_results_agents": list(previous_sub_results.keys()),
+        },
     )
-    return {"context": {"long_term_facts": facts, "short_term": stm_data}}
+    ctx: dict[str, Any] = {
+        "long_term_facts": facts,
+        "previous_turns": previous_turns,
+    }
+    if previous_sub_results:
+        ctx["previous_sub_results"] = previous_sub_results
+    return {"context": ctx}
 
 
 async def title_node(state: OrchestratorState) -> dict:
@@ -119,12 +148,34 @@ async def title_node(state: OrchestratorState) -> dict:
 async def ambiguity_node(state: OrchestratorState) -> dict:
     """LLM ambiguity detection.
 
+    Short-circuits in two cases (no LLM call, no HITL):
+    1. ``state["intent"]["is_followup"] == True``  — intent parser detected a
+       back-reference (language-agnostic, LLM-based).
+    2. ``previous_turns`` is non-empty — we are already in an established
+       conversation; the intent parser has already resolved the query with full
+       context, so re-checking for ambiguity is redundant and error-prone.
+
     Sets ``hitl_request_id``, ``hitl_questions``, and ``hitl_status``
     when the ambiguity score exceeds the configured threshold; otherwise
     clears those fields.
     """
+    previous_turns: list[dict] = (state.get("context") or {}).get("previous_turns") or []
+
+    # ── Fast-path: follow-up flag set by intent parser ────────────────────
+    if (state.get("intent") or {}).get("is_followup"):
+        logger.info("ambiguity_node: is_followup=True — skipping ambiguity check")
+        return {"hitl_status": "", "hitl_request_id": "", "hitl_questions": []}
+
+    # ── Fast-path: already in a conversation ─────────────────────────────
+    if previous_turns:
+        logger.info(
+            "ambiguity_node: %d previous turn(s) — skipping ambiguity check",
+            len(previous_turns),
+        )
+        return {"hitl_status": "", "hitl_request_id": "", "hitl_questions": []}
+
     detector = AmbiguityAgent()
-    score, questions = await detector.detect(state["query"])
+    score, questions = await detector.detect(state["query"], previous_turns=previous_turns)
     settings = get_settings()
     audit = get_audit()
 
@@ -189,13 +240,48 @@ async def hitl_wait_node(state: OrchestratorState) -> dict:
 async def router_node(state: OrchestratorState) -> dict:
     """Route the query to one or more agents.
 
+    When ``is_followup`` is True in the intent and previous sub_results exist,
+    routes directly to ``followup_filter_agent`` without calling the dispatcher.
+    The ``is_followup`` flag is set exclusively by the LLM-based intent parser.
+
     When ``settings.smart_dispatcher_enabled`` is ``True`` (default), uses
-    :class:`SmartDispatcherAgent` — a deterministic + semantic scorer that
-    requires no LLM call.  When ``False``, falls back to the LLM-based
+    :class:`SmartDispatcherAgent`.  When ``False``, falls back to the LLM-based
     :class:`DynamicRouter`.
     """
     settings = get_settings()
     audit = get_audit()
+    ctx = state.get("context") or {}
+    intent = ctx.get("intent") or state.get("intent") or {}
+
+    has_previous_data = bool(ctx.get("previous_sub_results"))
+    is_followup: bool = bool(intent.get("is_followup"))
+
+    # Safety override: the LLM sometimes misses is_followup=True.
+    # If the intent action is "filter" (or "count") AND previous data exists,
+    # it is structurally a follow-up — the user is filtering already-fetched results.
+    # This is a purely structural check (no NLP): action type + data presence.
+    if (
+        not is_followup
+        and has_previous_data
+        and intent.get("action") in ("filter", "count")
+        and "followup_filter_agent" in _AGENT_NODE_NAMES
+    ):
+        logger.warning(
+            "router_node: LLM returned is_followup=False but action=%r with previous data — "
+            "overriding to followup",
+            intent.get("action"),
+        )
+        is_followup = True
+
+    logger.info(
+        "router_node: is_followup=%r has_previous_data=%r intent_action=%r",
+        is_followup, has_previous_data, intent.get("action"),
+    )
+
+    # Short-circuit: follow-up question with previous data available
+    if is_followup and has_previous_data and "followup_filter_agent" in _AGENT_NODE_NAMES:
+        await audit.log(state["session_id"], "routing", {"mode": "followup", "agents_to_call": ["followup_filter_agent"]})
+        return {"agents_to_call": ["followup_filter_agent"], "execution_reasoning": "Follow-up query with previous data — routed to followup_filter_agent"}
 
     if settings.smart_dispatcher_enabled:
         from app.pangiagent.agents.smart_dispatcher_agent import SmartDispatcherAgent
@@ -247,8 +333,16 @@ async def merge_node(state: OrchestratorState) -> dict:
     internal context by ``synthesis_node``.  The synthesis agent then rewrites
     it into a clean user-facing response.  When no synthesis agent is wired,
     ``final_answer`` is surfaced directly.
+
+    Only results from agents dispatched in the **current** turn are included;
+    stale results from previous checkpointed turns are discarded by filtering
+    against ``state["agents_to_call"]``.
     """
-    sub_results: dict[str, Any] = state.get("sub_results") or {}
+    # Filter to current-turn agents to avoid stale results from the checkpoint
+    agents_called = set(state.get("agents_to_call") or [])
+    all_sub_results: dict[str, Any] = state.get("sub_results") or {}
+    sub_results = {k: v for k, v in all_sub_results.items() if k in agents_called}
+
     successful = [
         (name, r)
         for name, r in sub_results.items()
@@ -265,16 +359,16 @@ async def merge_node(state: OrchestratorState) -> dict:
         else 0.0
     )
 
-    # Persist to short-term memory; log and swallow errors to avoid blocking
-    stm = ShortTermMemory(state["session_id"])
-
-    async def _save_stm() -> None:
-        try:
-            await stm.append_turn(state["query"], combined[:2000])
-        except Exception:
-            logger.exception("merge_node: failed to save short-term memory")
-
-    asyncio.create_task(_save_stm())
+    # Append this turn to the checkpointed conversation history.
+    # Include raw sub_results so follow-up queries can reuse previous data
+    # without re-calling any sub-agent.
+    existing_messages: list[dict] = state.get("messages") or []
+    messages_to_keep = existing_messages[-((_MAX_HISTORY_TURNS - 1)):]
+    new_message: dict[str, Any] = {
+        "query": state["query"],
+        "answer": combined[:2000],
+        "sub_results": sub_results,  # raw — forwarded to checkpoint for follow-up turns
+    }
 
     audit = get_audit()
     await audit.log(
@@ -283,13 +377,22 @@ async def merge_node(state: OrchestratorState) -> dict:
         {"answer_length": len(combined), "confidence": avg_confidence},
     )
 
-    return {"final_answer": combined, "confidence": avg_confidence}
+    return {
+        "final_answer": combined,
+        "confidence": avg_confidence,
+        "messages": messages_to_keep + [new_message],
+    }
 
 
 # ── Routing / conditional-edge helpers ────────────────────────────────────────
 
+
+
+
 def _hitl_decision(state: OrchestratorState) -> str:
-    return "hitl_wait_node" if state.get("hitl_status") == "pending" else "router_node"
+    if state.get("hitl_status") == "pending":
+        return "hitl_wait_node"
+    return "router_node"
 
 
 def _hitl_after_wait(state: OrchestratorState) -> str:
@@ -351,6 +454,7 @@ def build_graph(
     output_agents: "dict[str, BaseAgent] | None" = None,
     synthesis_agent: "BaseAgent | None" = None,
     intent_agent: "BaseAgent | None" = None,
+    checkpointer=None,
 ):
     """Build and compile the orchestrator StateGraph.
 
@@ -447,7 +551,10 @@ def build_graph(
     workflow.add_conditional_edges(
         "ambiguity_node",
         _hitl_decision,
-        {"hitl_wait_node": "hitl_wait_node", "router_node": "router_node"},
+        {
+            "hitl_wait_node": "hitl_wait_node",
+            "router_node": "router_node",
+        },
     )
     workflow.add_conditional_edges(
         "hitl_wait_node",
@@ -499,7 +606,7 @@ def build_graph(
     else:
         workflow.add_edge("merge_node", _end_target)
 
-    orchestrator_graph = workflow.compile()
+    orchestrator_graph = workflow.compile(checkpointer=checkpointer)
 
     # ── Write Mermaid diagrams at startup ──────────────────────────────────
     _write_mermaid(orchestrator_graph, "orchestrator_graph.mmd")

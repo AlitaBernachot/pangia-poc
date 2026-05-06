@@ -8,15 +8,22 @@ prompt: |
   clarifying questions. Return ONLY valid JSON:
     {"score": 0.0, "questions": []}
 
+  When a conversation history is provided (previous Human/AI turns), use it to
+  determine whether the current query is a follow-up referencing prior results.
+
   Scoring rules:
   - 0.0–0.3  Clear: the user names a specific dataset, event, year, place, or topic.
              No clarification needed even if wording is informal.
   - 0.3–0.6  Mild ambiguity: intent is guessable but one detail is missing.
              Return questions only if they would meaningfully change the result.
   - 0.6–1.0  Truly ambiguous: the request cannot be routed without human input
-             (e.g. bare pronouns, contradictory constraints, no topic at all).
+             (e.g. bare pronouns with NO conversation history, contradictory
+             constraints, no topic at all).
 
-  Critical: do NOT trigger HITL for queries that:
+  Critical: ALWAYS score 0.0 (no questions) for queries that:
+  - Are a follow-up to a previous turn in the conversation history
+    (use "ces données", "ces résultats", "parmi ces", "parmi eux", "filtre les",
+     "among those", "from these", "show only", "on those", etc.)
   - Reference a known dataset or event by name (e.g. "municipales 2026", "RPG 2023")
   - Ask to "show", "display", "fetch", or "retrieve" specific data
   - Contain a year, a place name, or a recognisable acronym
@@ -28,3 +35,7 @@ prompt: |
   - "données sur les communes"                         → 0.45 / ["Quelle année vous intéresse ?"]
   - "montre moi des trucs géographiques"               → 0.85 / ["Quel type de données ou territoire vous intéresse ?"]
   - "carte"                                            → 0.90 / ["Quel territoire et quelle thématique souhaitez-vous visualiser ?"]
+  # With conversation history (previous: "Où sont les webcams à Orléans ?"):
+  - "Parmi ces données, quelles sont celles en vue directe ?"  → 0.0 / []
+  - "filtre les résultats par statut actif"                    → 0.0 / []
+

@@ -373,15 +373,8 @@ class BaseAgent(ABC):
         async def execute_node(state: SubAgentState) -> dict:
             context: dict = dict(state.get("context") or {})
 
-            # ── Inject short-term memory as previous_turns ────────────────────
-            # memory_node loads STM into context["short_term"] each turn.
-            # We surface it as context["previous_turns"] (list, newest last)
-            # so every agent can reference the last N exchanges without
-            # knowing the STM internals.
-            stm: dict = context.get("short_term") or {}
-            history: list[dict] = stm.get("conversation_history") or []
-            if history:
-                context["previous_turns"] = history
+            # context["previous_turns"] is already populated by memory_node
+            # from the checkpointed state["messages"]; no further injection needed.
 
             inp = AgentInput(
                 query=state["query"],
@@ -397,10 +390,8 @@ class BaseAgent(ABC):
                 "violations": output.state.get("post_guardrail_violations", []),
                 "sources": [s.model_dump() for s in output.sources],
             }
-            # Forward any rich-data extras produced by the agent
-            # (dataviz, geojson, etc.) so the SSE layer can emit the appropriate
-            # frontend events.
-            for key in ("dataviz", "geojson", "ogc_layers"):
+            # Forward rich-data extras from the agent output state.
+            for key in ("dataviz", "geojson", "ogc_layers", "tabular_data"):
                 if key in output.state:
                     value = output.state[key]
                     # Normalise dataviz table keys: LLM sometimes uses tool
