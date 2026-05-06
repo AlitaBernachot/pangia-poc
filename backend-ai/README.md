@@ -45,7 +45,7 @@ This is the second-generation backend for PangIA. It adds guardrails, structured
     - [DataVizAgent](#datavizagent)
     - [MapVizAgent](#mapvizagent)
   - [Synthesis agent](#synthesis-agent)
-  - [DB client library (`libs/client/`)](#db-client-library-libsclient)
+  - [DB client library (`libs/clients/`)](#db-client-library-libsclients)
   - [data.gouv.fr MCP agent](#datagouvfr-mcp-agent)
     - [Capabilities](#capabilities)
     - [Dataset disambiguation via `request_choice`](#dataset-disambiguation-via-request_choice)
@@ -644,9 +644,9 @@ Key rules (enforced in the prompt):
 
 ---
 
-## DB client library (`libs/client/`)
+## DB client library (`libs/clients/`)
 
-The `libs/client/` package provides thin, async DB clients used by the connector agents. Each module is self-contained with lazy imports and a module-level singleton (pool / driver / connection) to avoid reconnecting on every request.
+The `libs/clients/` package provides thin, async DB clients used by the connector agents. Each module is self-contained with lazy imports and a module-level singleton (pool / driver / connection) to avoid reconnecting on every request.
 
 | Module | Data store | Key functions |
 |---|---|---|
