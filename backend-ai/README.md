@@ -45,6 +45,7 @@ This is the second-generation backend for PangIA. It adds guardrails, structured
     - [DataVizAgent](#datavizagent)
     - [MapVizAgent](#mapvizagent)
   - [Synthesis agent](#synthesis-agent)
+  - [Follow-up filter agent](#follow-up-filter-agent)
   - [DB client library (`libs/clients/`)](#db-client-library-libsclients)
   - [data.gouv.fr MCP agent](#datagouvfr-mcp-agent)
     - [Capabilities](#capabilities)
@@ -124,8 +125,10 @@ backend-ai/
         ├── source_registry.py      SourceRegistry loader + ChromaDB bootstrap
         ├── hitl.py                 HITLManager — asyncio.Future-based suspend/resume + per-session notification queues
         ├── sse_stream.py           run_graph_to_queue / drain_queue_to_sse
-        ├── model_config.py         Per-agent LLM provider/model resolution
-        ├── graph.py                AGENTS + OUTPUT_AGENTS + SYNTHESIS_AGENT registry; ORCHESTRATOR_GRAPH
+        ├── model_config.py         Per-agent LLM provider/model resolution; re-exports build_llm from provider_config
+        ├── provider_config.py      LLM provider registry (PROVIDER_CLASS_MAP) + build_llm factory
+        ├── checkpointer.py         AsyncPostgresSaver lifecycle — init/get/close (LangGraph state persistence)
+        ├── graph.py                AGENTS + OUTPUT_AGENTS + SYNTHESIS_AGENT registry; init_graph / get_graph
         ├── mermaid_graph/          Auto-generated LangGraph Mermaid diagrams (written at startup)
         └── agents/
             ├── base_agents/                Base agent package (abstract classes + mixins)
@@ -150,7 +153,8 @@ backend-ai/
             ├── humanoutput_agent.py    HumanOutputAgent — post-processing: decides needs_map / needs_dataviz
             ├── dataviz_agent.py        DataVizAgent — post-processing: chart / KPI / table structures
             ├── mapviz_agent.py         MapVizAgent — post-processing: GeoJSON extraction
-            └── synthesis_agent.py      SynthesisAgent — final node: rewrites raw results into a clean answer
+            ├── synthesis_agent.py      SynthesisAgent — final node: rewrites raw results into a clean answer
+            └── followup_filter_agent.py FollowupFilterAgent — answers follow-up questions on previously fetched data
 ```
 
 ---
@@ -161,17 +165,20 @@ backend-ai/
 __start__
     │
     ▼
-memory_node            ← loads LTM (pgvector) + STM (Redis) into context
+memory_node            ← loads LTM (pgvector) + conversation history (checkpoint) into context
     │
     ▼
 title_node             ← generates a short session title (first turn only, non-blocking)
+                         + a session phrase every turn
     │
     ▼
 intent_node            ← IntentParserAgent: extracts action, entity_concept, filters, geo_scope
     │                      into state["context"]["intent"] for downstream agents
+    │                      sets is_followup=True when query references previous results
     │
     ▼
-ambiguity_node         ← LLM scores query ambiguity (0–1)
+ambiguity_node         ← LLM scores query ambiguity (0–1); skipped when is_followup=True
+    │                      or when previous conversation turns exist
     │
     ├──[pending]──► hitl_wait_node   ← suspends graph; awaits human clarification
     │                   │
@@ -179,6 +186,8 @@ ambiguity_node         ← LLM scores query ambiguity (0–1)
     │            [resolved]──► router_node
     │
     └──[clear]──► router_node        ← SmartDispatcher (or LLM DynamicRouter)
+                                       fast-path: is_followup=True + previous data
+                                       → routes directly to followup_filter_agent
                       │
                 [Send fan-out — parallel]
                 │       │       │
@@ -221,6 +230,7 @@ The Mermaid diagram is written to `app/pangiagent/mermaid_graph/orchestrator_gra
 | `vector_chroma_agent` | `VectorChromaAgent` | ChromaDB similarity search → LLM synthesis | ✓ |
 | `datagouv_mcp_agent` | `DataGouvMCPAgent` | French open-data (data.gouv.fr MCP) | ✓ |
 | `geonetwork_mcp_agent` | `GeoNetworkMCPAgent` | Geospatial metadata (GeoNetwork MCP) | ✓ |
+| `followup_filter_agent` | `FollowupFilterAgent` | Filters / counts / aggregates previously fetched data to answer follow-up questions | ✓ |
 | `humanoutput_agent` | `HumanOutputAgent` | Decides needs_map / needs_dataviz | No (post-processing) |
 | `dataviz_agent` | `DataVizAgent` | Builds chart / KPI / table structures | No (post-processing) |
 | `mapviz_agent` | `MapVizAgent` | Extracts GeoJSON FeatureCollection | No (post-processing) |
@@ -230,7 +240,7 @@ The Mermaid diagram is written to `app/pangiagent/mermaid_graph/orchestrator_gra
 
 ## BaseAgent — the reusable base class
 
-**File:** `app/pangiagent/agents/base_agent.py`
+**File:** `app/pangiagent/agents/base_agents/base_agent.py`
 
 All sub-agents that participate in the orchestrator fan-out **must** inherit from `BaseAgent`.
 
@@ -544,6 +554,15 @@ Stores the last query and answer per session. Injected into agent context at the
 
 Stores factual information extracted from previous conversations as vector embeddings. Searched via cosine similarity at the start of each request (top-5 facts). Populated by the agents themselves when they identify reusable facts.
 
+### Conversation history (LangGraph checkpointer)
+
+**Backend:** PostgreSQL · **Tables:** `checkpoint_*` (created automatically by `AsyncPostgresSaver.setup()`)  
+**Module:** `app/pangiagent/checkpointer.py`
+
+The full orchestrator graph state is persisted between turns using LangGraph's `AsyncPostgresSaver` (`psycopg3` connection pool). This enables true multi-turn conversations: `memory_node` reads the last 3 turns (capped at 20) from the checkpointed `messages` list, and `followup_filter_agent` can access `previous_sub_results` from the previous turn without re-calling any sub-agent.
+
+The checkpointer is initialised once at startup via `await init_graph()` in the FastAPI lifespan handler and uses the same `POSTGRES_DSN` as the audit log.
+
 ---
 
 ## Audit trail
@@ -644,6 +663,34 @@ Key rules (enforced in the prompt):
 
 ---
 
+## Follow-up filter agent
+
+**File:** `app/pangiagent/agents/followup_filter_agent.py`
+
+Handles follow-up questions about data already fetched during a previous turn — e.g. *"combien y en a-t-il à Ingré ?"* or *"parmi ces caméras, lesquelles sont en vue directe ?"*.
+
+It is a normal `BaseAgent` registered in the fan-out like any other connector agent.
+
+### Routing conditions
+
+`router_node` routes directly to `followup_filter_agent` (bypassing the dispatcher) when **both** conditions hold:
+
+1. `context["intent"]["is_followup"]` is `True` — set by `IntentParserAgent` when it detects a back-reference.
+2. `context["previous_sub_results"]` is non-empty — raw results from the previous turn, stored in the LangGraph checkpoint.
+
+A safety override also triggers the route when `intent.action` is `filter` or `count` and previous data is present, even if the LLM missed the `is_followup` flag.
+
+### How it works
+
+1. Reads `tabular_data` (columns + rows) from `previous_sub_results`.
+2. Sends the data (up to 500 rows) + the user's question to the LLM.
+3. The LLM filters / counts / aggregates and returns a structured JSON `{answer, columns, rows, total_rows}`.
+4. Returns an `AgentOutput` with `tabular_data` set for the `dataviz_node` to render.
+
+When no previous tabular data is found, the agent returns gracefully with a French error message and confidence `0.0`.
+
+---
+
 ## DB client library (`libs/clients/`)
 
 The `libs/clients/` package provides thin, async DB clients used by the connector agents. Each module is self-contained with lazy imports and a module-level singleton (pool / driver / connection) to avoid reconnecting on every request.
@@ -713,9 +760,11 @@ After fetching files, the agent appends a `**Téléchargement :**` Markdown bloc
 | Event | Description |
 |---|---|
 | `session_title` | Short title generated by TitleAgent for the current conversation |
+| `session_phrase` | Descriptive phrase for the current query (generated every turn by TitleAgent) |
 | `session` | Session ID assigned for this conversation |
 | `status` | "Processing your request…" |
 | `memory_access` | LTM facts + STM data loaded |
+| `intent_parsed` | Structured intent produced by IntentParserAgent (action, concept, filters, geo_scope, is_followup) |
 | `hitl_request` | Ambiguous query — show HITL clarification UI |
 | `hitl_resolved` | Human responded — execution resuming |
 | `hitl_timeout` | No response within timeout |
@@ -727,6 +776,7 @@ After fetching files, the agent appends a `**Téléchargement :**` Markdown bloc
 | `tool_end` | A tool call completed inside a sub-agent |
 | `dataviz` | Chart / KPI / table payload |
 | `geojson` | GeoJSON FeatureCollection |
+| `ogc_layer` | OGC/WFS/WMS layer list (from sub-agents or mapviz_node) |
 | `output_decision` | `{needs_map, needs_dataviz}` from HumanOutputAgent |
 | `choice_request` | Agent needs user to pick an item (dataset, result, …) |
 | `final_answer` | Merged + synthesised final answer |
@@ -801,15 +851,18 @@ After fetching files, the agent appends a `**Téléchargement :**` Markdown bloc
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | — | Required for LLM calls |
-| `MODEL_PROVIDER` | `openai` | Global LLM provider (`openai`, `anthropic`, `ollama`) |
+| `OPENAI_API_KEY` | — | Required for LLM calls when using OpenAI |
+| `MODEL_PROVIDER` | `openai` | Global LLM provider (`openai`, `anthropic`, `mistral`, `ollama`, `openrouter`, `googleai`) |
 | `MODEL_NAME` | `gpt-4o-mini` | Global LLM model name |
 | `OPENAI_TEMPERATURE` | `0.0` | LLM temperature |
 | `ANTHROPIC_API_KEY` | — | Required if using Anthropic models |
 | `MISTRAL_API_KEY` | — | Required if using Mistral models |
+| `OPENROUTER_API_KEY` | — | Required if using OpenRouter (`MODEL_PROVIDER=openrouter`) |
+| `KAGGLE_USERNAME` | — | Kaggle username — required if using Google AI / Gemma (`MODEL_PROVIDER=googleai`) |
+| `KAGGLE_KEY` | — | Kaggle API key — required if using Google AI / Gemma |
 | `OLLAMA_BASE_URL` | `http://ollama:11434` | Ollama base URL (local models) |
-| `POSTGRES_DSN` | `postgresql+asyncpg://pangia2:pangia2-password@postgres2:5432/pangia2` | Audit + LTM database |
-| `REDIS_URL` | `redis://redis:6379` | Redis (STM + HITL state) |
+| `POSTGRES_DSN` | `postgresql+asyncpg://pangia2:pangia2-password@postgres2:5432/pangia2` | Audit + LTM + LangGraph checkpoint database |
+| `REDIS_URL` | `redis://redis:6379` | Redis (HITL / choice state) |
 | `SESSION_TTL_SECONDS` | `3600` | Short-term memory TTL |
 | `HITL_TIMEOUT_SECONDS` | `120` | Seconds before HITL or choice request times out |
 | `HITL_AMBIGUITY_THRESHOLD` | `0.8` | Ambiguity score threshold that triggers HITL |
@@ -833,6 +886,7 @@ After fetching files, the agent appends a `**Téléchargement :**` Markdown bloc
 ```env
 NEO4J_AGENT_MODEL_PROVIDER=openai
 NEO4J_AGENT_MODEL_NAME=gpt-4o
+NEO4J_AGENT_TEMPERATURE=0.0
 DATAGOUV_MCP_AGENT_MODEL_PROVIDER=anthropic
 DATAGOUV_MCP_AGENT_MODEL_NAME=claude-3-5-sonnet-latest
 ```
