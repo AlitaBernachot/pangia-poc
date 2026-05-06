@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # startup – run database seeds if enabled
+    # Startup – run database seeds if enabled
     settings = get_settings()
     if settings.seed_db:
         logger.info("SEED_DB=true – running database seeds …")
@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
         except Exception:
             logger.exception("Database seeding failed – continuing startup anyway.")
     yield
-    # shutdown – close all data-store connections
+    # Shutdown – close all data-store connections
     await close_driver()
     await close_pool()
     await close_chroma()
