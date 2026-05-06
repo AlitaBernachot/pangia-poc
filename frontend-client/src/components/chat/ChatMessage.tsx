@@ -97,6 +97,13 @@ export function ChatMessage({ message, onSubmitChoice, onPrefillPrompt, isStream
   return (
     <div className="flex gap-3 items-start">
       <div className="flex flex-col gap-2.5 min-w-0 flex-1">
+        {/* Session phrase — descriptive one-liner shown at the start of the first turn */}
+        {message.sessionPhrase && (
+          <p className="text-sm text-white/70 leading-snug">
+            {message.sessionPhrase}
+          </p>
+        )}
+
         {/* Routing chips */}
         {message.routingAgents && message.routingAgents.length > 0 && (
           <div className="flex items-center flex-wrap gap-1.5">

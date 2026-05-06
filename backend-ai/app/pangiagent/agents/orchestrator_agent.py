@@ -40,6 +40,7 @@ and every sub-agent subgraph are written to
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from pathlib import Path
@@ -133,16 +134,26 @@ async def memory_node(state: OrchestratorState) -> dict:
 
 
 async def title_node(state: OrchestratorState) -> dict:
-    """Generate a short session title from the user's first query.
+    """Generate session metadata from the user's query.
 
-    Only runs on the first turn of a session (when ``session_title`` is still
-    empty).  On subsequent turns the existing title is preserved.
+    - ``session_title``: generated once (first turn only) — a 4-6 word title.
+    - ``session_phrase``: generated every turn — a descriptive sentence for the
+      current query, shown in the chat UI above the routing chips.
     """
-    if state.get("session_title"):
-        return {}
     agent = TitleAgent()
-    title = await agent.generate(state["query"])
-    return {"session_title": title}
+    has_title = bool(state.get("session_title"))
+
+    if has_title:
+        # Subsequent turns: only refresh the phrase
+        phrase = await agent.generate_phrase(state["query"])
+        return {"session_phrase": phrase}
+
+    # First turn: generate both in parallel
+    title, phrase = await asyncio.gather(
+        agent.generate(state["query"]),
+        agent.generate_phrase(state["query"]),
+    )
+    return {"session_title": title, "session_phrase": phrase}
 
 
 async def ambiguity_node(state: OrchestratorState) -> dict:

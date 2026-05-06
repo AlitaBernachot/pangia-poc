@@ -186,5 +186,12 @@
     "list_dataset_resources":         "Liste des ressources",
     "get_resource_info":              "Infos ressource",
     "query_resource_data":            "Aperçu des données"
+  },
+  "externalLink": {
+    "title": "Ouverture d'un lien externe",
+    "warning": "Vous êtes sur le point de naviguer vers un site web externe. L'origine et la sécurité de ce lien sont inconnues.",
+    "url": "URL",
+    "continue": "Continuer",
+    "cancel": "Annuler"
   }
 }

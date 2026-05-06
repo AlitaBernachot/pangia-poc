@@ -3,13 +3,16 @@
 // SPDX-License-Identifier: MIT
 
 import { useState } from 'react'
+import { ExternalLink } from 'lucide-react'
 import type { DataVizTable } from '../../types'
+import { ExternalLinkModal } from '../common/ExternalLinkModal'
 
 const PAGE_SIZE = 50
 
 const IMAGE_URL_RE = /^https?:\/\/.+\.(jpe?g|png|gif|webp|svg)(\?.*)?$/i
+const URL_RE = /^https?:\/\//i
 
-function CellContent({ value }: { value: string | number }) {
+function CellContent({ value, onLinkClick }: { value: string | number; onLinkClick: (url: string) => void }) {
   const s = String(value)
   if (IMAGE_URL_RE.test(s)) {
     return (
@@ -22,6 +25,18 @@ function CellContent({ value }: { value: string | number }) {
       />
     )
   }
+  if (URL_RE.test(s)) {
+    return (
+      <button
+        type="button"
+        onClick={() => onLinkClick(s)}
+        className="inline-flex items-center gap-0.5 text-blue-400 hover:text-blue-300 underline underline-offset-2 break-all text-left cursor-pointer"
+      >
+        <span className="min-w-48">{s}</span>
+        <ExternalLink size={10} className="shrink-0 opacity-70" />
+      </button>
+    )
+  }
   return <>{s}</>
 }
 
@@ -31,6 +46,7 @@ interface Props {
 
 export function TableViewer({ table }: Props) {
   const [page, setPage] = useState(0)
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null)
   const totalPages = Math.ceil(table.rows.length / PAGE_SIZE)
   const visibleRows = table.rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
@@ -52,7 +68,7 @@ export function TableViewer({ table }: Props) {
     URL.revokeObjectURL(url)
   }
 
-  return (
+  return (<>
     <div className="rounded-xl border border-white/10 bg-white/3 overflow-hidden">
       {/* Header */}
       <div className="flex items-center px-3 py-2 border-b border-white/8">
@@ -85,7 +101,7 @@ export function TableViewer({ table }: Props) {
               <tr key={i} className="border-b border-white/5 last:border-0">
                 {row.map((cell, j) => (
                   <td key={j} className="text-white/75 py-1 px-2">
-                    <CellContent value={cell} />
+                    <CellContent value={cell} onLinkClick={setPendingUrl} />
                   </td>
                 ))}
               </tr>
@@ -139,5 +155,12 @@ export function TableViewer({ table }: Props) {
         )}
       </div>
     </div>
-  )
+    {pendingUrl && (
+      <ExternalLinkModal
+        url={pendingUrl}
+        onConfirm={() => { window.open(pendingUrl, '_blank', 'noopener,noreferrer'); setPendingUrl(null) }}
+        onCancel={() => setPendingUrl(null)}
+      />
+    )}
+  </>)
 }

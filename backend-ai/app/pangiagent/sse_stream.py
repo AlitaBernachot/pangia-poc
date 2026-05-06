@@ -140,6 +140,9 @@ async def run_graph_to_queue(
                 title = out.get("session_title", "")
                 if title:
                     await queue.put(_sse({"type": "session_title", "title": title}))
+                phrase = out.get("session_phrase", "")
+                if phrase:
+                    await queue.put(_sse({"type": "session_phrase", "phrase": phrase}))
 
             # ── memory_node end ──────────────────────────────────────────────
             if kind == "on_chain_end" and node == "memory_node":

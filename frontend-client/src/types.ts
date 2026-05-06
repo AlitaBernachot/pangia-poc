@@ -90,6 +90,7 @@ export interface Message {
   role: 'user' | 'assistant'
   content: string
   streaming?: boolean
+  sessionPhrase?: string
   routingAgents?: string[]
   agentActivity?: AgentActivity[]
   geojson?: Record<string, unknown> | null

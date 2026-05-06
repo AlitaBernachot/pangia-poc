@@ -81,51 +81,6 @@ class FollowupFilterAgent(BaseAgent):
                     return td
         return None
 
-    @staticmethod
-    def _extract_geojson(sub_results: dict[str, Any]) -> dict[str, Any] | None:
-        """Return the first GeoJSON FeatureCollection found in any sub_result value."""
-        for result in sub_results.values():
-            if isinstance(result, dict):
-                gj = result.get("geojson")
-                if isinstance(gj, dict) and gj.get("type") == "FeatureCollection":
-                    return gj
-        return None
-
-    @staticmethod
-    def _filter_geojson(
-        original_geojson: dict[str, Any],
-        filtered_rows: list[list],
-        cols: list[str],
-    ) -> dict[str, Any] | None:
-        """Keep only GeoJSON features whose properties match at least one filtered row.
-
-        Matching strategy: build a set of (col, value) pairs from the filtered rows
-        and keep features where ANY unique-looking property value appears in that set.
-        """
-        if not filtered_rows or not original_geojson.get("features"):
-            return None
-
-        # Build a lookup: set of (column_name, str_value) from the filtered rows
-        filtered_props: set[tuple[str, str]] = set()
-        for row in filtered_rows:
-            for col, val in zip(cols, row):
-                if val and str(val) not in ("", "None", "null"):
-                    filtered_props.add((col.lower(), str(val).strip()))
-
-        kept: list[dict] = []
-        for feature in original_geojson["features"]:
-            props = feature.get("properties") or {}
-            for prop_key, prop_val in props.items():
-                if prop_val is None:
-                    continue
-                if (prop_key.lower(), str(prop_val).strip()) in filtered_props:
-                    kept.append(feature)
-                    break
-
-        if not kept:
-            return None
-        return {"type": "FeatureCollection", "features": kept}
-
     async def _run(self, inp: AgentInput) -> AgentOutput:
         previous_sub_results: dict[str, Any] = inp.context.get("previous_sub_results") or {}
         tabular_data = self._extract_tabular_data(previous_sub_results)
@@ -184,30 +139,12 @@ class FollowupFilterAgent(BaseAgent):
             "format": fmt_label,
         }
 
-        # Filter the original GeoJSON to only keep features matching the filtered rows
-        original_geojson = self._extract_geojson(previous_sub_results)
-        filtered_geojson: dict[str, Any] | None = None
-        if original_geojson and result_rows:
-            filtered_geojson = self._filter_geojson(original_geojson, result_rows, result_cols)
-            logger.info(
-                "FollowupFilterAgent: filtered GeoJSON %d → %d features",
-                len(original_geojson.get("features") or []),
-                len((filtered_geojson or {}).get("features") or []),
-            )
-
-        extra_state: dict[str, Any] = {
-            "tabular_data": result_tabular,
-            "output_decision": {
-                "needs_map": bool(filtered_geojson),
-                "needs_dataviz": bool(result_rows),
-            },
-        }
-        if filtered_geojson:
-            extra_state["geojson"] = filtered_geojson
-
         return AgentOutput(
             agent_name=self.name,
             answer=answer,
             confidence=0.95,
-            state=extra_state,
+            state={
+                "tabular_data": result_tabular,
+                "output_decision": {"needs_map": False, "needs_dataviz": bool(result_rows)},
+            },
         )
