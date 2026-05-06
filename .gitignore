@@ -15,6 +15,12 @@ backend/app/**/__pycache__/
 .mypy_cache/
 .ruff_cache/
 
+# Notebooks
+**/.ipynb_checkpoints/
+
+# Données crawlées (non commitées, voir notebooks/)
+data/
+
 # OS
 .DS_Store
 Thumbs.db
