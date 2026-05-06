@@ -19,6 +19,8 @@ from app.api.routes.chat import router as chat_router
 from app.api.routes.suggestions import router as suggestions_router
 from app.config import get_settings
 from app.db import close_engine
+from app.pangiagent.checkpointer import close_checkpointer
+from app.pangiagent.graph import init_graph
 from app.pangiagent.memory import close_redis
 from app.pangiagent.source_registry import bootstrap_registry_embeddings
 
@@ -42,6 +44,7 @@ async def lifespan(app: FastAPI):
         await bootstrap_registry_embeddings()
     except Exception:
         logger.warning("lifespan: bootstrap_registry_embeddings failed — continuing without ChromaDB routing", exc_info=True)
+    await init_graph()
     print(
         "\n"
         "██████╗  █████╗ ███╗   ██╗ ██████╗ ██╗  █████╗ \n"
@@ -56,6 +59,7 @@ async def lifespan(app: FastAPI):
     yield
     await close_engine()
     await close_redis()
+    await close_checkpointer()
 
 
 def create_app() -> FastAPI:

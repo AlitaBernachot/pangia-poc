@@ -133,7 +133,7 @@ export function AgentActivityPanel({ activity, isLast = false }: Props) {
 
         {/* Expandable content */}
         {showContent && (
-          <div className="mt-1.5 space-y-2">
+          <div className="mt-1.5 space-y-2 max-h-60 overflow-y-auto">
             {/* Phase steps — only when expanded */}
             {!collapsed && phasedSteps.length > 0 && (
               <div className="flex flex-col gap-1">

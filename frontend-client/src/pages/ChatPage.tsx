@@ -10,9 +10,10 @@ import type { Attachment } from '../types'
 
 interface Props {
   onSessionTitle?: (title: string) => void
+  onSessionId?: (id: string | null) => void
 }
 
-export function ChatPage({ onSessionTitle }: Props) {
+export function ChatPage({ onSessionTitle, onSessionId }: Props) {
   const {
     messages,
     isStreaming,
@@ -28,6 +29,7 @@ export function ChatPage({ onSessionTitle }: Props) {
     submitHitlResponse,
     submitChoiceResponse,
     sessionTitle,
+    sessionId,
   } = usePangiaChat()
 
   const [prefillText, setPrefillText] = useState<string | undefined>(undefined)
@@ -36,10 +38,14 @@ export function ChatPage({ onSessionTitle }: Props) {
     fetchAgents()
   }, [fetchAgents])
 
-  // Propagate title to parent (App.tsx) whenever it changes
+  // Propagate title and session id to parent (App.tsx) whenever they change
   useEffect(() => {
     onSessionTitle?.(sessionTitle)
   }, [sessionTitle, onSessionTitle])
+
+  useEffect(() => {
+    onSessionId?.(sessionId)
+  }, [sessionId, onSessionId])
 
   const handleSubmit = (text: string, _attachments: Attachment[]) => {
     sendMessage(text)

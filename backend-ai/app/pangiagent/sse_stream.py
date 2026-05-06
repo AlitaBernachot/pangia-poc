@@ -126,7 +126,11 @@ async def run_graph_to_queue(
     notif_task = asyncio.create_task(_forward_notifications())
 
     try:
-        async for event in graph.astream_events(initial_state, version="v2"):
+        async for event in graph.astream_events(
+            initial_state,
+            version="v2",
+            config={"configurable": {"thread_id": session_id}},
+        ):
             kind: str = event.get("event", "")
             node: str = _node_name(event)
 
@@ -136,18 +140,21 @@ async def run_graph_to_queue(
                 title = out.get("session_title", "")
                 if title:
                     await queue.put(_sse({"type": "session_title", "title": title}))
+                phrase = out.get("session_phrase", "")
+                if phrase:
+                    await queue.put(_sse({"type": "session_phrase", "phrase": phrase}))
 
             # ── memory_node end ──────────────────────────────────────────────
             if kind == "on_chain_end" and node == "memory_node":
                 out = _output(event)
                 ctx: dict[str, Any] = out.get("context", {})
                 facts = ctx.get("long_term_facts", [])
-                stm = ctx.get("short_term", {})
-                if facts or stm:
+                previous_turns = ctx.get("previous_turns", [])
+                if facts or previous_turns:
                     await queue.put(_sse({
                         "type": "memory_access",
                         "long_term_facts": facts,
-                        "short_term": stm,
+                        "previous_turns": len(previous_turns),
                     }))
 
             # ── intent_node end → emit parsed intent for frontend debug/display ──
@@ -203,6 +210,7 @@ async def run_graph_to_queue(
             elif kind == "on_chain_start" and node in (
                 "synthesis_node",
                 "humanoutput_node", "dataviz_node", "mapviz_node",
+                "followup_filter_agent",
             ):
                 await queue.put(_sse({"type": "agent_start", "agent": node}))
 
@@ -274,13 +282,17 @@ async def run_graph_to_queue(
                         "violations": result.get("violations", []),
                         "error": result.get("error"),
                     }))
-                    # ── Rich-data extras forwarded from AgentOutput.state ──────
-                    if "dataviz" in result:
-                        await queue.put(_sse({"type": "dataviz", "data": result["dataviz"]}))
-                    if "geojson" in result:
-                        await queue.put(_sse({"type": "geojson", "data": result["geojson"]}))
-                    if "ogc_layers" in result:
-                        await queue.put(_sse({"type": "ogc_layer", "layers": result["ogc_layers"]}))
+                # ── Rich-data extras: only emit for the agent that just ran ────
+                # sub_results may contain accumulated results from previous turns
+                # (due to _merge_dicts reducer). Using `node` (the subgraph name)
+                # ensures we only emit fresh data, never stale previous-turn data.
+                current_result = sub_results.get(node, {})
+                if "dataviz" in current_result:
+                    await queue.put(_sse({"type": "dataviz", "data": current_result["dataviz"]}))
+                if "geojson" in current_result:
+                    await queue.put(_sse({"type": "geojson", "data": current_result["geojson"]}))
+                if "ogc_layers" in current_result:
+                    await queue.put(_sse({"type": "ogc_layer", "layers": current_result["ogc_layers"]}))
 
             # ── merge_node end → final_answer (fallback when no synthesis node) ──
             # When a synthesis_node is wired, it will emit the real final_answer

@@ -799,21 +799,17 @@ class DataGouvMCPAgent(BaseReActAgent, BaseAddSourcesAgent):
                 len(sorted_svcs), sorted_svcs[0]["type"] if sorted_svcs else "none",
             )
 
-        # Tabular dataviz
+        # Tabular data — forward raw columns/rows for humanoutput/dataviz agents
         if tabular_data is not None:
             columns = tabular_data["columns"]
             all_rows = tabular_data["rows"]
             total = tabular_data.get("total_rows", len(all_rows))
-            fmt_label = tabular_data.get("format", "data").upper()
             if total > 0 and columns and all_rows:
-                extra_state["dataviz"] = {
-                    "charts": [],
-                    "kpis": [],
-                    "tables": [{
-                        "title": f"Données complètes ({total} enregistrements) [{fmt_label}]",
-                        "columns": columns,
-                        "rows": [[str(row.get(col, "")) for col in columns] for row in all_rows],
-                    }],
+                extra_state["tabular_data"] = {
+                    "columns": columns,
+                    "rows": [[str(row.get(col, "")) for col in columns] for row in all_rows],
+                    "total_rows": total,
+                    "format": tabular_data.get("format", "data"),
                 }
 
         output = AgentOutput(

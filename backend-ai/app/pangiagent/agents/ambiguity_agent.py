@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import logging
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.pangiagent.agents.base_agents.base_agent import _load_prompt_file
 from app.pangiagent.model_config import build_llm, get_agent_model_config
@@ -43,21 +43,20 @@ class AmbiguityAgent:
         self._threshold = settings.hitl_ambiguity_threshold
         self._system_prompt = _load_prompt_file("ambiguity_agent") or self._DEFAULT_PROMPT
 
-    async def detect(self, query: str) -> tuple[float, list[str]]:
+    async def detect(self, query: str, previous_turns: list[dict] | None = None) -> tuple[float, list[str]]:
         """Score *query* for ambiguity.
 
-        Returns
-        -------
-        tuple[float, list[str]]
-            ``(score, clarifying_questions)`` where *score* is in [0, 1]
-            (0 = clear, 1 = very ambiguous).  *clarifying_questions* is
-            empty when the score is below the threshold or on parse error.
+        When *previous_turns* is provided, they are injected as conversation
+        history so the LLM can recognise follow-up queries as unambiguous
+        references to prior results.
         """
+
         try:
-            messages = [
-                SystemMessage(content=self._system_prompt),
-                HumanMessage(content=f"Query: {query}\n\nReturn ONLY the JSON."),
-            ]
+            messages: list = [SystemMessage(content=self._system_prompt)]
+            for turn in (previous_turns or [])[-3:]:
+                messages.append(HumanMessage(content=turn.get("query", "")))
+                messages.append(AIMessage(content=turn.get("answer", "")))
+            messages.append(HumanMessage(content=f"Query: {query}\n\nReturn ONLY the JSON."))
             response = await self._llm.ainvoke(messages)
             content = str(response.content).strip()
             if content.startswith("```"):

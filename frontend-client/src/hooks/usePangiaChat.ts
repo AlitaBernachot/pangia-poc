@@ -117,6 +117,8 @@ export function usePangiaChat() {
               setSessionId(event.session_id as string)
             } else if (type === 'session_title') {
               setSessionTitle(event.title as string)
+            } else if (type === 'session_phrase') {
+              updateAssistant((m) => ({ ...m, sessionPhrase: event.phrase as string }))
             } else if (type === 'routing') {
               const agents = event.agents as string[]
               updateAssistant((m) => ({ ...m, routingAgents: agents }))
@@ -227,17 +229,17 @@ export function usePangiaChat() {
             } else if (type === 'ogc_layer') {
               updateAssistant((m) => ({
                 ...m,
-                ogcLayers: event.layers as OgcLayer[],
+                ogcLayers: (event.layers as OgcLayer[] | null) ?? undefined,
               }))
             } else if (type === 'geojson') {
               updateAssistant((m) => ({
                 ...m,
-                geojson: event.data as Record<string, unknown>,
+                geojson: (event.data as Record<string, unknown> | null) ?? undefined,
               }))
             } else if (type === 'dataviz') {
               updateAssistant((m) => ({
                 ...m,
-                dataviz: event.data as DataVizPayload,
+                dataviz: (event.data as DataVizPayload | null) ?? undefined,
               }))
             } else if (type === 'dataset_choice') {
               const agentName = event.agent as string

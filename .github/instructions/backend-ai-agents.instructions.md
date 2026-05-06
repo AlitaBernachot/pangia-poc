@@ -157,3 +157,83 @@ Whenever a new agent is added to `backend-ai/app/pangiagent/agents/`, **always**
 - Add the file to the architecture tree under `agents/`.
 - Add a row to the relevant table (Mermaid diagram list, capability descriptions, etc.) if applicable.
 - Describe the agent's purpose and any configuration or environment variables it requires.
+
+---
+
+## Architectural rules — separation of concerns
+
+### No hardcoding
+
+Never hardcode agent names, data keys, or routing logic outside of the module that owns them.
+
+- Agent names are defined once as `name = "..."` on the class and nowhere else.
+- Routing decisions belong in `router_node` or `_hitl_decision` — not scattered across nodes.
+- Data keys like `"tabular_data"`, `"dataviz"`, `"geojson"` are only referenced in the agents that produce or consume them, never in orchestration code.
+
+### Never use regex or keyword lists for linguistic understanding
+
+Any detection that depends on the meaning of natural language — intent classification,
+back-reference resolution, follow-up detection, entity extraction — **must** use an LLM.
+
+**Forbidden patterns:**
+
+```python
+# BAD — fragile, language-specific, unmaintainable
+if re.search(r"\b(parmi|ces|ceux|among)\b", query):
+    ...
+
+FOLLOWUP_WORDS = ["parmi", "ces", "ceux", "lesquelles"]
+if any(w in query.lower() for w in FOLLOWUP_WORDS):
+    ...
+```
+
+**Correct approach:** extend or improve the relevant LLM prompt (e.g. `intent_parser_agent.yaml`)
+with better instructions, examples, and rules. The system must work in all languages without
+hardcoded vocabulary.
+
+This applies everywhere: orchestrator nodes, router, agents, guardrails, utility functions.
+
+### The orchestrator is a traffic controller, not a data inspector
+
+`orchestrator_agent.py` must remain agnostic of what is inside `sub_results`.
+
+**Allowed in the orchestrator:**
+- Knowing that `sub_results` is a `dict[str, Any]` and whether it is empty or not.
+- Knowing that `context["previous_sub_results"]` exists and is non-empty.
+- Knowing that `intent["is_followup"]` is `True` or `False`.
+
+**Forbidden in the orchestrator:**
+- Reading or checking any key inside a sub_result value (`tabular_data`, `dataviz`, `geojson`, `ogc_layers`, `rows`, `columns`, …).
+- Making routing decisions based on the content of sub_result values.
+- Building, transforming, or merging data structures (tables, charts, GeoJSON) directly in a node function.
+
+### Every data domain has a single owner
+
+| Data key | Owner (only this file may read/write it) |
+|---|---|
+| `tabular_data` | `followup_filter_agent.py`, `datagouv_mcp_agent.py`, `dataviz_agent.py` |
+| `dataviz` | `dataviz_agent.py`, `humanoutput_agent.py` (decides), `dataviz_node` (reads for final output) |
+| `geojson` / `ogc_layers` | `mapviz_agent.py`, agents that produce geographic output |
+| `output_decision` | `humanoutput_agent.py` (writes), `_after_humanoutput` edge (reads) |
+| `previous_sub_results` | `memory_node` (writes), `followup_filter_agent.py` (reads) |
+
+### Routing is the router's job
+
+`router_node` is the single place that decides which agents to call. If a special condition requires a different agent (e.g. follow-up queries), implement it as a short-circuit **inside `router_node`**, not as an extra conditional edge from another node.
+
+```python
+# CORRECT — short-circuit inside router_node
+if intent.get("is_followup") and ctx.get("previous_sub_results"):
+    return {"agents_to_call": ["followup_filter_agent"], ...}
+
+# WRONG — adding a new branch in _hitl_decision or build_graph
+if previous_turns and has_something:
+    return "some_special_node"
+```
+
+### Agents communicate through sub_results, not through state keys
+
+An agent must not read another agent's internal state keys directly.
+All inter-agent data flows through `sub_results[agent_name][key]`.
+The only exceptions are the final output fields (`dataviz`, `geojson`, `ogc_layers`) that the post-processing agents write to top-level state.
+

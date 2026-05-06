@@ -44,7 +44,7 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.models import AgentInput, AgentOutput
 from app.pangiagent.agents.base_agents.base_agent import BaseAgent
@@ -179,6 +179,7 @@ def _parse_response(raw: str) -> dict[str, Any]:
         "filters": clean_filters,
         "geo_scope": str(obj.get("geo_scope", "")).strip(),
         "needs_map": bool(obj.get("needs_map", False)),
+        "is_followup": bool(obj.get("is_followup", False)),
     }
 
 
@@ -213,27 +214,36 @@ class IntentParserAgent(BaseAgent):
             state={"intent": parsed},
         )
 
-    async def parse(self, query: str) -> dict[str, Any]:
+    async def parse(self, query: str, previous_turns: list[dict] | None = None) -> dict[str, Any]:
         """Parse *query* and return a structured intent dict.
+
+        When *previous_turns* is provided (list of ``{query, answer}`` dicts,
+        newest last), they are injected as conversation history so the LLM can
+        resolve referential expressions like "ces données", "parmi ces résultats",
+        "filtre les", etc.
 
         Returns a best-effort dict even on LLM or parsing errors (fallback to
         ``action=display``, ``entity_concept=query``).
         """
         try:
             llm = build_llm(get_agent_model_config(self.name))
-            messages = [
-                SystemMessage(content=self._system_prompt),
-                HumanMessage(content=query),
-            ]
+            messages = [SystemMessage(content=self._system_prompt)]
+            # Inject the last 3 turns as alternating Human/AI messages so the
+            # LLM can resolve back-references ("ces données", "parmi eux", …).
+            for turn in (previous_turns or [])[-3:]:
+                messages.append(HumanMessage(content=turn.get("query", "")))
+                messages.append(AIMessage(content=turn.get("answer", "")))
+            messages.append(HumanMessage(content=query))
             response = await llm.ainvoke(messages)
             raw = (response.content or "").strip()
             parsed = _parse_response(raw)
             logger.info(
-                "IntentParserAgent: action=%r concept=%r filters=%s geo=%r",
+                "IntentParserAgent: action=%r concept=%r filters=%s geo=%r followup=%r",
                 parsed["action"],
                 parsed["entity_concept"],
                 parsed["filters"],
                 parsed["geo_scope"],
+                parsed["is_followup"],
             )
             return parsed
         except Exception:
@@ -243,6 +253,8 @@ class IntentParserAgent(BaseAgent):
                 "entity_concept": query,
                 "filters": [],
                 "geo_scope": "",
+                "needs_map": False,
+                "is_followup": False,
             }
 
     def make_node(self):
@@ -255,9 +267,10 @@ class IntentParserAgent(BaseAgent):
         agent = self
 
         async def _intent_node(state: "OrchestratorState") -> dict:
-            parsed = await agent.parse(state["query"])
-            existing_ctx: dict[str, Any] = dict(state.get("context") or {})
-            existing_ctx["intent"] = parsed
-            return {"context": existing_ctx, "intent": parsed}
+            ctx: dict[str, Any] = dict(state.get("context") or {})
+            previous_turns: list[dict] = ctx.get("previous_turns") or []
+            parsed = await agent.parse(state["query"], previous_turns=previous_turns)
+            ctx["intent"] = parsed
+            return {"context": ctx, "intent": parsed}
 
         return _intent_node

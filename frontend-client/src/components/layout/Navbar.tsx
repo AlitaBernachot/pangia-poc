@@ -9,9 +9,10 @@ import { LanguageSwitcher } from './LanguageSwitcher'
 
 interface Props {
   sessionTitle?: string
+  sessionId?: string | null
 }
 
-export function Navbar({ sessionTitle }: Props) {
+export function Navbar({ sessionTitle, sessionId }: Props) {
   const { t } = useTranslation()
 
   return (
@@ -21,11 +22,21 @@ export function Navbar({ sessionTitle }: Props) {
         <span>PangIA</span>
       </a>
 
-      {/* Session title — right of the logo, uppercase */}
+      {/* Session title + id tag — right of the logo */}
       {sessionTitle && (
-        <span id="session-title" className="ml-8 text-xs font-semibold uppercase tracking-widest truncate max-w-[260px]">
-          {sessionTitle}
-        </span>
+        <div className="ml-8 flex items-center gap-2 min-w-0">
+          <span id="session-title" className="text-xs font-semibold uppercase tracking-widest truncate max-w-[260px]">
+            {sessionTitle}
+          </span>
+          {sessionId && (
+            <span
+              title={sessionId}
+              className="shrink-0 font-mono text-[10px] text-white/40 bg-white/5 border border-white/10 rounded px-1.5 py-0.5"
+            >
+              {sessionId.slice(0, 8)}
+            </span>
+          )}
+        </div>
       )}
 
       <div className="flex-1" />
