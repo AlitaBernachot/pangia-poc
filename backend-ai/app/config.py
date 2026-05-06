@@ -88,6 +88,7 @@ class Settings(BaseSettings):
     humanoutput_agent_max_iterations: int = 0
     dataviz_agent_max_iterations: int = 0
     mapviz_agent_max_iterations: int = 0
+    followup_filter_agent_max_iterations: int = 0
 
 
 @lru_cache
