@@ -4,29 +4,29 @@
 
 """DB client package — one module per backend data store."""
 
-from libs.client.chroma_client import (
+from libs.clients.chroma_client import (
     add_documents,
     get_chroma_client,
     similarity_search,
 )
-from libs.client.graphdb_client import (
+from libs.clients.graphdb_client import (
     ensure_repository,
     run_sparql_construct,
     run_sparql_select,
 )
-from libs.client.neo4j_client import (
+from libs.clients.neo4j_client import (
     close_driver,
     get_driver,
     run_query,
     run_readonly_query,
 )
-from libs.client.postgis_client import (
+from libs.clients.postgis_client import (
     close_pool,
     get_pool,
     run_spatial_query,
     run_write_query,
 )
-from libs.client.redis_client import (
+from libs.clients.redis_client import (
     close_redis,
     get_redis,
     load_session,
