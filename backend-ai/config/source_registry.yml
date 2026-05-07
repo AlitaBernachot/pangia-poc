@@ -214,6 +214,25 @@ sources:
       WHERE m.bbox_west >= -5 AND m.bbox_east <= 10
         AND m.bbox_south >= 41 AND m.bbox_north <= 52
       RETURN m.title LIMIT 10
+
+      // *** PREFERRED for title/content search: full-text index ***
+      // Use this pattern when the user asks about a dataset by topic, event,
+      // or location mentioned in a title or abstract (e.g. "inondations Ouangani",
+      // "compte rendu observations", "carte géologique Alsace").
+      // Extract the most meaningful nouns/proper nouns from the question as the query.
+      // The index 'brgm_metadata_text' covers both title and abstract.
+      CALL db.index.fulltext.queryNodes("brgm_metadata_text", "inondations ouangani observations")
+      YIELD node AS m, score
+      RETURN m.title, m.uuid, m.abstract, score
+      ORDER BY score DESC
+      LIMIT 10
+
+      // Combine full-text search with relationship traversal
+      CALL db.index.fulltext.queryNodes("brgm_metadata_text", "ouangani inondations")
+      YIELD node AS m, score
+      OPTIONAL MATCH (m)-[:HAS_ONLINE_RESOURCE]->(r:BRGM_OnlineResource)
+      RETURN m.title, m.uuid, r.url, r.protocol, score
+      ORDER BY score DESC LIMIT 10
       ```
 
   - id: postgis_agent
