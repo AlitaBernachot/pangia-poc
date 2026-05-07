@@ -76,8 +76,8 @@ sources:
       productions: geological maps at 1/50 000 (BD Scan-Géol-50), WFS/WMS/ATOM
       download services, and subsurface observation datasets. Also contains
       records from SANDRE, regional urbanisme agencies (AURCA, AUDeG), and
-      DDT/DGTM services. Node labels are prefixed with "CSW_" (e.g. CSW_Metadata,
-      CSW_Keyword, CSW_Organisation). Supports keyword relationship traversal
+      DDT/DGTM services. Node labels are prefixed with "BRGM_" (e.g. BRGM_Metadata,
+      BRGM_Keyword, BRGM_Organisation). Supports keyword relationship traversal
       including SYNONYM_OF and SEMANTICALLY_RELATED edges inferred by LLM.
       Use it to explore which organisations produce which datasets, which
       keywords co-occur, which formats and CRS are used, and to navigate
@@ -129,38 +129,38 @@ sources:
       - "Quels mots-clés sont synonymes de 'géologie' dans le graphe ?"
       - "Quels services WFS sont référencés dans le catalogue BRGM ?"
     prompt: |
-      ## Neo4j graph schema — CSW / BRGM metadata (KG_SOURCE_NAME = "CSW")
+      ## Neo4j graph schema — CSW / BRGM metadata (KG_SOURCE_NAME = "BRGM")
 
-      All node labels are prefixed with "CSW_".
+      All node labels are prefixed with "BRGM_".
 
       ### Node labels and key properties
 
       | Label | Key property | Other properties |
       |---|---|---|
-      | CSW_Metadata | uuid | title, abstract, hierarchy_level, date_stamp, language, standard, bbox_* |
-      | CSW_Organisation | name | — |
-      | CSW_Keyword | value | thesaurus |
-      | CSW_TopicCategory | code | label_en, label_fr |
-      | CSW_Format | id | name, version |
-      | CSW_CRS | code | code_space |
-      | CSW_OnlineResource | url | protocol, name, function_code |
-      | CSW_ServiceType | name | canonical OGC service name: WFS, WMS, WMTS, ATOM, WCS |
+      | BRGM_Metadata | uuid | title, abstract, hierarchy_level, date_stamp, language, standard, bbox_* |
+      | BRGM_Organisation | name | — |
+      | BRGM_Keyword | value | thesaurus |
+      | BRGM_TopicCategory | code | label_en, label_fr |
+      | BRGM_Format | id | name, version |
+      | BRGM_CRS | code | code_space |
+      | BRGM_OnlineResource | url | protocol, name, function_code |
+      | BRGM_ServiceType | name | canonical OGC service name: WFS, WMS, WMTS, ATOM, WCS |
 
       ### Relationships
 
       | Type | From → To | Properties |
       |---|---|---|
-      | PRODUCED_BY | CSW_Metadata → CSW_Organisation | role = "owner" |
-      | CONTACT | CSW_Metadata → CSW_Organisation | role = "pointOfContact" / "custodian" / … |
-      | HAS_KEYWORD | CSW_Metadata → CSW_Keyword | — |
-      | COVERS_TOPIC | CSW_Metadata → CSW_TopicCategory | — |
-      | DISTRIBUTED_AS | CSW_Metadata → CSW_Format | — |
-      | USES_CRS | CSW_Metadata → CSW_CRS | — |
-      | HAS_ONLINE_RESOURCE | CSW_Metadata → CSW_OnlineResource | — |
-      | PROVIDES | CSW_Metadata → CSW_ServiceType | — |
-      | SEMANTICALLY_RELATED | CSW_Keyword → CSW_Keyword | type (BROADER_TERM/NARROWER_TERM/RELATED_TO/IS_TYPE_OF/PART_OF), confidence, inferred_by |
-      | SYNONYM_OF | CSW_Keyword → CSW_Keyword | source ("llm"), confidence, inferred_by |
-      | SYNONYM_OF | CSW_TopicCategory → CSW_Keyword | source ("iso19115_label"), lang ("fr"/"en") |
+      | PRODUCED_BY | BRGM_Metadata → BRGM_Organisation | role = "owner" |
+      | CONTACT | BRGM_Metadata → BRGM_Organisation | role = "pointOfContact" / "custodian" / … |
+      | HAS_KEYWORD | BRGM_Metadata → BRGM_Keyword | — |
+      | COVERS_TOPIC | BRGM_Metadata → BRGM_TopicCategory | — |
+      | DISTRIBUTED_AS | BRGM_Metadata → BRGM_Format | — |
+      | USES_CRS | BRGM_Metadata → BRGM_CRS | — |
+      | HAS_ONLINE_RESOURCE | BRGM_Metadata → BRGM_OnlineResource | — |
+      | PROVIDES | BRGM_Metadata → BRGM_ServiceType | — |
+      | SEMANTICALLY_RELATED | BRGM_Keyword → BRGM_Keyword | type (BROADER_TERM/NARROWER_TERM/RELATED_TO/IS_TYPE_OF/PART_OF), confidence, inferred_by |
+      | SYNONYM_OF | BRGM_Keyword → BRGM_Keyword | source ("llm"), confidence, inferred_by |
+      | SYNONYM_OF | BRGM_TopicCategory → BRGM_Keyword | source ("iso19115_label"), lang ("fr"/"en") |
 
       ### Corpus statistics (800 records from geocatalogue.fr)
       - Dominant organisation: BRGM (>2 000 occurrences across records)
@@ -173,26 +173,26 @@ sources:
 
       ```cypher
       // Datasets produced by BRGM
-      MATCH (m:CSW_Metadata)-[:PRODUCED_BY]->(o:CSW_Organisation {name: "BRGM"})
+      MATCH (m:BRGM_Metadata)-[:PRODUCED_BY]->(o:BRGM_Organisation {name: "BRGM"})
       RETURN m.title, m.date_stamp LIMIT 10
 
       // Keywords related to 'géologie'
-      MATCH (k:CSW_Keyword {value: "géologie"})-[r:SEMANTICALLY_RELATED|SYNONYM_OF]-(k2:CSW_Keyword)
+      MATCH (k:BRGM_Keyword {value: "géologie"})-[r:SEMANTICALLY_RELATED|SYNONYM_OF]-(k2:BRGM_Keyword)
       RETURN k2.value, type(r), r.type LIMIT 20
 
       // Top organisations by dataset count
-      MATCH (m:CSW_Metadata)-[:PRODUCED_BY|CONTACT]->(o:CSW_Organisation)
+      MATCH (m:BRGM_Metadata)-[:PRODUCED_BY|CONTACT]->(o:BRGM_Organisation)
       RETURN o.name, count(DISTINCT m) AS n ORDER BY n DESC LIMIT 10
 
       // Formats available for a given keyword
-      MATCH (m:CSW_Metadata)-[:HAS_KEYWORD]->(k:CSW_Keyword {value: "géologie"})
-      MATCH (m)-[:DISTRIBUTED_AS]->(f:CSW_Format)
+      MATCH (m:BRGM_Metadata)-[:HAS_KEYWORD]->(k:BRGM_Keyword {value: "géologie"})
+      MATCH (m)-[:DISTRIBUTED_AS]->(f:BRGM_Format)
       RETURN DISTINCT f.name, f.version
 
       // *** PREFERRED: WFS services via PROVIDES (fast, index-backed) ***
       // Use this pattern for ALL "quels services WFS/WMS/ATOM ?" questions.
-      MATCH (m:CSW_Metadata)-[:PROVIDES]->(s:CSW_ServiceType {name: "WFS"})
-      OPTIONAL MATCH (m)-[:HAS_ONLINE_RESOURCE]->(r:CSW_OnlineResource)
+      MATCH (m:BRGM_Metadata)-[:PROVIDES]->(s:BRGM_ServiceType {name: "WFS"})
+      OPTIONAL MATCH (m)-[:HAS_ONLINE_RESOURCE]->(r:BRGM_OnlineResource)
       WHERE toLower(r.protocol) CONTAINS 'wfs'
          OR toLower(r.url)      CONTAINS 'wfs'
       RETURN m.title, r.url, r.protocol, r.name
@@ -200,17 +200,17 @@ sources:
       LIMIT 30
 
       // WMS services
-      MATCH (m:CSW_Metadata)-[:PROVIDES]->(s:CSW_ServiceType {name: "WMS"})
-      OPTIONAL MATCH (m)-[:HAS_ONLINE_RESOURCE]->(r:CSW_OnlineResource)
+      MATCH (m:BRGM_Metadata)-[:PROVIDES]->(s:BRGM_ServiceType {name: "WMS"})
+      OPTIONAL MATCH (m)-[:HAS_ONLINE_RESOURCE]->(r:BRGM_OnlineResource)
       WHERE toLower(r.protocol) CONTAINS 'wms' OR toLower(r.url) CONTAINS 'wms'
       RETURN m.title, r.url, r.protocol LIMIT 20
 
       // All service types and how many records provide each
-      MATCH (m:CSW_Metadata)-[:PROVIDES]->(s:CSW_ServiceType)
+      MATCH (m:BRGM_Metadata)-[:PROVIDES]->(s:BRGM_ServiceType)
       RETURN s.name AS service, count(DISTINCT m) AS n ORDER BY n DESC
 
       // Metadata covering a bounding box (France métropolitaine approx.)
-      MATCH (m:CSW_Metadata)
+      MATCH (m:BRGM_Metadata)
       WHERE m.bbox_west >= -5 AND m.bbox_east <= 10
         AND m.bbox_south >= 41 AND m.bbox_north <= 52
       RETURN m.title LIMIT 10
