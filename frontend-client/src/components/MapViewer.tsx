@@ -304,23 +304,27 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
         </div>
       </div>
 
-      {/* Layer tree panel */}
-      {showLayerTree && layerCount > 0 && (
-        <MapLayerTree
-          layers={ogcLayers!}
-          colors={OGC_COLORS}
-          visibleLayers={visibleLayers}
-          layerStatus={layerStatus}
-          layerFeatureCounts={layerFeatureCounts}
-          onToggleVisibility={(idx) => setVisibleLayers(v => ({ ...v, [idx]: v[idx] !== false ? false : true }))}
-        />
-      )}
-
-      {/* Map container */}
+      {/* Map container — relative so the layer panel can float inside it */}
       <div
-        ref={containerRef}
+        className="relative"
         style={isFullscreen ? { flex: 1, background: '#1a1a2e' } : { height: 320, background: '#1a1a2e' }}
-      />
+      >
+        <div ref={containerRef} className="absolute inset-0" />
+
+        {/* Floating layer tree — bottom-left overlay */}
+        {showLayerTree && layerCount > 0 && (
+          <div className="absolute bottom-2 left-2 z-[1001] pointer-events-auto">
+            <MapLayerTree
+              layers={ogcLayers!}
+              colors={OGC_COLORS}
+              visibleLayers={visibleLayers}
+              layerStatus={layerStatus}
+              layerFeatureCounts={layerFeatureCounts}
+              onToggleVisibility={(idx) => setVisibleLayers(v => ({ ...v, [idx]: v[idx] !== false ? false : true }))}
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { AlertTriangle, Eye, EyeOff, Loader } from 'lucide-react'
+import { AlertTriangle, Eye, EyeOff, Layers, Loader } from 'lucide-react'
 import type { OgcLayer } from '../types'
 
 export type LayerStatus = 'loading' | 'loaded' | 'error' | 'cors'
@@ -31,8 +31,24 @@ export function MapLayerTree({
 }: Props) {
   if (!layers.length) return null
 
+  const loadedCount = Object.values(layerStatus).filter(s => s === 'loaded').length
+
   return (
-    <div className="border-b border-white/10 bg-white/2 max-h-36 overflow-y-auto">
+    <div
+      className="rounded-lg border border-white/15 shadow-2xl overflow-hidden"
+      style={{ background: 'rgba(10, 10, 26, 0.88)', backdropFilter: 'blur(8px)', minWidth: 210, maxWidth: 280 }}
+    >
+      {/* Panel header */}
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-white/10">
+        <Layers size={11} className="text-white/40 shrink-0" />
+        <span className="text-[11px] font-semibold text-white/60 tracking-wide uppercase">Couches</span>
+        <span className="ml-auto text-[10px] text-white/30">
+          {loadedCount}/{layers.length}
+        </span>
+      </div>
+
+      {/* Layer rows */}
+      <div className="max-h-44 overflow-y-auto">
       {layers.map((layer, idx) => {
         const color = colors[idx % colors.length]
         const visible = visibleLayers[idx] !== false
@@ -94,6 +110,7 @@ export function MapLayerTree({
           </div>
         )
       })}
+      </div>
     </div>
   )
 }

@@ -121,7 +121,11 @@ def _extract_wfs_layers(sub_results: dict[str, str]) -> list[dict[str, str]]:
                 title: str = rec.get("example_title") or rec.get("m.title") or ""
                 if not url or url in seen:
                     continue
-                if _WFS_PROTO_RE.search(protocol) or "wfs" in url.lower():
+                proto_is_wfs = bool(_WFS_PROTO_RE.search(protocol))
+                url_has_wfs = "wfs" in url.lower()
+                # Exclude non-WFS protocols (e.g. WWW:LINK download links)
+                non_wfs_protocol = bool(protocol) and not proto_is_wfs
+                if proto_is_wfs or (url_has_wfs and not non_wfs_protocol):
                     seen.add(url)
                     layers.append({
                         "url": url,
