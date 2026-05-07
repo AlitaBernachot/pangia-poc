@@ -50,7 +50,7 @@ class VectorChromaAgent(BaseAgent):
         # Step 2 — synthesize an answer
         try:
             response = await self._llm.ainvoke([
-                SystemMessage(content=self._system_prompt),
+                SystemMessage(content=self.get_prompt_for_request(inp, _DEFAULT_PROMPT)),
                 HumanMessage(content=(
                     f"Retrieved documents (JSON):\n{raw_results}\n\n"
                     f"Query: {inp.query}"

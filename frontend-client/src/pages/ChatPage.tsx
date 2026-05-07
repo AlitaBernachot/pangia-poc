@@ -54,7 +54,7 @@ export function ChatPage({ onSessionTitle, onSessionId }: Props) {
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
       {/* Header */}
-      <div className="shrink-0 border-b border-white/6" />
+      <div className="shrink-0" />
 
       {/* Messages */}
       <MessageList

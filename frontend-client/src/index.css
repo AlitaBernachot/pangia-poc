@@ -6,9 +6,15 @@
 
 @import "tailwindcss";
 
+/* Enable class-based dark mode for dark: variants */
+@custom-variant dark (&:where(html.dark, html.dark *));
+
 @layer base {
   :root {
     color-scheme: dark;
+  }
+  html.light {
+    color-scheme: light;
   }
   * {
     box-sizing: border-box;
@@ -25,6 +31,58 @@
   }
 }
 
+/* ─── Light mode overrides ────────────────────────────────────────────────── */
+/* These override Tailwind's white-based utilities to dark equivalents when    */
+/* the html.light class is present, without touching individual components.   */
+
+html.light .text-white        { color: #0f172a; }
+html.light .text-white\/90    { color: rgba(15,23,42,0.9); }
+html.light .text-white\/80    { color: rgba(15,23,42,0.8); }
+html.light .text-white\/70    { color: rgba(15,23,42,0.7); }
+html.light .text-white\/60    { color: rgba(15,23,42,0.6); }
+html.light .text-white\/55    { color: rgba(15,23,42,0.55); }
+html.light .text-white\/50    { color: rgba(15,23,42,0.5); }
+html.light .text-white\/45    { color: rgba(15,23,42,0.45); }
+html.light .text-white\/40    { color: rgba(15,23,42,0.4); }
+html.light .text-white\/35    { color: rgba(15,23,42,0.35); }
+html.light .text-white\/30    { color: rgba(15,23,42,0.3); }
+html.light .text-white\/25    { color: rgba(15,23,42,0.25); }
+html.light .text-white\/20    { color: rgba(15,23,42,0.2); }
+
+html.light .bg-white\/2       { background-color: rgba(0,0,0,0.02); }
+html.light .bg-white\/3       { background-color: rgba(0,0,0,0.03); }
+html.light .bg-white\/4       { background-color: rgba(0,0,0,0.04); }
+html.light .bg-white\/5       { background-color: rgba(0,0,0,0.05); }
+html.light .bg-white\/6       { background-color: rgba(0,0,0,0.06); }
+html.light .bg-white\/8       { background-color: rgba(0,0,0,0.07); }
+html.light .bg-white\/10      { background-color: rgba(0,0,0,0.09); }
+html.light .bg-white\/12      { background-color: rgba(0,0,0,0.1); }
+html.light .bg-white\/20      { background-color: rgba(0,0,0,0.14); }
+
+html.light .border-white\/6   { border-color: rgba(0,0,0,0.1); }
+html.light .border-white\/8   { border-color: rgba(0,0,0,0.1); }
+html.light .border-white\/10  { border-color: rgba(0,0,0,0.12); }
+html.light .border-white\/12  { border-color: rgba(0,0,0,0.14); }
+html.light .border-white\/15  { border-color: rgba(0,0,0,0.16); }
+html.light .border-white\/20  { border-color: rgba(0,0,0,0.18); }
+html.light .border-white\/25  { border-color: rgba(0,0,0,0.22); }
+
+/* Hover state overrides */
+html.light .hover\:text-white:hover        { color: #0f172a; }
+html.light .hover\:text-white\/80:hover    { color: rgba(15,23,42,0.8); }
+html.light .hover\:text-white\/70:hover    { color: rgba(15,23,42,0.7); }
+html.light .hover\:text-white\/60:hover    { color: rgba(15,23,42,0.6); }
+html.light .hover\:bg-white\/3:hover       { background-color: rgba(0,0,0,0.03); }
+html.light .hover\:bg-white\/5:hover       { background-color: rgba(0,0,0,0.05); }
+html.light .hover\:bg-white\/6:hover       { background-color: rgba(0,0,0,0.06); }
+html.light .hover\:bg-white\/12:hover      { background-color: rgba(0,0,0,0.1); }
+html.light .hover\:bg-white\/20:hover      { background-color: rgba(0,0,0,0.14); }
+html.light .hover\:border-white\/20:hover  { border-color: rgba(0,0,0,0.18); }
+html.light .hover\:border-white\/25:hover  { border-color: rgba(0,0,0,0.22); }
+
+/* Placeholder text */
+html.light .placeholder\:text-white\/30::placeholder { color: rgba(15,23,42,0.35); }
+
 /* Markdown prose styles */
 .prose-chat {
   line-height: 1.6;
@@ -38,6 +96,12 @@
 .prose-chat ul, .prose-chat ol {
   margin: 0.5em 0;
   padding-left: 1.5em;
+}
+.prose-chat ul {
+  list-style-type: disc;
+}
+.prose-chat ol {
+  list-style-type: decimal;
 }
 .prose-chat li {
   margin: 0.25em 0;
@@ -90,6 +154,27 @@
   background: rgba(255,255,255,0.06);
 }
 
+/* Light mode prose overrides */
+html.light .prose-chat code {
+  background: rgba(0,0,0,0.06);
+  color: #0f172a;
+}
+html.light .prose-chat pre {
+  background: rgba(0,0,0,0.05);
+  border-color: rgba(0,0,0,0.1);
+  color: #0f172a;
+}
+html.light .prose-chat blockquote {
+  border-left-color: rgba(0,0,0,0.2);
+  color: rgba(15,23,42,0.6);
+}
+html.light .prose-chat th, html.light .prose-chat td {
+  border-color: rgba(0,0,0,0.12);
+}
+html.light .prose-chat th {
+  background: rgba(0,0,0,0.04);
+}
+
 /* Blinking cursor for streaming */
 .cursor-blink {
   display: inline-block;
@@ -122,6 +207,18 @@
   -webkit-text-fill-color: transparent;
   animation: shimmer 1.8s linear infinite;
 }
+html.light .thinking-indicator {
+  background: linear-gradient(
+    90deg,
+    rgba(15,23,42,0.3) 0%,
+    rgba(15,23,42,1) 50%,
+    rgba(15,23,42,0.3) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 @keyframes shimmer {
   0%   { background-position: 200% center; }
   100% { background-position: -200% center; }
@@ -134,4 +231,45 @@
 @keyframes shimmer-opacity {
   0%, 100% { opacity: 0.3; }
   50%       { opacity: 1.0; }
+}
+
+/* ─── Leaflet map overrides — navy blue theme ─────────────────────────────── */
+
+/* Popup bubble */
+.leaflet-popup-content-wrapper {
+  background: #0c1b30;
+  color: #e2e8f0;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+}
+.leaflet-popup-tip {
+  background: #0c1b30;
+}
+.leaflet-popup-content {
+  margin: 10px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Attribution bar */
+.leaflet-control-attribution {
+  background: rgba(7,17,31,0.75) !important;
+  color: rgba(255,255,255,0.35) !important;
+  font-size: 10px;
+  backdrop-filter: blur(4px);
+}
+.leaflet-control-attribution a {
+  color: rgba(96,165,250,0.7) !important;
+}
+
+/* Zoom buttons */
+.leaflet-control-zoom a {
+  background: #0c1b30 !important;
+  color: rgba(255,255,255,0.65) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+.leaflet-control-zoom a:hover {
+  background: #162d4a !important;
+  color: #fff !important;
 }

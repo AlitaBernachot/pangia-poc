@@ -65,7 +65,7 @@ class RAGAgent(BaseAgent):
         # Step 2 — generate answer
         try:
             response = await self._llm.ainvoke([
-                SystemMessage(content=self._system_prompt),
+                SystemMessage(content=self.get_prompt_for_request(inp, _DEFAULT_PROMPT)),
                 HumanMessage(content=user_content),
             ])
             return AgentOutput(

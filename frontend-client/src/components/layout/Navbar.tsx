@@ -2,30 +2,27 @@
 //
 // SPDX-License-Identifier: MIT
 
-import { NavLink } from 'react-router-dom'
-import { MessageSquare, HelpCircle } from 'lucide-react'
-import { useTranslation } from 'react-i18next'
+import { Sun, Moon } from 'lucide-react'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import type { Theme } from '../../hooks/useTheme'
 
 interface Props {
   sessionTitle?: string
   sessionId?: string | null
+  theme?: Theme
+  onToggleTheme?: () => void
 }
 
-export function Navbar({ sessionTitle, sessionId }: Props) {
-  const { t } = useTranslation()
-
+export function Navbar({ sessionTitle, sessionId, theme, onToggleTheme }: Props) {
   return (
-    <header className="flex items-center justify-between px-5 h-14 border-b border-white/8 bg-[#0d0d0f]/80 backdrop-blur-sm sticky top-0 z-50">
-      <a href="/" className="flex items-center gap-2 text-white font-semibold text-lg shrink-0">
-        <img src="/logo.png" alt="PangIA" className="size-7 rounded" />
-        <span>PangIA</span>
-      </a>
-
-      {/* Session title + id tag — right of the logo */}
-      {sessionTitle && (
-        <div className="ml-8 flex items-center gap-2 min-w-0">
-          <span id="session-title" className="text-xs font-semibold uppercase tracking-widest truncate max-w-[260px]">
+    <header className="flex items-center px-5 h-14 sticky top-0 z-50">
+      {/* Session title + id tag */}
+      {sessionTitle ? (
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <span
+            id="session-title"
+            className="text-xs font-semibold uppercase tracking-widest truncate max-w-100 text-white/70"
+          >
             {sessionTitle}
           </span>
           {sessionId && (
@@ -37,44 +34,24 @@ export function Navbar({ sessionTitle, sessionId }: Props) {
             </span>
           )}
         </div>
+      ) : (
+        <div className="flex-1" />
       )}
 
-      <div className="flex-1" />
-
-      <div className="flex items-center gap-3 shrink-0">
-        <nav className="flex items-center gap-1">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) =>
-              `flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                isActive
-                  ? 'text-white bg-white/10'
-                  : 'text-white/50 hover:text-white hover:bg-white/5'
-              }`
-            }
-          >
-            <MessageSquare size={15} />
-            {t('navbar.chat')}
-          </NavLink>
-
-          <NavLink
-            to="/faq"
-            className={({ isActive }) =>
-              `flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                isActive
-                  ? 'text-white bg-white/10'
-                  : 'text-white/50 hover:text-white hover:bg-white/5'
-              }`
-            }
-          >
-            <HelpCircle size={15} />
-            {t('navbar.faq')}
-          </NavLink>
-        </nav>
-
-        <div className="h-4 w-px bg-white/10" />
+      <div className="shrink-0 flex items-center gap-2">
         <LanguageSwitcher />
+
+        {/* Dark / light theme toggle */}
+        {onToggleTheme && (
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            className="size-8 flex items-center justify-center rounded-lg text-white/50 hover:text-white/90 hover:bg-white/8 transition-colors cursor-pointer"
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+        )}
       </div>
     </header>
   )

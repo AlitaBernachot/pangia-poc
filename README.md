@@ -29,12 +29,21 @@ A full-stack AI chat application built around a **multi-agent architecture** for
 
 ## Table of Contents
 
-- [Quick Start](#quick-start)
-- [Services](#services)
-- [Project structure](#project-structure)
-- [Observability](#observability)
-- [Development (without Docker)](#development-without-docker)
-- [Documentation](#documentation)
+- [PangIA — Multi-agent geospatial assistant 🌍](#pangia--multi-agent-geospatial-assistant-)
+  - [Table of Contents](#table-of-contents)
+  - [Quick Start](#quick-start)
+    - [1. Configure environment](#1-configure-environment)
+    - [2. Start all services](#2-start-all-services)
+  - [Services](#services)
+  - [Project structure](#project-structure)
+  - [Notebooks](#notebooks)
+    - [CSW Metadata Crawler — `notebooks/csw_crawler.ipynb`](#csw-metadata-crawler--notebookscsw_crawleripynb)
+      - [Prerequisites](#prerequisites)
+      - [Usage](#usage)
+      - [Output directory and Git](#output-directory-and-git)
+  - [Observability](#observability)
+  - [Development (without Docker)](#development-without-docker)
+  - [Documentation](#documentation)
 
 ---
 
@@ -102,7 +111,7 @@ pangia-poc/
 │           ├── memory.py   Short-term (Redis) + long-term (pgvector) memory
 │           ├── hitl.py     Human-in-the-loop manager
 │           └── audit.py    SHA-256 hash-chain audit log
-├── backend/                ← Legacy backend V1 (port 8084, kept for reference)
+├── backend/                ← Database seeder (port 8084) — seeds Neo4j, PostGIS, GraphDB, ChromaDB
 ├── frontend-client/        ← React 19 + Tailwind CSS v4 chat UI
 │   └── src/
 │       ├── hooks/
@@ -112,6 +121,57 @@ pangia-poc/
 │           ├── MapViewer.tsx      Leaflet interactive map
 │           └── DataViz/           Charts (D3.js), KPI cards, tables
 └── LICENSES/
+```
+
+---
+
+## Notebooks
+
+The [`notebooks/`](notebooks/) directory contains utility Jupyter Notebooks for
+feeding data into or exploring the project **outside of the Docker services**.
+
+### CSW Metadata Crawler — `notebooks/csw_crawler.ipynb`
+
+This notebook crawls a **CSW (OGC Catalog Service for the Web)** endpoint and
+downloads all metadata records as **ISO 19115 / XML** files into a configurable
+local directory.
+
+#### Prerequisites
+
+```bash
+pip install -r requirements-dev.txt
+# installs jupyter, requests and lxml
+```
+
+#### Usage
+
+```bash
+jupyter notebook notebooks/csw_crawler.ipynb
+```
+
+Edit the two variables at the top of the notebook:
+
+| Variable | Default | Description |
+|---|---|---|
+| `CSW_URL` | `https://www.geocatalogue.fr/…/csw` | Base URL of the CSW service |
+| `OUTPUT_DIR` | `../data/csw_metadata` | Output directory for XML files |
+
+The notebook runs the following steps in order:
+
+1. **GetCapabilities** — checks that the service is reachable.
+2. **GetRecords (hits)** — counts the total number of available records.
+3. **Paginated crawl** — downloads all records in batches (`PAGE_SIZE`, default 100)
+   and saves each `MD_Metadata` element as `<fileIdentifier>.xml`.
+4. **Verification** — lists downloaded files with their sizes.
+
+#### Output directory and Git
+
+The `data/` directory (holding the XML files) is **excluded from git** (`.gitignore`).
+To share it with a Docker service, add the following to `docker-compose.yml`:
+
+```yaml
+volumes:
+  - ./data/csw_metadata:/data/csw_metadata
 ```
 
 ---

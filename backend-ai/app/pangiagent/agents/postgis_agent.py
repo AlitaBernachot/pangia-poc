@@ -45,7 +45,7 @@ class PostGISAgent(BaseAgent):
     def __init__(self, **kwargs) -> None:
         super().__init__(name=self.name, **kwargs)
         self._llm = build_llm(get_agent_model_config(self.name))
-        self._system_prompt = self.get_source_augmented_prompt(_DEFAULT_PROMPT)
+        self._system_prompt = self.get_prompt(_DEFAULT_PROMPT)
 
     def get_capabilities(self) -> str:
         return (
@@ -66,7 +66,7 @@ class PostGISAgent(BaseAgent):
         # Step 1 — generate SQL
         try:
             gen_response = await self._llm.ainvoke([
-                SystemMessage(content=self._system_prompt),
+                SystemMessage(content=self.get_prompt_for_request(inp, _DEFAULT_PROMPT)),
                 HumanMessage(content=question),
             ])
             sql = _extract_sql(str(gen_response.content))

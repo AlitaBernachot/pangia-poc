@@ -82,6 +82,7 @@ export interface OgcLayer {
   url: string
   name: string
   title?: string
+  protocol?: string
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
