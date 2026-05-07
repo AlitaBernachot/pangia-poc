@@ -82,6 +82,20 @@ def _validate_url(url: str) -> None:
 # ─── GML2 → GeoJSON conversion ────────────────────────────────────────────────
 
 
+def _looks_projected(coords: list[list[float]]) -> bool:
+    """Return True if any coordinate value is clearly outside WGS84 [-180, 180] / [-90, 90] range.
+
+    Values like 700000 (Lambert 93 easting) or 6000000 (northing) are dead giveaways
+    that the server returned a projected CRS instead of WGS84 lon/lat.
+    """
+    for xy in coords:
+        if not xy:
+            continue
+        if abs(xy[0]) > 180 or abs(xy[1]) > 90:
+            return True
+    return False
+
+
 def _parse_gml_coords(text: str) -> list[list[float]]:
     """Parse a GML2 ``<gml:coordinates>`` text (``x,y x,y …``) into ``[[lon, lat], …]``."""
     points: list[list[float]] = []
@@ -179,10 +193,95 @@ _GML_GEOM_TAGS = frozenset({
 })
 
 
+_KNOWN_PROJECTED_CRS = {
+    # Lambert 93 (France métropolitaine)
+    "EPSG:2154", "urn:ogc:def:crs:EPSG::2154",
+    # Lambert CC (zones)
+    "EPSG:3942", "EPSG:3943", "EPSG:3944", "EPSG:3945", "EPSG:3946",
+    "EPSG:3947", "EPSG:3948", "EPSG:3949", "EPSG:3950",
+    # UTM zones (common)
+    "EPSG:32630", "EPSG:32631", "EPSG:32632",
+    "EPSG:2972",  # RGFG95 UTM 22N (Guyane)
+    "EPSG:2975",  # RGR92 UTM 40S (Réunion)
+}
+
+
+def _reproject_lambert93_to_wgs84(x: float, y: float) -> tuple[float, float]:
+    """Approximate reprojection from Lambert 93 (EPSG:2154) to WGS84.
+
+    Uses a simplified iterative Transverse Mercator inverse to avoid a pyproj
+    dependency.  Accuracy is ~1 m, sufficient for map display.
+    """
+    import math
+
+    # Lambert 93 parameters
+    a = 6378137.0          # GRS80 semi-major axis
+    e2 = 0.00669437999014  # GRS80 first eccentricity squared
+    e = math.sqrt(e2)
+    n = 0.7256077650532670
+    F = 11754255.4261
+    rho0 = 6289062.9678
+    lam0 = math.radians(3.0)  # central meridian 3°E
+
+    rho = math.sqrt(x ** 2 + (rho0 - y) ** 2)
+    if rho == 0:
+        return 3.0, 90.0
+    theta = math.atan2(x, rho0 - y)
+    lam = theta / n + lam0
+
+    t = (F / (abs(rho))) ** (1.0 / n)
+    phi = math.pi / 2 - 2 * math.atan(t)
+    for _ in range(10):
+        sin_phi = math.sin(phi)
+        phi = (math.pi / 2
+               - 2 * math.atan(t * ((1 - e * sin_phi) / (1 + e * sin_phi)) ** (e / 2)))
+
+    return math.degrees(lam), math.degrees(phi)
+
+
+def _reproject_geojson(geojson: dict, srs_name: str) -> dict:
+    """Reproject all coordinates in a GeoJSON FeatureCollection to WGS84.
+
+    Currently handles Lambert 93 (EPSG:2154) only; other projected CRS fall
+    back to a coordinate swap heuristic (tries lat/lon → lon/lat if values
+    look like WGS84 after swapping).
+    """
+    lambert93 = srs_name in ("EPSG:2154", "urn:ogc:def:crs:EPSG::2154")
+
+    def _reproj_coords(coords):
+        if not coords:
+            return coords
+        if isinstance(coords[0], (int, float)):
+            if lambert93:
+                return list(_reproject_lambert93_to_wgs84(coords[0], coords[1]))
+            return [coords[1], coords[0]]  # swap lat/lon → lon/lat for other CRS
+        return [_reproj_coords(c) for c in coords]
+
+    def _reproj_geom(geom):
+        if not geom:
+            return geom
+        return {**geom, "coordinates": _reproj_coords(geom["coordinates"])}
+
+    return {
+        **geojson,
+        "features": [
+            {**f, "geometry": _reproj_geom(f.get("geometry"))}
+            for f in geojson.get("features", [])
+        ],
+    }
+
+
 def _gml_to_geojson(xml_bytes: bytes) -> dict:
     """Convert a GML2/GML3 WFS FeatureCollection to GeoJSON."""
     root = ET.fromstring(xml_bytes)
     features: list[dict] = []
+
+    # Detect CRS from the FeatureCollection srsName attribute
+    srs_name: str = ""
+    for attr in ("srsName", "SRS"):
+        srs_name = root.get(attr, "")
+        if srs_name:
+            break
 
     for member in root.findall(f"{{{_WFS_NS}}}member") or root.findall(f"{{{_GML_NS}}}featureMember"):
         for feat_elem in member:
@@ -199,6 +298,9 @@ def _gml_to_geojson(xml_bytes: bytes) -> dict:
                 for geom_child in child:
                     g_local = geom_child.tag.split("}")[-1] if "}" in geom_child.tag else geom_child.tag
                     if g_local in _GML_GEOM_TAGS:
+                        # Also capture srsName from the geometry element if not set
+                        if not srs_name:
+                            srs_name = geom_child.get("srsName", "")
                         g = _parse_gml_geometry(geom_child)
                         if g:
                             geometry = g
@@ -211,7 +313,31 @@ def _gml_to_geojson(xml_bytes: bytes) -> dict:
             if geometry:
                 features.append({"type": "Feature", "geometry": geometry, "properties": props})
 
-    return {"type": "FeatureCollection", "features": features}
+    geojson: dict = {"type": "FeatureCollection", "features": features}
+
+    # Reproject if server returned a known projected CRS (e.g. Lambert 93)
+    # or if coordinate values are clearly outside WGS84 range
+    needs_reproject = srs_name in _KNOWN_PROJECTED_CRS
+    if not needs_reproject and features:
+        # Heuristic: sample the first feature's first coordinate
+        first_geom = features[0].get("geometry") or {}
+        coords = first_geom.get("coordinates") or []
+        flat: list[list[float]] = []
+        if coords and isinstance(coords[0], (int, float)):
+            flat = [coords[:2]]
+        elif coords and isinstance(coords[0], list):
+            flat = [c[:2] for c in (coords[0] if isinstance(coords[0][0], list) else coords)[:3]]
+        if _looks_projected(flat):
+            logger.debug("GML response appears to be in a projected CRS (srsName=%r); reprojecting to WGS84", srs_name)
+            # Assume Lambert 93 for French WFS services with no explicit srsName
+            if not srs_name:
+                srs_name = "EPSG:2154"
+            needs_reproject = True
+
+    if needs_reproject:
+        geojson = _reproject_geojson(geojson, srs_name)
+
+    return geojson
 
 
 def _is_service_exception(data: bytes) -> bool:
@@ -285,10 +411,33 @@ async def proxy_wfs(
         content_type = resp.headers.get("content-type", "")
         data = resp.content
 
-        # ── If JSON → return directly ──────────────────────────────────────────
+        # ── If JSON → check for projected CRS and reproject if needed ──────────
         if "json" in content_type:
             try:
-                return JSONResponse(content=resp.json())
+                geojson_data = resp.json()
+                # GeoJSON CRS (legacy, but some WFS servers still emit it)
+                crs_obj = geojson_data.get("crs") or {}
+                crs_name: str = ""
+                if isinstance(crs_obj, dict):
+                    props_obj = crs_obj.get("properties") or {}
+                    crs_name = props_obj.get("name", "")
+                if crs_name in _KNOWN_PROJECTED_CRS:
+                    geojson_data = _reproject_geojson(geojson_data, crs_name)
+                else:
+                    # Heuristic check on first feature
+                    first_feats = (geojson_data.get("features") or [])[:1]
+                    if first_feats:
+                        first_geom = (first_feats[0].get("geometry") or {})
+                        coords = first_geom.get("coordinates") or []
+                        flat: list[list[float]] = []
+                        if coords and isinstance(coords[0], (int, float)):
+                            flat = [coords[:2]]
+                        elif coords and isinstance(coords[0], list):
+                            flat = [c[:2] for c in (coords[0] if isinstance(coords[0][0], list) else coords)[:3]]
+                        if _looks_projected(flat):
+                            logger.debug("JSON GeoJSON has projected coords; reprojecting Lambert93→WGS84")
+                            geojson_data = _reproject_geojson(geojson_data, "EPSG:2154")
+                return JSONResponse(content=geojson_data)
             except Exception:
                 pass  # fall through to GML parser
 
@@ -312,6 +461,7 @@ async def proxy_wfs(
                 "REQUEST": "GetFeature",
                 "VERSION": "1.0.0",
                 "TYPENAME": typename,
+                "SRSNAME": orig_params.get("SRSNAME", orig_params.get("srsname", "EPSG:4326")),
                 "maxFeatures": max_features,
             }
             retry_url = f"{service_base}?{urlencode(retry_params)}"

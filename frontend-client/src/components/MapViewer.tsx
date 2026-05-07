@@ -42,7 +42,9 @@ function buildLayerFetchUrl(layer: OgcLayer): string {
   if (isWfs1x) {
     const base = layer.url.split('?')[0]
     const typename = layer.name || base.split('/').pop() || 'layer'
-    upstreamUrl = `${base}?SERVICE=WFS&REQUEST=GetFeature&VERSION=1.0.0&TYPENAME=${encodeURIComponent(typename)}&OUTPUTFORMAT=application%2Fjson&maxFeatures=200`
+    // SRSNAME=EPSG:4326 forces WGS84 output so Leaflet can display coordinates correctly.
+    // Without it, servers often return Lambert 93 (EPSG:2154) or other projected CRS.
+    upstreamUrl = `${base}?SERVICE=WFS&REQUEST=GetFeature&VERSION=1.0.0&TYPENAME=${encodeURIComponent(typename)}&SRSNAME=EPSG:4326&OUTPUTFORMAT=application%2Fjson&maxFeatures=200`
   } else {
     // OGC API Features
     const base = layer.url.split('?')[0].replace(/\/items\/?$/, '')
@@ -255,7 +257,7 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
   }
 
   const containerClass = isFullscreen
-    ? 'fixed inset-0 z-[9999] flex flex-col bg-[#0f0f1a]'
+    ? 'fixed inset-0 z-[9999] flex flex-col bg-[#07111f]'
     : 'rounded-xl overflow-hidden border border-white/10 mt-2 w-full'
 
   return (
@@ -307,7 +309,7 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
       {/* Map container — relative so the layer panel can float inside it */}
       <div
         className="relative"
-        style={isFullscreen ? { flex: 1, background: '#1a1a2e' } : { height: 320, background: '#1a1a2e' }}
+        style={isFullscreen ? { flex: 1, background: '#07111f' } : { height: 320, background: '#07111f' }}
       >
         <div ref={containerRef} className="absolute inset-0" />
 
