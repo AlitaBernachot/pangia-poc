@@ -129,7 +129,7 @@ sources:
       - "Quels mots-clés sont synonymes de 'géologie' dans le graphe ?"
       - "Quels services WFS sont référencés dans le catalogue BRGM ?"
     prompt: |
-      ## Neo4j graph schema — CSW / BRGM metadata (SOURCE_NAME = "CSW")
+      ## Neo4j graph schema — CSW / BRGM metadata (KG_SOURCE_NAME = "CSW")
 
       All node labels are prefixed with "CSW_".
 
@@ -144,6 +144,7 @@ sources:
       | CSW_Format | id | name, version |
       | CSW_CRS | code | code_space |
       | CSW_OnlineResource | url | protocol, name, function_code |
+      | CSW_ServiceType | name | canonical OGC service name: WFS, WMS, WMTS, ATOM, WCS |
 
       ### Relationships
 
@@ -156,6 +157,7 @@ sources:
       | DISTRIBUTED_AS | CSW_Metadata → CSW_Format | — |
       | USES_CRS | CSW_Metadata → CSW_CRS | — |
       | HAS_ONLINE_RESOURCE | CSW_Metadata → CSW_OnlineResource | — |
+      | PROVIDES | CSW_Metadata → CSW_ServiceType | — |
       | SEMANTICALLY_RELATED | CSW_Keyword → CSW_Keyword | type (BROADER_TERM/NARROWER_TERM/RELATED_TO/IS_TYPE_OF/PART_OF), confidence, inferred_by |
       | SYNONYM_OF | CSW_Keyword → CSW_Keyword | source ("llm"), confidence, inferred_by |
       | SYNONYM_OF | CSW_TopicCategory → CSW_Keyword | source ("iso19115_label"), lang ("fr"/"en") |
@@ -186,6 +188,26 @@ sources:
       MATCH (m:CSW_Metadata)-[:HAS_KEYWORD]->(k:CSW_Keyword {value: "géologie"})
       MATCH (m)-[:DISTRIBUTED_AS]->(f:CSW_Format)
       RETURN DISTINCT f.name, f.version
+
+      // *** PREFERRED: WFS services via PROVIDES (fast, index-backed) ***
+      // Use this pattern for ALL "quels services WFS/WMS/ATOM ?" questions.
+      MATCH (m:CSW_Metadata)-[:PROVIDES]->(s:CSW_ServiceType {name: "WFS"})
+      OPTIONAL MATCH (m)-[:HAS_ONLINE_RESOURCE]->(r:CSW_OnlineResource)
+      WHERE toLower(r.protocol) CONTAINS 'wfs'
+         OR toLower(r.url)      CONTAINS 'wfs'
+      RETURN m.title, r.url, r.protocol, r.name
+      ORDER BY r.url
+      LIMIT 30
+
+      // WMS services
+      MATCH (m:CSW_Metadata)-[:PROVIDES]->(s:CSW_ServiceType {name: "WMS"})
+      OPTIONAL MATCH (m)-[:HAS_ONLINE_RESOURCE]->(r:CSW_OnlineResource)
+      WHERE toLower(r.protocol) CONTAINS 'wms' OR toLower(r.url) CONTAINS 'wms'
+      RETURN m.title, r.url, r.protocol LIMIT 20
+
+      // All service types and how many records provide each
+      MATCH (m:CSW_Metadata)-[:PROVIDES]->(s:CSW_ServiceType)
+      RETURN s.name AS service, count(DISTINCT m) AS n ORDER BY n DESC
 
       // Metadata covering a bounding box (France métropolitaine approx.)
       MATCH (m:CSW_Metadata)

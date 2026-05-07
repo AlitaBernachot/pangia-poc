@@ -16,6 +16,7 @@ from openinference.instrumentation.langchain import LangChainInstrumentor
 from phoenix.otel import register
 
 from app.api.routes.chat import router as chat_router
+from app.api.routes.proxy import router as proxy_router
 from app.api.routes.suggestions import router as suggestions_router
 from app.config import get_settings
 from app.db import close_engine
@@ -77,6 +78,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(chat_router)
+    application.include_router(proxy_router)
     application.include_router(suggestions_router)
     return application
 
