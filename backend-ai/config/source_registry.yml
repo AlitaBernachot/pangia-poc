@@ -219,16 +219,44 @@ sources:
       // Use this pattern when the user asks about a dataset by topic, event,
       // or location mentioned in a title or abstract (e.g. "inondations Ouangani",
       // "compte rendu observations", "carte géologique Alsace").
-      // Extract the most meaningful nouns/proper nouns from the question as the query.
-      // The index 'brgm_metadata_text' covers both title and abstract.
-      CALL db.index.fulltext.queryNodes("brgm_metadata_text", "inondations ouangani observations")
+      //
+      // LUCENE QUERY SYNTAX RULES — always apply these:
+      //   +term   → term is REQUIRED (must appear in results)
+      //   term    → term is optional (boosts score if present)
+      //   "a b"   → phrase match (exact sequence)
+      //
+      // STRATEGY:
+      //   1. Identify proper nouns (place names, organization names, event names) → mark as REQUIRED with +
+      //   2. Add thematic nouns (topic words) as optional boosters
+      //   3. NEVER add generic functional words as required terms: avoid making
+      //      "observations", "compte rendu", "rapport", "données" required — they
+      //      appear in hundreds of records and cause false positives.
+      //
+      // VOCABULARY:
+      //   BRGM_Metadata nodes  = "fiches de métadonnées" / "datasets" (NOT "services")
+      //   BRGM_ServiceType nodes = OGC web service types: WFS, WMS, WMTS, ATOM
+      //   Never call BRGM_Metadata results "services" in your response.
+      //
+      // EXAMPLE — "compte rendu des observations des inondations à Ouangani":
+      //   → required: +Ouangani (proper noun, uniquely identifies geography)
+      //   → optional: inondations observations
+      //   → query: "+Ouangani inondations observations"
+      CALL db.index.fulltext.queryNodes("brgm_metadata_text", "+Ouangani inondations observations")
       YIELD node AS m, score
       RETURN m.title, m.uuid, m.abstract, score
       ORDER BY score DESC
       LIMIT 10
 
+      // EXAMPLE — "carte géologique de l'Alsace":
+      //   → required: +Alsace
+      //   → optional: géologique carte
+      //   → query: "+Alsace géologique"
+      CALL db.index.fulltext.queryNodes("brgm_metadata_text", "+Alsace géologique")
+      YIELD node AS m, score
+      RETURN m.title, m.uuid, score ORDER BY score DESC LIMIT 10
+
       // Combine full-text search with relationship traversal
-      CALL db.index.fulltext.queryNodes("brgm_metadata_text", "ouangani inondations")
+      CALL db.index.fulltext.queryNodes("brgm_metadata_text", "+Ouangani inondations")
       YIELD node AS m, score
       OPTIONAL MATCH (m)-[:HAS_ONLINE_RESOURCE]->(r:BRGM_OnlineResource)
       RETURN m.title, m.uuid, r.url, r.protocol, score

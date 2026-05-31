@@ -188,11 +188,11 @@ def _try_format_resource_list(answer: str) -> str | None:
     # The Cypher query uses LIMIT so we can't know the real total — just report what we have.
     if total_raw != total_dedup:
         header = (
-            f"**{total_dedup} service(s) trouvé(s)** "
+            f"**{total_dedup} résultat(s) trouvé(s)** "
             f"({total_raw} entrées brutes, doublons regroupés) :\n"
         )
     else:
-        header = f"**{total_dedup} service(s) trouvé(s)** :\n"
+        header = f"**{total_dedup} résultat(s) trouvé(s)** :\n"
 
     return header + "\n".join(lines)
 

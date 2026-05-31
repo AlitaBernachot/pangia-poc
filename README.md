@@ -33,7 +33,8 @@ A full-stack AI chat application built around a **multi-agent architecture** for
   - [Table of Contents](#table-of-contents)
   - [Quick Start](#quick-start)
     - [1. Configure environment](#1-configure-environment)
-    - [2. Start all services](#2-start-all-services)
+    - [2. Create the Ollama volume (first time only)](#2-create-the-ollama-volume-first-time-only)
+    - [3. Start all services](#3-start-all-services)
   - [Services](#services)
   - [Project structure](#project-structure)
   - [Notebooks](#notebooks)
@@ -56,7 +57,18 @@ cp .env.example .env
 # Edit .env — set at minimum: OPENAI_API_KEY
 ```
 
-### 2. Start all services
+### 2. Create the Ollama volume (first time only)
+
+The `ollama_data` Docker volume is **external** — it must exist before the first `docker compose up`, otherwise the stack will fail to start.
+
+```bash
+docker volume create ollama_data
+```
+
+> This is intentional: the volume is kept external so that `docker compose down -v` never deletes your downloaded model weights.
+> See [docs/ollama-gemma4-setup.md](docs/ollama-gemma4-setup.md) for the full explanation.
+
+### 3. Start all services
 
 ```bash
 docker compose up --build
