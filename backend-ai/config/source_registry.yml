@@ -22,10 +22,10 @@
 
 sources:
 
-  - id: neo4j_agent
+  - id: kg_source
     connector: neo4j_agent
     active: false
-    label: Neo4j
+    label: KnowledgeGraph
     description: >
       Neo4j knowledge graph agent. Answers questions about geographic entities,
       their spatial relationships, administrative hierarchies, and co-occurrences
@@ -64,6 +64,204 @@ sources:
       - "Find all hospitals within 5 km of a given node."
       - "Show the hierarchy of administrative units in France."
       - "Which entities co-occur with 'Loire' in the graph?"
+
+  - id: kg_brgm_source
+    connector: neo4j_agent
+    active: true
+    label: Géocatalogue BRGM
+    description: >
+      Neo4j knowledge graph agent over 800 ISO 19139 geospatial metadata records
+      harvested from the French national geocatalogue (geocatalogue.fr) via CSW.
+      The data is dominated by BRGM (Bureau de Recherches Géologiques et Minières)
+      productions: geological maps at 1/50 000 (BD Scan-Géol-50), WFS/WMS/ATOM
+      download services, and subsurface observation datasets. Also contains
+      records from SANDRE, regional urbanisme agencies (AURCA, AUDeG), and
+      DDT/DGTM services. Node labels are prefixed with "BRGM_" (e.g. BRGM_Metadata,
+      BRGM_Keyword, BRGM_Organisation). Supports keyword relationship traversal
+      including SYNONYM_OF and SEMANTICALLY_RELATED edges inferred by LLM.
+      Use it to explore which organisations produce which datasets, which
+      keywords co-occur, which formats and CRS are used, and to navigate
+      the thematic structure of French geospatial open data.
+    topics:
+      - géologie
+      - geological map
+      - carte géologique
+      - brgm
+      - sous-sol
+      - stratigraphie
+      - lithologie
+      - failles
+      - formations géologiques
+      - eaux souterraines
+      - wms
+      - wfs
+      - atom
+      - iso 19139
+      - métadonnées
+      - catalogue
+      - geocatalogue
+      - geosciences
+      - knowledge graph
+      - cypher
+    entity_types:
+      - metadata record
+      - organisation
+      - keyword
+      - topic category
+      - distribution format
+      - coordinate reference system
+      - online resource (WMS, WFS, ATOM)
+    capabilities:
+      - graph_traversal
+      - entity_search
+      - co-occurrence
+      - hierarchy
+      - relationship
+      - semantic_search
+    geo_scope: France
+    example_questions:
+      - "Quels datasets géologiques sont produits par le BRGM ?"
+      - "Quelles sont les fiches de métadonnées liées à la stratigraphie ?"
+      - "Quels mots-clés sont associés aux cartes géologiques ?"
+      - "Liste les formats de distribution disponibles dans le catalogue."
+      - "Quelles organisations produisent des données sur les eaux souterraines ?"
+      - "Quels systèmes de projection sont utilisés dans les métadonnées ?"
+      - "Quels mots-clés sont synonymes de 'géologie' dans le graphe ?"
+      - "Quels services WFS sont référencés dans le catalogue BRGM ?"
+    prompt: |
+      ## Neo4j graph schema — CSW / BRGM metadata (KG_SOURCE_NAME = "BRGM")
+
+      All node labels are prefixed with "BRGM_".
+
+      ### Node labels and key properties
+
+      | Label | Key property | Other properties |
+      |---|---|---|
+      | BRGM_Metadata | uuid | title, abstract, hierarchy_level, date_stamp, language, standard, bbox_* |
+      | BRGM_Organisation | name | — |
+      | BRGM_Keyword | value | thesaurus |
+      | BRGM_TopicCategory | code | label_en, label_fr |
+      | BRGM_Format | id | name, version |
+      | BRGM_CRS | code | code_space |
+      | BRGM_OnlineResource | url | protocol, name, function_code |
+      | BRGM_ServiceType | name | canonical OGC service name: WFS, WMS, WMTS, ATOM, WCS |
+
+      ### Relationships
+
+      | Type | From → To | Properties |
+      |---|---|---|
+      | PRODUCED_BY | BRGM_Metadata → BRGM_Organisation | role = "owner" |
+      | CONTACT | BRGM_Metadata → BRGM_Organisation | role = "pointOfContact" / "custodian" / … |
+      | HAS_KEYWORD | BRGM_Metadata → BRGM_Keyword | — |
+      | COVERS_TOPIC | BRGM_Metadata → BRGM_TopicCategory | — |
+      | DISTRIBUTED_AS | BRGM_Metadata → BRGM_Format | — |
+      | USES_CRS | BRGM_Metadata → BRGM_CRS | — |
+      | HAS_ONLINE_RESOURCE | BRGM_Metadata → BRGM_OnlineResource | — |
+      | PROVIDES | BRGM_Metadata → BRGM_ServiceType | — |
+      | SEMANTICALLY_RELATED | BRGM_Keyword → BRGM_Keyword | type (BROADER_TERM/NARROWER_TERM/RELATED_TO/IS_TYPE_OF/PART_OF), confidence, inferred_by |
+      | SYNONYM_OF | BRGM_Keyword → BRGM_Keyword | source ("llm"), confidence, inferred_by |
+      | SYNONYM_OF | BRGM_TopicCategory → BRGM_Keyword | source ("iso19115_label"), lang ("fr"/"en") |
+
+      ### Corpus statistics (800 records from geocatalogue.fr)
+      - Dominant organisation: BRGM (>2 000 occurrences across records)
+      - Dominant topic category: geoscientificInformation (629 records)
+      - Top keywords: géologie, failles, sous-sol, stratigraphie, lithologie, formations, contact
+      - Distribution formats: WMS, WFS, ESRI Shapefile, ATOM, GeoTIFF
+      - Main CRS: Lambert 93 / EPSG:2154, RGFG95 UTM 22N (EPSG:2972)
+
+      ### Example Cypher queries
+
+      ```cypher
+      // Datasets produced by BRGM
+      MATCH (m:BRGM_Metadata)-[:PRODUCED_BY]->(o:BRGM_Organisation {name: "BRGM"})
+      RETURN m.title, m.date_stamp LIMIT 10
+
+      // Keywords related to 'géologie'
+      MATCH (k:BRGM_Keyword {value: "géologie"})-[r:SEMANTICALLY_RELATED|SYNONYM_OF]-(k2:BRGM_Keyword)
+      RETURN k2.value, type(r), r.type LIMIT 20
+
+      // Top organisations by dataset count
+      MATCH (m:BRGM_Metadata)-[:PRODUCED_BY|CONTACT]->(o:BRGM_Organisation)
+      RETURN o.name, count(DISTINCT m) AS n ORDER BY n DESC LIMIT 10
+
+      // Formats available for a given keyword
+      MATCH (m:BRGM_Metadata)-[:HAS_KEYWORD]->(k:BRGM_Keyword {value: "géologie"})
+      MATCH (m)-[:DISTRIBUTED_AS]->(f:BRGM_Format)
+      RETURN DISTINCT f.name, f.version
+
+      // *** PREFERRED: WFS services via PROVIDES (fast, index-backed) ***
+      // Use this pattern for ALL "quels services WFS/WMS/ATOM ?" questions.
+      MATCH (m:BRGM_Metadata)-[:PROVIDES]->(s:BRGM_ServiceType {name: "WFS"})
+      OPTIONAL MATCH (m)-[:HAS_ONLINE_RESOURCE]->(r:BRGM_OnlineResource)
+      WHERE toLower(r.protocol) CONTAINS 'wfs'
+         OR toLower(r.url)      CONTAINS 'wfs'
+      RETURN m.title, r.url, r.protocol, r.name
+      ORDER BY r.url
+      LIMIT 30
+
+      // WMS services
+      MATCH (m:BRGM_Metadata)-[:PROVIDES]->(s:BRGM_ServiceType {name: "WMS"})
+      OPTIONAL MATCH (m)-[:HAS_ONLINE_RESOURCE]->(r:BRGM_OnlineResource)
+      WHERE toLower(r.protocol) CONTAINS 'wms' OR toLower(r.url) CONTAINS 'wms'
+      RETURN m.title, r.url, r.protocol LIMIT 20
+
+      // All service types and how many records provide each
+      MATCH (m:BRGM_Metadata)-[:PROVIDES]->(s:BRGM_ServiceType)
+      RETURN s.name AS service, count(DISTINCT m) AS n ORDER BY n DESC
+
+      // Metadata covering a bounding box (France métropolitaine approx.)
+      MATCH (m:BRGM_Metadata)
+      WHERE m.bbox_west >= -5 AND m.bbox_east <= 10
+        AND m.bbox_south >= 41 AND m.bbox_north <= 52
+      RETURN m.title LIMIT 10
+
+      // *** PREFERRED for title/content search: full-text index ***
+      // Use this pattern when the user asks about a dataset by topic, event,
+      // or location mentioned in a title or abstract (e.g. "inondations Ouangani",
+      // "compte rendu observations", "carte géologique Alsace").
+      //
+      // LUCENE QUERY SYNTAX RULES — always apply these:
+      //   +term   → term is REQUIRED (must appear in results)
+      //   term    → term is optional (boosts score if present)
+      //   "a b"   → phrase match (exact sequence)
+      //
+      // STRATEGY:
+      //   1. Identify proper nouns (place names, organization names, event names) → mark as REQUIRED with +
+      //   2. Add thematic nouns (topic words) as optional boosters
+      //   3. NEVER add generic functional words as required terms: avoid making
+      //      "observations", "compte rendu", "rapport", "données" required — they
+      //      appear in hundreds of records and cause false positives.
+      //
+      // VOCABULARY:
+      //   BRGM_Metadata nodes  = "fiches de métadonnées" / "datasets" (NOT "services")
+      //   BRGM_ServiceType nodes = OGC web service types: WFS, WMS, WMTS, ATOM
+      //   Never call BRGM_Metadata results "services" in your response.
+      //
+      // EXAMPLE — "compte rendu des observations des inondations à Ouangani":
+      //   → required: +Ouangani (proper noun, uniquely identifies geography)
+      //   → optional: inondations observations
+      //   → query: "+Ouangani inondations observations"
+      CALL db.index.fulltext.queryNodes("brgm_metadata_text", "+Ouangani inondations observations")
+      YIELD node AS m, score
+      RETURN m.title, m.uuid, m.abstract, score
+      ORDER BY score DESC
+      LIMIT 10
+
+      // EXAMPLE — "carte géologique de l'Alsace":
+      //   → required: +Alsace
+      //   → optional: géologique carte
+      //   → query: "+Alsace géologique"
+      CALL db.index.fulltext.queryNodes("brgm_metadata_text", "+Alsace géologique")
+      YIELD node AS m, score
+      RETURN m.title, m.uuid, score ORDER BY score DESC LIMIT 10
+
+      // Combine full-text search with relationship traversal
+      CALL db.index.fulltext.queryNodes("brgm_metadata_text", "+Ouangani inondations")
+      YIELD node AS m, score
+      OPTIONAL MATCH (m)-[:HAS_ONLINE_RESOURCE]->(r:BRGM_OnlineResource)
+      RETURN m.title, m.uuid, r.url, r.protocol, score
+      ORDER BY score DESC LIMIT 10
+      ```
 
   - id: postgis_agent
     connector: postgis_agent

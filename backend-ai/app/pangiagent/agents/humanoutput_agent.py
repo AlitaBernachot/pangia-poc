@@ -140,16 +140,54 @@ class HumanOutputAgent(BaseAgent):
         return output
 
     async def _decide(self, inp: AgentInput) -> dict[str, bool]:
+        """Decide which visual components to render.
+
+        Separation of concerns:
+        - ``needs_map``     → driven by **user intent** (IntentParserAgent).
+                              Data-content heuristics only fire when intent is absent.
+        - ``needs_dataviz`` → driven by **data content** (tabular data, statistics).
+        """
         sub_results: dict[str, str] = inp.context.get("sub_results", {})
         existing_dataviz: dict | None = inp.context.get("dataviz")
         existing_geojson: dict | None = inp.context.get("geojson")
+        has_ogc_layers = bool(inp.context.get("has_ogc_layers"))
+        tabular_data: dict | None = inp.context.get("tabular_data")
         user_query = inp.query
 
-        # Intent signal: IntentParserAgent may have already determined needs_map
         intent: dict = inp.context.get("intent") or {}
-        intent_needs_map: bool | None = intent.get("needs_map")  # None = not set
+        intent_needs_map: bool | None = intent.get("needs_map")  # None = not expressed
 
-        # Fast-path: pre-built rich data overrides heuristics
+        # ── needs_map: intent is authoritative ───────────────────────────────
+        # IntentParserAgent decides this from the user's phrasing.
+        # "Quels services WFS ?"           → needs_map=false (list/search intent)
+        # "Affiche sur une carte"          → needs_map=true  (display/map intent)
+        # Only fall back to data heuristics when intent parser didn't express an opinion.
+        if intent_needs_map is not None:
+            needs_map = intent_needs_map
+        else:
+            combined_for_map = f"{' '.join(sub_results.values())} {user_query}"
+            needs_map = (
+                existing_geojson is not None
+                or has_ogc_layers
+                or bool(_COORD_HINT_RE.search(combined_for_map))
+                or bool(_GEO_KEYWORD_RE.search(combined_for_map))
+            )
+            # Tabular data with spatial columns also warrants a map
+            if not needs_map and tabular_data:
+                td_cols = tabular_data.get("columns") or []
+                lat_col, lon_col = find_coord_columns(td_cols)
+                has_wkt_geom = find_wkt_geom_column(td_cols) is not None
+                has_geo_col = any(
+                    c.lower().strip() in {
+                        "geo_point_2d", "coordonnees_gps", "coordonnees_geo",
+                        "geolocalisation", "geo_point", "geoloc", "position", "localisation",
+                    }
+                    for c in td_cols
+                )
+                if (lat_col is not None and lon_col is not None) or has_wkt_geom or has_geo_col:
+                    needs_map = True
+
+        # ── needs_dataviz: data-content driven ───────────────────────────────
         has_prebuilt_dataviz = bool(
             existing_dataviz
             and (
@@ -158,56 +196,12 @@ class HumanOutputAgent(BaseAgent):
                 or existing_dataviz.get("kpis")
             )
         )
-        has_ogc_layers = bool(inp.context.get("has_ogc_layers"))
-        if has_prebuilt_dataviz or existing_geojson is not None or has_ogc_layers:
-            tables = (existing_dataviz or {}).get("tables", [])
-            columns = tables[0].get("columns", []) if tables else []
-            lat_col, lon_col = find_coord_columns(columns)
-            has_wkt_geom = find_wkt_geom_column(columns) is not None
-            needs_map = (
-                existing_geojson is not None
-                or has_ogc_layers
-                or (lat_col is not None and lon_col is not None)
-                or has_wkt_geom
-            )
-            # Let intent override: if user explicitly asked for a map, honour it
-            if intent_needs_map is True:
-                needs_map = True
-            return {
-                "needs_map": needs_map,
-                "needs_dataviz": bool(has_prebuilt_dataviz),
-            }
 
-        # Fast-path: data_gouv ran but produced nothing useful
-        if "data_gouv" in sub_results and not has_prebuilt_dataviz and existing_geojson is None and not has_ogc_layers:
-            other_text = "\n".join(v for k, v in sub_results.items() if k != "data_gouv")
-            other_text = "\n".join(v for k, v in sub_results.items() if k != "data_gouv")
-            combined_other = f"{other_text} {user_query}"
-            needs_map = bool(
-                _COORD_HINT_RE.search(combined_other) or _GEO_KEYWORD_RE.search(combined_other)
-            )
-            if intent_needs_map is True:
-                needs_map = True
-            return {"needs_map": needs_map, "needs_dataviz": False}
+        if has_prebuilt_dataviz:
+            return {"needs_map": needs_map, "needs_dataviz": True}
 
-        # Fast-path: tabular_data with coordinate columns → needs_map=True without LLM
-        tabular_data: dict | None = inp.context.get("tabular_data")
-        if tabular_data and not inp.context.get("geojson"):
-            td_cols = tabular_data.get("columns") or []
-            lat_col, lon_col = find_coord_columns(td_cols)
-            has_wkt_geom = find_wkt_geom_column(td_cols) is not None
-            has_combined = any(
-                c.lower().strip() in {
-                    "geo_point_2d", "coordonnees_gps", "coordonnees_geo",
-                    "geolocalisation", "geo_point", "geoloc", "position", "localisation",
-                }
-                for c in td_cols
-            )
-            if (lat_col is not None and lon_col is not None) or has_wkt_geom or has_combined:
-                return {
-                    "needs_map": True,
-                    "needs_dataviz": bool(tabular_data.get("rows")),
-                }
+        if tabular_data and tabular_data.get("rows"):
+            return {"needs_map": needs_map, "needs_dataviz": True}
 
         sub_text = "\n\n".join(
             f"[{agent.upper()} RESULTS]:\n{result}"
@@ -216,32 +210,18 @@ class HumanOutputAgent(BaseAgent):
         )
         combined = f"{sub_text} {user_query}"
 
-        # Fast-path: nothing to work with
         if not combined.strip():
-            if intent_needs_map is True:
-                return {"needs_map": True, "needs_dataviz": False}
-            return {"needs_map": False, "needs_dataviz": False}
+            return {"needs_map": needs_map, "needs_dataviz": False}
 
-        # Heuristic screening
-        has_geo_signal = bool(
-            _COORD_HINT_RE.search(combined) or _GEO_KEYWORD_RE.search(combined)
-        )
         has_dataviz_signal = bool(
             _NUMERIC_HINT_RE.search(combined) or _DATAVIZ_KEYWORD_RE.search(combined)
         )
-        geo_strong = bool(_GEO_KEYWORD_RE.search(combined))
         dataviz_strong = bool(_DATAVIZ_KEYWORD_RE.search(combined))
 
-        # Intent override: if user explicitly asked for a map, honour it
-        if intent_needs_map is True:
-            has_geo_signal = True
-            geo_strong = True
+        if dataviz_strong or not has_dataviz_signal:
+            return {"needs_map": needs_map, "needs_dataviz": has_dataviz_signal}
 
-        # Both sides have a definitive heuristic answer → skip the LLM
-        if (geo_strong or not has_geo_signal) and (dataviz_strong or not has_dataviz_signal):
-            return {"needs_map": has_geo_signal, "needs_dataviz": has_dataviz_signal}
-
-        # Ambiguous → ask the LLM
+        # Ambiguous needs_dataviz → ask LLM
         llm = build_llm(get_agent_model_config(self.name))
         context = (
             f"{sub_text}\n\nOriginal user question: {user_query}"
@@ -260,11 +240,12 @@ class HumanOutputAgent(BaseAgent):
             raw = re.sub(r"\n?```$", "", raw.strip())
         try:
             decision = json.loads(raw)
-            needs_map = bool(decision.get("needs_map", has_geo_signal))
             needs_dataviz = bool(decision.get("needs_dataviz", has_dataviz_signal))
+            # Only accept LLM's needs_map opinion when intent parser was silent
+            if intent_needs_map is None:
+                needs_map = bool(decision.get("needs_map", needs_map))
         except (json.JSONDecodeError, AttributeError):
             logger.warning("HumanOutputAgent: could not parse LLM response %r", raw)
-            needs_map = has_geo_signal
             needs_dataviz = has_dataviz_signal
 
         return {"needs_map": needs_map, "needs_dataviz": needs_dataviz}

@@ -108,6 +108,15 @@ prompt: |
   Query: "Compare les accidents de la route en 2022 et 2023"
   → {"action": "compare", "entity_concept": "accidents de la route", "filters": [], "geo_scope": "", "needs_map": false, "is_followup": false}
 
+  Query: "Quels services WFS sont référencés dans le catalogue BRGM ?"
+  → {"action": "search", "entity_concept": "services WFS catalogue BRGM", "filters": [], "geo_scope": "France", "needs_map": false, "is_followup": false}
+
+  Query: "Affiche moi les services WFS référencés dans le catalogue BRGM sur une carte"
+  → {"action": "display", "entity_concept": "services WFS catalogue BRGM", "filters": [], "geo_scope": "France", "needs_map": true, "is_followup": false}
+
+  Query: "Liste les endpoints WMS disponibles dans le géocatalogue"
+  → {"action": "search", "entity_concept": "services WMS géocatalogue", "filters": [], "geo_scope": "", "needs_map": false, "is_followup": false}
+
   Query: "Show all bike-sharing stations in Lyon"
   → {"action": "display", "entity_concept": "vélos en libre-service", "filters": [], "geo_scope": "Lyon", "needs_map": true, "is_followup": false}
 

@@ -53,7 +53,7 @@ class GeoNetworkMCPAgent(BaseAgent):
         )
 
         messages = [
-            SystemMessage(content=self._system_prompt),
+            SystemMessage(content=self.get_prompt_for_request(inp, self._DEFAULT_PROMPT)),
             HumanMessage(content=user_content),
         ]
         try:

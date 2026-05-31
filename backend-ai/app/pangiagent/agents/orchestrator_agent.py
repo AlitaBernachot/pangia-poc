@@ -55,6 +55,7 @@ from app.pangiagent.hitl import get_hitl_manager
 from app.pangiagent.memory import LongTermMemory
 from app.models import AgentInput, HITLRequest
 from app.pangiagent.router import DynamicRouter
+from app.pangiagent.source_registry import get_registry
 from app.pangiagent.state import OrchestratorState
 from app.pangiagent.agents.ambiguity_agent import AmbiguityAgent
 from app.pangiagent.agents.title_agent import TitleAgent
@@ -299,11 +300,14 @@ async def router_node(state: OrchestratorState) -> dict:
 
         dispatcher = SmartDispatcherAgent()
         user_selected: list[str] = state.get("selected_sources") or []
-        active = (
-            [k for k in _AGENT_REGISTRY if k in user_selected]
-            if user_selected
-            else list(_AGENT_REGISTRY.keys())
-        )
+        if user_selected:
+            # Map source registry IDs (e.g. "kg_brgm_source") to connector names
+            # (e.g. "neo4j_agent") so that AGENT_REGISTRY filtering works correctly.
+            src_registry = get_registry()
+            connectors = {e.connector for e in src_registry if e.id in user_selected}
+            active = [k for k in _AGENT_REGISTRY if k in connectors]
+        else:
+            active = list(_AGENT_REGISTRY.keys())
         inp = AgentInput(
             query=state["query"],
             session_id=state["session_id"],
@@ -419,10 +423,12 @@ def _dispatch_agents(state: OrchestratorState):
     # multiple agents run in parallel and LangGraph merges their outputs back
     # into OrchestratorState (plain keys like `query` can only be written once
     # per step without a reducer).
+    ctx = dict(state.get("context") or {})
+    ctx["selected_sources"] = state.get("selected_sources") or []
     subgraph_input = {
         "query": state["query"],
         "session_id": state["session_id"],
-        "context": state.get("context", {}),
+        "context": ctx,
         "sub_results": {},
     }
     return [Send(a, subgraph_input) for a in agents]

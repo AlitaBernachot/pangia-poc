@@ -60,7 +60,7 @@ class RDFAgent(BaseAgent):
         # Step 1 — generate SPARQL
         try:
             gen_response = await self._llm.ainvoke([
-                SystemMessage(content=self._system_prompt),
+                SystemMessage(content=self.get_prompt_for_request(inp, _DEFAULT_PROMPT)),
                 HumanMessage(content=question),
             ])
             sparql = _extract_sparql(str(gen_response.content))

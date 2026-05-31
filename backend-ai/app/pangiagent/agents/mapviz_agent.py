@@ -87,6 +87,54 @@ _COORD_HINT_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Matches OGC WFS protocol strings and WFS substrings in URLs
+_WFS_PROTO_RE = re.compile(r"\bOGC:WFS\b|(?<![A-Za-z])WFS(?![A-Za-z])", re.IGNORECASE)
+
+
+def _extract_wfs_layers(sub_results: dict[str, str]) -> list[dict[str, str]]:
+    """Scan structured JSON sub-results for WFS service URLs.
+
+    Matches records produced by the Neo4j CSW graph schema (``CSW_OnlineResource``
+    nodes) that expose ``r.url``, ``r.protocol``, ``r.name``, and
+    ``example_title`` columns. Returns a list of layer dicts ready to be
+    stored in ``AgentOutput.state["ogc_layers"]``.
+    """
+    layers: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for result_text in sub_results.values():
+        if not isinstance(result_text, str):
+            continue
+        # Sub-results embed a JSON array between the Cypher block and end-of-string
+        for m in re.finditer(r"\[\s*\{.*?\}\s*\]", result_text, re.DOTALL):
+            try:
+                records = json.loads(m.group(0))
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(records, list):
+                continue
+            for rec in records:
+                if not isinstance(rec, dict):
+                    continue
+                url: str = rec.get("r.url") or rec.get("url") or ""
+                protocol: str = rec.get("r.protocol") or rec.get("protocol") or ""
+                name: str = rec.get("r.name") or rec.get("name") or ""
+                title: str = rec.get("example_title") or rec.get("m.title") or ""
+                if not url or url in seen:
+                    continue
+                proto_is_wfs = bool(_WFS_PROTO_RE.search(protocol))
+                url_has_wfs = "wfs" in url.lower()
+                # Exclude non-WFS protocols (e.g. WWW:LINK download links)
+                non_wfs_protocol = bool(protocol) and not proto_is_wfs
+                if proto_is_wfs or (url_has_wfs and not non_wfs_protocol):
+                    seen.add(url)
+                    layers.append({
+                        "url": url,
+                        "name": name or url.rstrip("?").split("/")[-1],
+                        "title": title,
+                        "protocol": protocol,
+                    })
+    return layers
+
 
 @tool
 async def extract_geojson_from_text(text: str) -> str:
@@ -410,6 +458,19 @@ class MapVizAgent(BaseReActAgent):
             output.state["geojson"] = existing_geojson
             return output
 
+        # WFS service URLs detected in sub-results — expose as OGC layers, skip geocoding
+        wfs_layers = _extract_wfs_layers(sub_results)
+        if wfs_layers:
+            logger.debug("MapVizAgent: %d WFS layer(s) extracted from sub-results", len(wfs_layers))
+            output = AgentOutput(
+                agent_name=self.name,
+                answer=f"{len(wfs_layers)} service(s) WFS détecté(s) dans les résultats.",
+                confidence=0.9,
+            )
+            output.state["ogc_layers"] = wfs_layers
+            output.state["geojson"] = None
+            return output
+
         # Build GeoJSON from dataviz table coordinate columns if present
         _raw_injection = ""
         if existing_dataviz and existing_dataviz.get("tables"):
@@ -542,7 +603,9 @@ class MapVizAgent(BaseReActAgent):
         agent = self
 
         async def mapviz_node(state: OrchestratorState) -> dict:
-            sub_text: dict[str, str] = {
+            # Pass the raw sub_results (dicts with "answer" key) so that
+            # _extract_wfs_layers can scan the full answer text for JSON arrays.
+            sub_results_raw: dict[str, str] = {
                 k: (v.get("answer") or "") if isinstance(v, dict) else str(v)
                 for k, v in (state.get("sub_results") or {}).items()
             }
@@ -550,7 +613,7 @@ class MapVizAgent(BaseReActAgent):
                 query=state["query"],
                 session_id=state["session_id"],
                 context={
-                    "sub_results": sub_text,
+                    "sub_results": sub_results_raw,
                     "dataviz": state.get("dataviz"),
                     "geojson": state.get("geojson"),
                 },
@@ -558,9 +621,16 @@ class MapVizAgent(BaseReActAgent):
             try:
                 output = await agent.run(inp)
                 gj = output.state.get("geojson")
+                ogc = output.state.get("ogc_layers")
             except Exception:
                 logger.exception("mapviz_node: agent raised")
                 gj = None
-            return {"geojson": gj} if gj is not None else {}
+                ogc = None
+            result: dict = {}
+            if gj is not None:
+                result["geojson"] = gj
+            if ogc is not None:
+                result["ogc_layers"] = ogc
+            return result
 
         return mapviz_node

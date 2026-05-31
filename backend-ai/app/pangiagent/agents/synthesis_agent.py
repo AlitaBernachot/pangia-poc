@@ -28,6 +28,7 @@ Design notes
 """
 from __future__ import annotations
 
+import json
 import logging
 from typing import TYPE_CHECKING, Any, Callable, Coroutine
 
@@ -113,6 +114,87 @@ You will be given:
    a list by showing only a subset.**
 10. Use Markdown for emphasis (bold, italic, lists) when it improves readability.
 """
+
+
+def _try_format_resource_list(answer: str) -> str | None:
+    """Try to extract and format a named-resource list from a structured agent answer.
+
+    Detects ``Results (JSON):`` blocks whose records contain a title field and an
+    optional URL field, and renders them as a Markdown bullet list.
+
+    Returns the formatted Markdown string, or ``None`` if the answer doesn't match
+    the expected shape (numerical/statistical data → caller should use the LLM).
+    """
+    import re as _re
+
+    m = _re.search(r"Results \(JSON\):\s*(\[.*\])", answer, _re.DOTALL)
+    if not m:
+        return None
+
+    try:
+        records: list[dict] = json.loads(m.group(1))
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+    if not isinstance(records, list) or not records:
+        return None
+
+    # Find the title and URL keys (e.g. "m.title", "r.url", "title", "url")
+    first = records[0]
+    title_key = next((k for k in first if k.endswith(".title") or k == "title"), None)
+    url_key = next((k for k in first if k.endswith(".url") or k == "url"), None)
+    proto_key = next((k for k in first if k.endswith(".protocol") or k == "protocol"), None)
+
+    if title_key is None:
+        # No title field → numerical/statistical data, let the LLM handle it
+        return None
+
+    # Deduplicate: for each title, prefer OGC:WFS/WMS over WWW:DOWNLOAD/LINK entries
+    seen: dict[str, dict] = {}
+    for rec in records:
+        title: str = (rec.get(title_key) or "").strip()
+        if not title:
+            continue
+        proto: str = (rec.get(proto_key) or "") if proto_key else ""
+        url: str = (rec.get(url_key) or "") if url_key else ""
+        is_ogc = proto.upper().startswith("OGC:")
+        existing = seen.get(title)
+        if existing is None:
+            seen[title] = {"url": url, "proto": proto, "is_ogc": is_ogc}
+        elif is_ogc and not existing["is_ogc"]:
+            # Prefer OGC entries over WWW:DOWNLOAD/LINK duplicates
+            seen[title] = {"url": url, "proto": proto, "is_ogc": is_ogc}
+
+    if not seen:
+        return None
+
+    total_raw = len(records)
+    total_dedup = len(seen)
+
+    lines: list[str] = []
+    for title, info in seen.items():
+        url = info["url"]
+        proto = info["proto"]
+        if url and proto:
+            lines.append(f"- **{title}** — {proto} — [{url}]({url})")
+        elif url:
+            lines.append(f"- **{title}** — [{url}]({url})")
+        elif proto:
+            lines.append(f"- **{title}** — {proto}")
+        else:
+            lines.append(f"- **{title}**")
+
+    # Header: total displayed (after dedup), note if raw results suggest truncation
+    # The Cypher query uses LIMIT so we can't know the real total — just report what we have.
+    if total_raw != total_dedup:
+        header = (
+            f"**{total_dedup} résultat(s) trouvé(s)** "
+            f"({total_raw} entrées brutes, doublons regroupés) :\n"
+        )
+    else:
+        header = f"**{total_dedup} résultat(s) trouvé(s)** :\n"
+
+    return header + "\n".join(lines)
 
 
 class SynthesisAgent(BaseAgent):
@@ -226,17 +308,41 @@ class SynthesisAgent(BaseAgent):
 
             # ── Discovery / listing bypass ────────────────────────────────
             # When there is no structured output (no dataviz, no geojson, no ogc),
-            # the sub-agent answer is already the final answer.
+            # try to format the answer directly without LLM.
             if not has_dataviz and not has_geojson and not has_ogc_layers and successful:
                 import re as _re
-                # Strip "[agent_name]: " prefixes produced by the merge step
-                clean = raw_results
-                for name, _ in successful:
-                    clean = _re.sub(rf"^\[{_re.escape(name)}\]:\s*", "", clean, flags=_re.MULTILINE)
-                clean = clean.strip()
-                if footer:
-                    clean = clean.rstrip("\n") + "\n\n" + footer
-                return {"final_answer": clean}
+                has_json_results = any(
+                    "Results (JSON):" in r.get("answer", "")
+                    or "Results (SPARQL):" in r.get("answer", "")
+                    for _, r in successful
+                )
+                if has_json_results:
+                    # Try to format resource lists (title+url records) directly
+                    formatted_parts: list[str] = []
+                    needs_llm = False
+                    for _, r in successful:
+                        ans = r.get("answer", "")
+                        formatted = _try_format_resource_list(ans)
+                        if formatted is not None:
+                            formatted_parts.append(formatted)
+                        else:
+                            needs_llm = True
+                            break
+                    if not needs_llm and formatted_parts:
+                        clean = "\n\n".join(formatted_parts)
+                        if footer:
+                            clean = clean.rstrip("\n") + "\n\n" + footer
+                        return {"final_answer": clean}
+                    # Numerical/statistical data or mixed → use LLM
+                else:
+                    # Pure prose answers → return as-is
+                    clean = raw_results
+                    for name, _ in successful:
+                        clean = _re.sub(rf"^\[{_re.escape(name)}\]:\s*", "", clean, flags=_re.MULTILINE)
+                    clean = clean.strip()
+                    if footer:
+                        clean = clean.rstrip("\n") + "\n\n" + footer
+                    return {"final_answer": clean}
 
             try:
                 output = await agent.run(inp)

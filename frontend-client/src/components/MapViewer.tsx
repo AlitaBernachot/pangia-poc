@@ -5,8 +5,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { AlertTriangle, Map, Maximize2, Minimize2 } from 'lucide-react'
+import { Layers, Map, Maximize2, Minimize2 } from 'lucide-react'
 import type { OgcLayer } from '../types'
+import { MapLayerTree, type LayerStatus } from './MapLayerTree'
 
 // Fix default marker icon paths broken by bundlers
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -17,10 +18,15 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
+const API_BASE: string = import.meta.env.VITE_API_URL ?? ''
+
 interface Props {
   geojson?: Record<string, unknown> | null
   ogcLayers?: OgcLayer[] | null
 }
+
+// Palette for OGC/WFS layers (each layer gets a distinct colour)
+const OGC_COLORS = ['#f97316', '#a855f7', '#10b981', '#eab308', '#ec4899']
 
 function countFeatures(gj: Record<string, unknown> | null | undefined): number {
   if (!gj) return 0
@@ -29,21 +35,38 @@ function countFeatures(gj: Record<string, unknown> | null | undefined): number {
   return 0
 }
 
-// Palette for OGC layers (each layer gets a distinct colour)
-const OGC_COLORS = ['#f97316', '#a855f7', '#10b981', '#eab308', '#ec4899']
+function buildLayerFetchUrl(layer: OgcLayer): string {
+  const proto = (layer.protocol ?? '').toLowerCase()
+  const isWfs1x = proto.startsWith('ogc:wfs') || proto === 'wfs'
+  let upstreamUrl: string
+  if (isWfs1x) {
+    const base = layer.url.split('?')[0]
+    const typename = layer.name || base.split('/').pop() || 'layer'
+    // SRSNAME=EPSG:4326 forces WGS84 output so Leaflet can display coordinates correctly.
+    // Without it, servers often return Lambert 93 (EPSG:2154) or other projected CRS.
+    upstreamUrl = `${base}?SERVICE=WFS&REQUEST=GetFeature&VERSION=1.0.0&TYPENAME=${encodeURIComponent(typename)}&SRSNAME=EPSG:4326&OUTPUTFORMAT=application%2Fjson&maxFeatures=200`
+  } else {
+    // OGC API Features
+    const base = layer.url.split('?')[0].replace(/\/items\/?$/, '')
+    upstreamUrl = `${base}/items?f=json&limit=500`
+  }
+  return `${API_BASE}/api/proxy/wfs?url=${encodeURIComponent(upstreamUrl)}`
+}
 
 export function MapViewer({ geojson, ogcLayers }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layerRef = useRef<L.GeoJSON | null>(null)
-  const ogcLayerRefs = useRef<L.GeoJSON[]>([])
-  const [ogcFeatureCount, setOgcFeatureCount] = useState(0)
-  const [ogcError, setOgcError] = useState<string | null>(null)
+  const ogcLayerRefs = useRef<Record<number, L.GeoJSON>>({})
+
+  const [visibleLayers, setVisibleLayers] = useState<Record<number, boolean>>({})
+  const [layerStatus, setLayerStatus] = useState<Record<number, LayerStatus>>({})
+  const [layerFeatureCounts, setLayerFeatureCounts] = useState<Record<number, number>>({})
+  const [showLayerTree, setShowLayerTree] = useState(true)
   const [isFullscreen, setIsFullscreen] = useState(false)
 
   const toggleFullscreen = useCallback(() => {
     setIsFullscreen((fs) => {
-      // Leaflet needs one tick to measure the resized container
       setTimeout(() => mapRef.current?.invalidateSize(), 50)
       return !fs
     })
@@ -57,10 +80,16 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [isFullscreen, toggleFullscreen])
 
+  // Reset per-layer state when ogcLayers list changes
+  useEffect(() => {
+    setVisibleLayers(Object.fromEntries((ogcLayers ?? []).map((_, i) => [i, true])))
+    setLayerStatus({})
+    setLayerFeatureCounts({})
+  }, [ogcLayers])
+
   // Initialise map once
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
-
     const map = L.map(containerRef.current, { zoomControl: true, attributionControl: true })
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:
@@ -69,23 +98,14 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
       maxZoom: 19,
     }).addTo(map)
     mapRef.current = map
-
-    return () => {
-      map.remove()
-      mapRef.current = null
-    }
+    return () => { map.remove(); mapRef.current = null }
   }, [])
 
   // Re-render GeoJSON layer when data changes
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
-
-    if (layerRef.current) {
-      layerRef.current.remove()
-      layerRef.current = null
-    }
-
+    if (layerRef.current) { layerRef.current.remove(); layerRef.current = null }
     if (!countFeatures(geojson)) return
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -93,12 +113,8 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       pointToLayer(_feature: any, latlng: L.LatLng) {
         return L.circleMarker(latlng, {
-          radius: 8,
-          fillColor: '#38bdf8',
-          color: '#ffffff',
-          weight: 1.5,
-          opacity: 1,
-          fillOpacity: 0.85,
+          radius: 8, fillColor: '#38bdf8', color: '#ffffff',
+          weight: 1.5, opacity: 1, fillOpacity: 0.85,
         })
       },
       style() {
@@ -108,61 +124,47 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
       onEachFeature(feature: any, l: L.Layer) {
         const props = feature.properties ?? {}
         if (!Object.keys(props).length) return
-
-        // Keys to skip from the property table (redundant or internal)
         const SKIP = new Set(['popup_content', 'latitude', 'longitude', 'lat', 'lon', 'lng'])
-
         const name: string = props.name ?? props.display_name ?? props.nom_court ?? props.titre ?? ''
         const prebuiltPopup: string = props.popup_content ?? ''
-
         let html = ''
         if (name) html += `<strong>${name}</strong>`
-        if (prebuiltPopup && prebuiltPopup !== name) {
-          html += (html ? '<br>' : '') + prebuiltPopup
-        }
-
-        // Build a compact key/value table for all remaining properties
+        if (prebuiltPopup && prebuiltPopup !== name) html += (html ? '<br>' : '') + prebuiltPopup
         const rows = Object.entries(props)
           .filter(([k]) => !SKIP.has(k) && k !== 'name' && k !== 'display_name')
           .map(([k, v]) => {
-            const label = k.replace(/_/g, ' ')
             const val = v === null || v === undefined ? '' : String(v)
             if (!val) return ''
-            return `<tr><td style="color:#94a3b8;padding-right:6px;white-space:nowrap">${label}</td><td style="word-break:break-word">${val}</td></tr>`
+            return `<tr><td style="color:#94a3b8;padding-right:6px;white-space:nowrap">${k.replace(/_/g, ' ')}</td><td style="word-break:break-word">${val}</td></tr>`
           })
           .filter(Boolean)
-
         if (rows.length) {
           html += (html ? '<hr style="border-color:#334155;margin:4px 0">' : '')
           html += `<table style="font-size:11px;border-collapse:collapse;width:100%">${rows.join('')}</table>`
         }
-
         if (html) (l as L.Path).bindPopup(html, { maxWidth: 320 })
       },
     }).addTo(map)
-
     layerRef.current = layer
-
     const bounds = layer.getBounds()
     if (bounds.isValid()) map.fitBounds(bounds, { padding: [32, 32], maxZoom: 14 })
   }, [geojson])
 
-  // Load and display OGC API Features layers
+  // Load OGC / WFS layers (runs once per ogcLayers reference)
   useEffect(() => {
     if (!ogcLayers?.length) return
     const controllers: AbortController[] = []
     let mounted = true
-    let totalFeatures = 0
-    setOgcError(null)
 
     async function loadLayer(layer: OgcLayer, idx: number) {
+      if (!mapRef.current) return
       const ctrl = new AbortController()
       controllers.push(ctrl)
+      const color = OGC_COLORS[idx % OGC_COLORS.length]
+      setLayerStatus(s => ({ ...s, [idx]: 'loading' }))
+
       try {
-        // Build /items URL: strip query params and trailing /items, then re-append
-        const base = layer.url.split('?')[0].replace(/\/items\/?$/, '')
-        const itemsUrl = `${base}/items?f=json&limit=500`
-        const res = await fetch(itemsUrl, {
+        const res = await fetch(buildLayerFetchUrl(layer), {
           signal: ctrl.signal,
           headers: { Accept: 'application/geo+json, application/json' },
         })
@@ -170,18 +172,13 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
         const fc = await res.json()
         if (!mounted || fc.type !== 'FeatureCollection') return
 
-        const color = OGC_COLORS[idx % OGC_COLORS.length]
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const geoLayer = L.geoJSON(fc as any, {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           pointToLayer(_feature: any, latlng: L.LatLng) {
             return L.circleMarker(latlng, {
-              radius: 7,
-              fillColor: color,
-              color: '#ffffff',
-              weight: 1.5,
-              opacity: 1,
-              fillOpacity: 0.85,
+              radius: 7, fillColor: color, color: '#ffffff',
+              weight: 1.5, opacity: 1, fillOpacity: 0.85,
             })
           },
           style() {
@@ -204,15 +201,19 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
           },
         }).addTo(mapRef.current!)
 
-        ogcLayerRefs.current.push(geoLayer)
-        totalFeatures += (fc.features ?? []).length
-        if (mounted) setOgcFeatureCount(totalFeatures)
-
+        ogcLayerRefs.current[idx] = geoLayer
+        const count = (fc.features ?? []).length
+        if (mounted) {
+          setLayerFeatureCounts(c => ({ ...c, [idx]: count }))
+          setLayerStatus(s => ({ ...s, [idx]: 'loaded' }))
+        }
         const bounds = geoLayer.getBounds()
         if (bounds.isValid()) mapRef.current!.fitBounds(bounds, { padding: [32, 32], maxZoom: 14 })
       } catch (err: unknown) {
         if (err instanceof Error && err.name === 'AbortError') return
-        if (mounted) setOgcError(`Impossible de charger la couche « ${layer.title || layer.name || 'WFS'} »`)
+        if (mounted) {
+          setLayerStatus(s => ({ ...s, [idx]: 'error' }))
+        }
       }
     }
 
@@ -220,16 +221,29 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
 
     return () => {
       mounted = false
-      controllers.forEach((c) => c.abort())
-      ogcLayerRefs.current.forEach((l) => l.remove())
-      ogcLayerRefs.current = []
-      setOgcFeatureCount(0)
+      controllers.forEach(c => c.abort())
+      Object.values(ogcLayerRefs.current).forEach(l => l.remove())
+      ogcLayerRefs.current = {}
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ogcLayers])
 
-  const featureCount = countFeatures(geojson) + ogcFeatureCount
-  const totalLayers = (ogcLayers?.length ?? 0)
+  // Sync Leaflet layer visibility when user toggles a layer
+  useEffect(() => {
+    if (!mapRef.current) return
+    Object.entries(ogcLayerRefs.current).forEach(([idxStr, layer]) => {
+      if (visibleLayers[Number(idxStr)] === false) {
+        layer.remove()
+      } else {
+        layer.addTo(mapRef.current!)
+      }
+    })
+  }, [visibleLayers])
+
+  const geojsonFeatureCount = countFeatures(geojson)
+  const ogcFeatureCount = Object.values(layerFeatureCounts).reduce((a, b) => a + b, 0)
+  const totalFeatureCount = geojsonFeatureCount + ogcFeatureCount
+  const layerCount = ogcLayers?.length ?? 0
 
   function downloadGeoJson() {
     if (!geojson) return
@@ -243,7 +257,7 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
   }
 
   const containerClass = isFullscreen
-    ? 'fixed inset-0 z-[9999] flex flex-col bg-[#0f0f1a]'
+    ? 'fixed inset-0 z-[9999] flex flex-col bg-[#07111f]'
     : 'rounded-xl overflow-hidden border border-white/10 mt-2 w-full'
 
   return (
@@ -253,10 +267,25 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
         <Map size={14} className="text-white/50" />
         <span className="text-xs font-medium text-white/70">Interactive Map</span>
         <span className="text-xs text-white/30">
-          {featureCount} feature{featureCount !== 1 ? 's' : ''}
-          {totalLayers > 0 && ` · ${totalLayers} OGC layer${totalLayers !== 1 ? 's' : ''}`}
+          {totalFeatureCount > 0 && `${totalFeatureCount} feature${totalFeatureCount !== 1 ? 's' : ''}`}
+          {layerCount > 0 && ` · ${layerCount} couche${layerCount !== 1 ? 's' : ''}`}
         </span>
         <div className="ml-auto flex items-center gap-1.5">
+          {layerCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowLayerTree(v => !v)}
+              title="Afficher/masquer le panneau des couches"
+              className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors cursor-pointer ${
+                showLayerTree
+                  ? 'border-white/25 text-white/80 bg-white/8'
+                  : 'border-white/10 text-white/40 hover:text-white/70 hover:border-white/20'
+              }`}
+            >
+              <Layers size={12} />
+              <span>Couches</span>
+            </button>
+          )}
           {geojson && (
             <button
               type="button"
@@ -276,17 +305,28 @@ export function MapViewer({ geojson, ogcLayers }: Props) {
           </button>
         </div>
       </div>
-      {ogcError && (
-        <div className="flex items-start gap-2 px-3 py-2 text-xs text-red-300 bg-red-950/40 border-b border-red-800/30">
-          <AlertTriangle size={13} className="mt-px shrink-0" />
-          <span>{ogcError}</span>
-        </div>
-      )}
-      {/* Map container */}
+
+      {/* Map container — relative so the layer panel can float inside it */}
       <div
-        ref={containerRef}
-        style={isFullscreen ? { flex: 1, background: '#1a1a2e' } : { height: 320, background: '#1a1a2e' }}
-      />
+        className="relative"
+        style={isFullscreen ? { flex: 1, background: '#07111f' } : { height: 320, background: '#07111f' }}
+      >
+        <div ref={containerRef} className="absolute inset-0" />
+
+        {/* Floating layer tree — bottom-left overlay */}
+        {showLayerTree && layerCount > 0 && (
+          <div className="absolute bottom-2 left-2 z-[1001] pointer-events-auto">
+            <MapLayerTree
+              layers={ogcLayers!}
+              colors={OGC_COLORS}
+              visibleLayers={visibleLayers}
+              layerStatus={layerStatus}
+              layerFeatureCounts={layerFeatureCounts}
+              onToggleVisibility={(idx) => setVisibleLayers(v => ({ ...v, [idx]: v[idx] !== false ? false : true }))}
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

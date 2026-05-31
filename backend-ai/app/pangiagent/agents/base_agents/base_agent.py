@@ -188,6 +188,43 @@ class BaseAgent(ABC):
             logger.debug("BaseAgent: could not load source registry entry for '%s'", self.name)
         return base
 
+    def get_prompt_for_request(self, inp: AgentInput, default: str) -> str:
+        """Return the system prompt augmented with the source-specific ``prompt`` block
+        for the *current request*.
+
+        Unlike :meth:`get_source_augmented_prompt` (which is evaluated once at
+        ``__init__`` time and uses the connector name as a lookup key),
+        this method is called at request time and uses
+        ``inp.context["selected_sources"]`` to find the exact registry entry
+        that was selected by the dispatcher for this query.  This correctly
+        handles the case where multiple registry entries share the same
+        connector (e.g. ``kg_source`` and ``kg_brgm_source`` both use
+        ``neo4j_agent``).
+
+        Parameters
+        ----------
+        inp:
+            The current :class:`~app.models.AgentInput`.
+        default:
+            Hardcoded fallback string passed through to :meth:`get_prompt`.
+        """
+        base = self.get_prompt(default)
+        selected: list[str] = inp.context.get("selected_sources") or []
+        if not selected:
+            return base
+        try:
+            from app.pangiagent.source_registry import get_registry  # noqa: PLC0415
+            for entry in get_registry():
+                if entry.connector == self.name and entry.id in selected and entry.prompt:
+                    logger.debug(
+                        "BaseAgent: injecting registry prompt from '%s' into '%s'",
+                        entry.id, self.name,
+                    )
+                    return f"{base}\n\n## Source context\n\n{entry.prompt.strip()}"
+        except Exception:
+            logger.debug("BaseAgent: could not load registry for '%s'", self.name)
+        return base
+
     # ── Intent helpers (populated by IntentParserAgent before fan-out) ────────
 
     def get_intent(self, inp: AgentInput) -> dict:
