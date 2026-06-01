@@ -31,7 +31,12 @@ Public API
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from app.config import Settings
 
 # Re-export for backwards compatibility so existing imports keep working.
 from app.pangiagent.provider_config import PROVIDER_CLASS_MAP, build_llm  # noqa: F401
@@ -77,7 +82,10 @@ class AgentModelConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def get_agent_max_iterations(agent_key: str) -> int:
+def get_agent_max_iterations(
+    agent_key: str,
+    settings: "Settings | None" = None,
+) -> int:
     """Return the maximum ReAct loop iterations for *agent_key*.
 
     Looks up ``<agent_key>_max_iterations`` from application settings.
@@ -87,15 +95,23 @@ def get_agent_max_iterations(agent_key: str) -> int:
     ----------
     agent_key:
         Snake-case agent name, e.g. ``"neo4j_agent"``.
+    settings:
+        Optional :class:`~app.config.Settings` instance.  When ``None``
+        (default) :func:`~app.config.get_settings` is called so the value is
+        resolved from environment variables / ``.env``.
     """
-    from app.config import get_settings  # noqa: PLC0415
+    from app.config import Settings, get_settings  # noqa: PLC0415
 
-    settings = get_settings()
+    if settings is None:
+        settings = get_settings()
     per_agent: int = getattr(settings, f"{agent_key}_max_iterations", 0)
     return per_agent if per_agent > 0 else settings.agent_max_iterations
 
 
-def get_agent_model_config(agent_name: str) -> AgentModelConfig:
+def get_agent_model_config(
+    agent_name: str,
+    settings: "Settings | None" = None,
+) -> AgentModelConfig:
     """Build an :class:`AgentModelConfig` for *agent_name* from settings.
 
     Resolution order for each field:
@@ -112,14 +128,20 @@ def get_agent_model_config(agent_name: str) -> AgentModelConfig:
     ----------
     agent_name:
         Snake-case agent name, e.g. ``"rag_agent"``.
+    settings:
+        Optional :class:`~app.config.Settings` instance.  When ``None``
+        (default) :func:`~app.config.get_settings` is called so the value is
+        resolved from environment variables / ``.env``.  Pass an explicit
+        ``Settings(...)`` to bypass env vars entirely — useful in notebooks.
 
     Returns
     -------
     AgentModelConfig
     """
-    from app.config import get_settings  # noqa: PLC0415
+    from app.config import Settings, get_settings  # noqa: PLC0415
 
-    settings = get_settings()
+    if settings is None:
+        settings = get_settings()
 
     provider: str = (
         getattr(settings, f"{agent_name}_model_provider", None)

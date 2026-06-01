@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from typing import TYPE_CHECKING
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -15,6 +16,9 @@ from app.pangiagent.agents.base_agents.base_agent import BaseAgent
 from app.pangiagent.model_config import build_llm, get_agent_model_config
 from app.models import AgentInput, AgentOutput
 from libs.client.neo4j_client import run_readonly_query
+
+if TYPE_CHECKING:
+    from app.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +41,10 @@ def _extract_cypher(text: str) -> str:
 class Neo4jAgent(BaseAgent):
     name = "neo4j_agent"
 
-    def __init__(self, **kwargs) -> None:
-        super().__init__(name=self.name, **kwargs)
-        self._llm = build_llm(get_agent_model_config(self.name))
+    def __init__(self, settings: "Settings | None" = None, **kwargs) -> None:
+        super().__init__(name=self.name, settings=settings, **kwargs)
+        self._settings = settings
+        self._llm = build_llm(get_agent_model_config(self.name, settings=settings))
         self._system_prompt = self.get_prompt(_DEFAULT_PROMPT)
 
     def get_capabilities(self) -> str:
@@ -71,7 +76,7 @@ class Neo4jAgent(BaseAgent):
 
         # Step 2 — execute Cypher
         try:
-            records = await run_readonly_query(cypher)
+            records = await run_readonly_query(cypher, settings=self._settings)
             results = json.dumps(records, indent=2, ensure_ascii=False, default=str)
         except Exception as exc:
             logger.warning("Neo4jAgent: query execution failed — %s\nCypher: %s", exc, cypher)

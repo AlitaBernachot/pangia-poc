@@ -12,6 +12,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
+if TYPE_CHECKING:
+    from app.config import Settings
+
 import yaml
 from langgraph.graph import END, StateGraph
 
@@ -75,11 +78,12 @@ class BaseAgent(ABC):
         name: str,
         pre_guardrails: Optional[list[Callable[[AgentInput], Optional[str]]]] = None,
         post_guardrails: Optional[list[Callable[[AgentOutput], Optional[str]]]] = None,
+        settings: "Settings | None" = None,
     ) -> None:
         self.name = name
         self.pre_guardrails = pre_guardrails or []
         self.post_guardrails = post_guardrails or []
-        self.max_iterations: int = get_agent_max_iterations(name)
+        self.max_iterations: int = get_agent_max_iterations(name, settings=settings)
 
     # ── Choice / disambiguation helper ────────────────────────────────────────
 
