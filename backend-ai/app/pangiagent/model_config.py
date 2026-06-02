@@ -165,6 +165,7 @@ def get_agent_model_config(
 
     if provider_lower == "openai":
         api_key = settings.openai_api_key or None
+        base_url = getattr(settings, "ollama_base_url", None) or None # TODO: fix naming here, maybe "openai_base_url"?
     elif provider_lower == "anthropic":
         api_key = getattr(settings, "anthropic_api_key", None) or None
     elif provider_lower == "mistral":
