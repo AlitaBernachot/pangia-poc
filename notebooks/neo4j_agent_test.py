@@ -33,6 +33,7 @@ import asyncio
 import logging
 import sys
 from pathlib import Path
+from time import time
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -125,8 +126,14 @@ async def ask(agent: "Neo4jAgent", question: str, context: dict | None = None) -
     """Run *question* through *agent* and pretty-print the output."""
     from app.models import AgentInput  # noqa: PLC0415
 
+    start_time = time.time()
+
     inp = AgentInput(query=question, context=context or {})
     output = await agent.run(inp)
+
+    end_time = time.time()
+    elapsed = end_time - start_time
+    print(f"\n⏱️  Elapsed time: {elapsed:.2f} seconds")
 
     print("=" * 70)
     print(f"QUESTION  : {question}")
