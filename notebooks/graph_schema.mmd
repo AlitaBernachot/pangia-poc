@@ -1,0 +1,20 @@
+graph LR
+    M[CSW_Metadata]
+    O[CSW_Organisation]
+    K[CSW_Keyword]
+    T[CSW_TopicCategory]
+    F[CSW_Format]
+    C[CSW_CRS]
+    R[CSW_OnlineResource]
+    S[CSW_ServiceType]
+
+    M -- PRODUCED_BY / CONTACT --> O
+    M -- HAS_KEYWORD --> K
+    M -- COVERS_TOPIC --> T
+    M -- DISTRIBUTED_AS --> F
+    M -- USES_CRS --> C
+    M -- HAS_ONLINE_RESOURCE --> R
+    M -- PROVIDES --> S
+    K -- SEMANTICALLY_RELATED --> K
+    K -- SYNONYM_OF --> K
+    T -- SYNONYM_OF --> K
