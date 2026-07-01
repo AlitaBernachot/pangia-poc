@@ -4,6 +4,8 @@ SPDX-FileCopyrightText: 2026 AlitaBernachot
 SPDX-License-Identifier: MIT
 -->
 
+WARNING: This app is absolute vibe coding, the purpose was to fast test some concept, not to focus on development.
+
 ![PangIA Banner](docs/pangIA_logo.png)
 
 # PangIA — Multi-agent geospatial assistant 🌍
